@@ -3,12 +3,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Box, Heading, Text, HStack, VStack, Button, Badge, Spinner, Flex, Input,
 } from '@chakra-ui/react'
-import { Check, X, ExternalLink, ArrowRight } from 'lucide-react'
+import { Check, X, ExternalLink, ArrowRight, Sparkles } from 'lucide-react'
 import {
   listOffeneBedarfsmeldungen, meldungAblehnen, meldungInKatalog,
 } from '../../data/api/bedarf.js'
 import { listKategorien } from '../../data/api/kategorien.js'
 import { getBedarfSignedUrl } from '../../data/api/storage.js'
+import { analyzeBedarfBild } from '../../data/api/shopAi.js'
 import ArtikelDialog from '../components/ArtikelDialog.jsx'
 
 function fmt(dateStr) {
@@ -37,6 +38,9 @@ export default function AdminBedarfPage() {
   const [ablehnGrund, setAblehnGrund] = useState({})
   const [dialogOpen, setDialogOpen] = useState(false)
   const [uebernehmenMeldung, setUebernehmenMeldung] = useState(null)
+  const [prefillOverride, setPrefillOverride] = useState(null)
+  const [analyzing, setAnalyzing] = useState({}) // id → bool
+  const [analyseError, setAnalyseError] = useState({}) // id → text
 
   const { data: liste = [], isLoading } = useQuery({
     queryKey: ['shop-bedarf-offen'],
@@ -66,15 +70,56 @@ export default function AdminBedarfPage() {
   }
 
   function startUebernehmen(m) {
+    setPrefillOverride(null)
     setUebernehmenMeldung(m)
     setDialogOpen(true)
   }
 
-  const prefill = uebernehmenMeldung ? {
-    name: uebernehmenMeldung.beschreibung.slice(0, 60),
-    beschreibung: uebernehmenMeldung.beschreibung,
-    lieferant_url: uebernehmenMeldung.lieferant_url || '',
-  } : null
+  async function startKiUebernehmen(m) {
+    if (!m.bild_url) return
+    setAnalyzing((s) => ({ ...s, [m.id]: true }))
+    setAnalyseError((s) => ({ ...s, [m.id]: null }))
+    try {
+      const signedUrl = await getBedarfSignedUrl(m.bild_url)
+      if (!signedUrl) throw new Error('Bild nicht verfuegbar')
+      const result = await analyzeBedarfBild({
+        bildUrl: signedUrl,
+        beschreibung: m.beschreibung,
+        kategorien: kategorien.map((k) => k.name),
+      })
+      if (!result) throw new Error('Keine KI-Antwort')
+
+      // Kategorie matchen
+      let kategorieId = ''
+      if (result.kategorie) {
+        const cleaned = String(result.kategorie).replace(/^NEU:\s*/i, '').trim()
+        const existing = kategorien.find((k) => k.name.toLowerCase() === cleaned.toLowerCase())
+        if (existing) kategorieId = existing.id
+      }
+
+      setPrefillOverride({
+        name: result.name || m.beschreibung.slice(0, 60),
+        beschreibung: result.beschreibung || m.beschreibung,
+        kategorie_id: kategorieId,
+        lieferant_url: m.lieferant_url || '',
+        einheit: result.einheit || '',
+        tags: Array.isArray(result.tags) ? result.tags.join(', ') : '',
+      })
+      setUebernehmenMeldung(m)
+      setDialogOpen(true)
+    } catch (e) {
+      setAnalyseError((s) => ({ ...s, [m.id]: e.message || 'KI-Analyse fehlgeschlagen' }))
+    } finally {
+      setAnalyzing((s) => ({ ...s, [m.id]: false }))
+    }
+  }
+
+  const prefill = prefillOverride
+    || (uebernehmenMeldung ? {
+      name: uebernehmenMeldung.beschreibung.slice(0, 60),
+      beschreibung: uebernehmenMeldung.beschreibung,
+      lieferant_url: uebernehmenMeldung.lieferant_url || '',
+    } : null)
 
   if (isLoading) return <Flex justify="center" p={12}><Spinner size="xl" /></Flex>
 
@@ -109,9 +154,15 @@ export default function AdminBedarfPage() {
                       </a>
                     )}
                   </VStack>
-                  <VStack gap={2} align="stretch" minW="200px">
+                  <VStack gap={2} align="stretch" minW="220px">
                     {!isAbl ? (
                       <>
+                        {m.bild_url && (
+                          <Button colorPalette="purple" size="sm" variant="outline"
+                            onClick={() => startKiUebernehmen(m)} loading={!!analyzing[m.id]}>
+                            <Sparkles size={14} /> Mit KI analysieren
+                          </Button>
+                        )}
                         <Button colorPalette="green" size="sm" onClick={() => startUebernehmen(m)}>
                           <ArrowRight size={14} /> In Katalog übernehmen
                         </Button>
@@ -119,6 +170,7 @@ export default function AdminBedarfPage() {
                           onClick={() => setAblehnOpen((s) => ({ ...s, [m.id]: true }))}>
                           <X size={14} /> Ablehnen
                         </Button>
+                        {analyseError[m.id] && <Text fontSize="xs" color="red.500">{analyseError[m.id]}</Text>}
                       </>
                     ) : (
                       <VStack gap={2} align="stretch">
@@ -146,7 +198,7 @@ export default function AdminBedarfPage() {
 
       <ArtikelDialog
         open={dialogOpen}
-        onClose={() => { setDialogOpen(false); setUebernehmenMeldung(null) }}
+        onClose={() => { setDialogOpen(false); setUebernehmenMeldung(null); setPrefillOverride(null) }}
         artikel={null}
         prefill={prefill}
         kategorien={kategorien}

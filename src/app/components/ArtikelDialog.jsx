@@ -3,9 +3,11 @@ import {
   Dialog, Portal, Button, Field, Input, Textarea, VStack, HStack, Box, Text,
   Select, NativeSelect, IconButton, Flex, Spacer, createListCollection,
 } from '@chakra-ui/react'
-import { X, Upload, Link as LinkIcon, Image as ImgIcon, Plus, Trash2, Package, Layers } from 'lucide-react'
+import { X, Upload, Link as LinkIcon, Image as ImgIcon, Plus, Trash2, Package, Layers, Sparkles, ExternalLink } from 'lucide-react'
 import { createArtikel, updateArtikel, deleteArtikel, replaceVarianten, replaceGebinde } from '../../data/api/artikel.js'
+import { createKategorie } from '../../data/api/kategorien.js'
 import { uploadArtikelBild, deleteArtikelBild } from '../../data/api/storage.js'
+import { enrichArtikel } from '../../data/api/shopAi.js'
 import ArtikelBild from './ArtikelBild.jsx'
 
 export default function ArtikelDialog({ open, onClose, artikel, prefill, kategorien, onSaved }) {
@@ -25,6 +27,9 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
   const [gebinde, setGebinde] = useState([])     // [{ name, stueckzahl, ist_default }]
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiError, setAiError] = useState(null)
+  const [bildsucheQuery, setBildsucheQuery] = useState('') // Fuer Google-Bildsuche-Link nach KI-Enrich
 
   useEffect(() => {
     if (!open) return
@@ -59,8 +64,48 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       setAktiv(true); setTagsRaw(''); setBildExternUrl('')
       setVarianten([]); setGebinde([])
     }
-    setBildDatei(null); setError(null)
+    setBildDatei(null); setError(null); setAiError(null); setBildsucheQuery('')
   }, [open, artikel, prefill])
+
+  async function handleKiVorschlag() {
+    if (!name.trim()) { setAiError('Name eingeben, bevor die KI arbeitet.'); return }
+    setAiBusy(true); setAiError(null)
+    try {
+      const result = await enrichArtikel({
+        name: name.trim(),
+        beschreibung: beschreibung.trim(),
+        kategorien: kategorien.map((k) => k.name),
+      })
+      if (!result) throw new Error('Keine Antwort von der KI')
+
+      // Beschreibung + Tags + Einheit uebernehmen (falls leer, sonst nicht ueberschreiben)
+      if (result.beschreibung && !beschreibung.trim()) setBeschreibung(result.beschreibung)
+      if (Array.isArray(result.tags) && result.tags.length && !tagsRaw.trim()) {
+        setTagsRaw(result.tags.join(', '))
+      }
+      if (result.einheit && einheit === 'Stück') setEinheit(result.einheit)
+      if (result.bildsuche_query) setBildsucheQuery(result.bildsuche_query)
+
+      // Kategorie: matching per Name (case-insensitive). Wenn KI "NEU: X" liefert → anlegen.
+      if (result.kategorie && !kategorieId) {
+        const raw = String(result.kategorie).trim()
+        const cleaned = raw.replace(/^NEU:\s*/i, '').trim()
+        const existing = kategorien.find((k) => k.name.toLowerCase() === cleaned.toLowerCase())
+        if (existing) {
+          setKategorieId(existing.id)
+        } else if (cleaned) {
+          try {
+            const neu = await createKategorie({ name: cleaned })
+            setKategorieId(neu.id)
+          } catch { /* ignore */ }
+        }
+      }
+    } catch (e) {
+      setAiError(e.message || 'KI-Aufruf fehlgeschlagen')
+    } finally {
+      setAiBusy(false)
+    }
+  }
 
   async function save() {
     setSaving(true); setError(null)
@@ -155,12 +200,25 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
                   <VStack gap={2} align="stretch" flex="1">
                     <Field.Root required>
                       <Field.Label>Name</Field.Label>
-                      <Input value={name} onChange={(e) => setName(e.target.value)} />
+                      <HStack gap={2}>
+                        <Input value={name} onChange={(e) => setName(e.target.value)} flex="1" />
+                        <Button size="sm" variant="outline" colorPalette="purple" onClick={handleKiVorschlag} loading={aiBusy} disabled={!name.trim()}>
+                          <Sparkles size={14} /> KI-Vorschläge
+                        </Button>
+                      </HStack>
                     </Field.Root>
                     <Field.Root>
                       <Field.Label>Beschreibung</Field.Label>
                       <Textarea value={beschreibung} onChange={(e) => setBeschreibung(e.target.value)} rows={2} />
                     </Field.Root>
+                    {aiError && <Text color="red.500" fontSize="xs">{aiError}</Text>}
+                    {bildsucheQuery && (
+                      <a href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(bildsucheQuery)}`}
+                        target="_blank" rel="noreferrer"
+                        style={{ fontSize: 12, color: '#3182CE', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        Google-Bildsuche für „{bildsucheQuery}" öffnen <ExternalLink size={12} />
+                      </a>
+                    )}
                   </VStack>
                 </HStack>
 
