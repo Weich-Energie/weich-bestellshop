@@ -27,14 +27,14 @@ export default function BestellungenPage() {
   const qc = useQueryClient()
 
   const { data: liste = [], isLoading } = useQuery({
-    queryKey: ['shop-bestellungen', currentUser?.id],
-    queryFn: () => listEigeneBestellungen(currentUser.id),
-    enabled: !!currentUser?.id,
+    queryKey: ['shop-bestellungen', currentUser?.authId],
+    queryFn: () => listEigeneBestellungen(currentUser.authId),
+    enabled: !!currentUser?.authId,
   })
 
   const withdrawMutation = useMutation({
     mutationFn: zurueckziehen,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['shop-bestellungen', currentUser?.id] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shop-bestellungen', currentUser?.authId] }),
   })
 
   if (isLoading) return <Flex justify="center" p={12}><Spinner size="xl" /></Flex>

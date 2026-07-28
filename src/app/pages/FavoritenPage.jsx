@@ -1,12 +1,56 @@
 import React, { useMemo, useState } from 'react'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
-import { Box, Heading, Text, HStack, VStack, Button, Badge, Spinner, Flex, SimpleGrid, IconButton } from '@chakra-ui/react'
-import { Heart, ShoppingCart, ExternalLink } from 'lucide-react'
+import { Box, Heading, Text, HStack, VStack, Button, Badge, Spinner, Flex, SimpleGrid, IconButton, Input } from '@chakra-ui/react'
+import { Heart, ShoppingCart, ExternalLink, Plus, Minus } from 'lucide-react'
 import { listArtikel } from '../../data/api/artikel.js'
 import { listFavoritenIds, toggleFavorit } from '../../data/api/favoriten.js'
 import { addZuWarenkorb } from '../../data/api/warenkorb.js'
 import ArtikelBild from '../components/ArtikelBild.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
+
+function FavKarte({ artikel, onUnfav, onCart }) {
+  const [menge, setMenge] = useState(1)
+  const [busy, setBusy] = useState(false)
+  async function handleCart() {
+    setBusy(true)
+    try { await onCart(menge); setMenge(1) } finally { setBusy(false) }
+  }
+  return (
+    <Box borderWidth="1px" borderRadius="lg" bg="white" p={3} position="relative" display="flex" flexDirection="column" gap={2}>
+      <Box position="absolute" top={2} right={2}>
+        <IconButton size="sm" variant="ghost" colorPalette="red" onClick={onUnfav} aria-label="Entfernen">
+          <Heart size={16} fill="currentColor" />
+        </IconButton>
+      </Box>
+      <ArtikelBild artikel={artikel} size="100%" />
+      <VStack align="stretch" gap={1}>
+        <Text fontWeight="bold" fontSize="sm" lineClamp={2}>{artikel.name}</Text>
+        {artikel.tags?.length > 0 && (
+          <HStack gap={1} flexWrap="wrap">
+            {artikel.tags.slice(0, 3).map((t) => <Badge key={t.id} size="xs" variant="subtle" colorPalette="blue">{t.name}</Badge>)}
+          </HStack>
+        )}
+      </VStack>
+      <HStack gap={2} mt="auto">
+        <HStack gap={0} borderWidth="1px" borderRadius="md" bg="white">
+          <IconButton size="xs" variant="ghost" onClick={() => setMenge((m) => Math.max(1, m - 1))} aria-label="Weniger"><Minus size={12} /></IconButton>
+          <Input variant="flushed" size="sm" type="number" min={1} value={menge}
+            onChange={(e) => setMenge(Math.max(1, Number(e.target.value) || 1))}
+            textAlign="center" w="40px" border="none" px={0} />
+          <IconButton size="xs" variant="ghost" onClick={() => setMenge((m) => m + 1)} aria-label="Mehr"><Plus size={12} /></IconButton>
+        </HStack>
+        <Button size="sm" colorPalette="blue" flex="1" loading={busy} onClick={handleCart}>
+          <ShoppingCart size={14} /> In Warenkorb
+        </Button>
+        {artikel.lieferant_url && (
+          <IconButton size="sm" variant="outline" asChild aria-label="Lieferant">
+            <a href={artikel.lieferant_url} target="_blank" rel="noreferrer"><ExternalLink size={14} /></a>
+          </IconButton>
+        )}
+      </HStack>
+    </Box>
+  )
+}
 
 export default function FavoritenPage() {
   const { currentUser } = useAuth()
@@ -17,21 +61,21 @@ export default function FavoritenPage() {
     queryFn: () => listArtikel(),
   })
   const { data: favIds = [], isLoading: lf } = useQuery({
-    queryKey: ['shop-favoriten', currentUser?.id],
-    queryFn: () => listFavoritenIds(currentUser.id),
-    enabled: !!currentUser?.id,
+    queryKey: ['shop-favoriten', currentUser?.authId],
+    queryFn: () => listFavoritenIds(currentUser.authId),
+    enabled: !!currentUser?.authId,
   })
 
   const favSet = useMemo(() => new Set(favIds), [favIds])
   const favArtikel = useMemo(() => artikelListe.filter((a) => favSet.has(a.id)), [artikelListe, favSet])
 
   const favMutation = useMutation({
-    mutationFn: ({ artikelId, currently }) => toggleFavorit(currentUser.id, artikelId, currently),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['shop-favoriten', currentUser.id] }),
+    mutationFn: ({ artikelId, currently }) => toggleFavorit(currentUser.authId, artikelId, currently),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shop-favoriten', currentUser.authId] }),
   })
   const cartMutation = useMutation({
-    mutationFn: (artikelId) => addZuWarenkorb({ userId: currentUser.id, artikelId }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['shop-warenkorb', currentUser.id] }),
+    mutationFn: ({ artikelId, menge }) => addZuWarenkorb({ userId: currentUser.authId, artikelId, menge }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shop-warenkorb', currentUser.authId] }),
   })
 
   if (la || lf) return <Flex justify="center" p={12}><Spinner size="xl" /></Flex>
@@ -44,34 +88,12 @@ export default function FavoritenPage() {
       ) : (
         <SimpleGrid columns={{ base: 2, md: 3, lg: 4, xl: 5 }} gap={4}>
           {favArtikel.map((a) => (
-            <Box key={a.id} borderWidth="1px" borderRadius="lg" bg="white" p={3} position="relative" display="flex" flexDirection="column" gap={2}>
-              <Box position="absolute" top={2} right={2}>
-                <IconButton size="sm" variant="ghost" colorPalette="red"
-                  onClick={() => favMutation.mutate({ artikelId: a.id, currently: true })} aria-label="Entfernen">
-                  <Heart size={16} fill="currentColor" />
-                </IconButton>
-              </Box>
-              <ArtikelBild artikel={a} size="100%" />
-              <VStack align="stretch" gap={1}>
-                <Text fontWeight="bold" fontSize="sm" lineClamp={2}>{a.name}</Text>
-                {a.tags?.length > 0 && (
-                  <HStack gap={1} flexWrap="wrap">
-                    {a.tags.slice(0, 3).map((t) => <Badge key={t.id} size="xs" variant="subtle" colorPalette="blue">{t.name}</Badge>)}
-                  </HStack>
-                )}
-              </VStack>
-              <HStack gap={2} mt="auto">
-                <Button size="sm" colorPalette="blue" flex="1"
-                  onClick={() => cartMutation.mutate(a.id)}>
-                  <ShoppingCart size={14} /> In Warenkorb
-                </Button>
-                {a.lieferant_url && (
-                  <IconButton size="sm" variant="outline" asChild aria-label="Lieferant">
-                    <a href={a.lieferant_url} target="_blank" rel="noreferrer"><ExternalLink size={14} /></a>
-                  </IconButton>
-                )}
-              </HStack>
-            </Box>
+            <FavKarte
+              key={a.id}
+              artikel={a}
+              onUnfav={() => favMutation.mutate({ artikelId: a.id, currently: true })}
+              onCart={(menge) => cartMutation.mutateAsync({ artikelId: a.id, menge })}
+            />
           ))}
         </SimpleGrid>
       )}

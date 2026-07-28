@@ -20,12 +20,12 @@ export default function WarenkorbPage() {
   const [error, setError] = useState(null)
 
   const { data: positionen = [], isLoading } = useQuery({
-    queryKey: ['shop-warenkorb', currentUser?.id],
-    queryFn: () => listWarenkorb(currentUser.id),
-    enabled: !!currentUser?.id,
+    queryKey: ['shop-warenkorb', currentUser?.authId],
+    queryFn: () => listWarenkorb(currentUser.authId),
+    enabled: !!currentUser?.authId,
   })
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['shop-warenkorb', currentUser?.id] })
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['shop-warenkorb', currentUser?.authId] })
 
   const updateMutation = useMutation({ mutationFn: ({ id, patch }) => updateWarenkorbPosition(id, patch), onSuccess: invalidate })
   const removeMutation = useMutation({ mutationFn: (id) => removeWarenkorbPosition(id), onSuccess: invalidate })
@@ -33,9 +33,9 @@ export default function WarenkorbPage() {
   async function abschicken() {
     setSubmitting(true); setError(null)
     try {
-      const sent = await bestellungAbschicken(currentUser.id)
+      const sent = await bestellungAbschicken(currentUser.authId)
       invalidate()
-      qc.invalidateQueries({ queryKey: ['shop-bestellungen', currentUser.id] })
+      qc.invalidateQueries({ queryKey: ['shop-bestellungen', currentUser.authId] })
       if (sent.length) navigate('/bestellungen')
     } catch (e) {
       setError(e.message || 'Absenden fehlgeschlagen')

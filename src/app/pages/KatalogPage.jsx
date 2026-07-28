@@ -4,7 +4,7 @@ import {
   Box, Heading, Text, HStack, VStack, Button, Input, Badge, Spinner, Flex, Spacer,
   SimpleGrid, IconButton,
 } from '@chakra-ui/react'
-import { Search, Heart, ShoppingCart, ExternalLink } from 'lucide-react'
+import { Search, Heart, ShoppingCart, ExternalLink, Plus, Minus } from 'lucide-react'
 import { listArtikel } from '../../data/api/artikel.js'
 import { listKategorien } from '../../data/api/kategorien.js'
 import { listFavoritenIds, toggleFavorit } from '../../data/api/favoriten.js'
@@ -14,6 +14,16 @@ import { useAuth } from '../contexts/AuthContext.jsx'
 
 function ArtikelKarte({ artikel, kategorieName, favorisiert, onFav, onCart }) {
   const [busy, setBusy] = useState(false)
+  const [menge, setMenge] = useState(1)
+
+  async function handleCart() {
+    setBusy(true)
+    try {
+      await onCart(menge)
+      setMenge(1)
+    } finally { setBusy(false) }
+  }
+
   return (
     <Box borderWidth="1px" borderRadius="lg" bg="white" p={3} position="relative" display="flex" flexDirection="column" gap={2}>
       <Box position="absolute" top={2} right={2}>
@@ -34,9 +44,19 @@ function ArtikelKarte({ artikel, kategorieName, favorisiert, onFav, onCart }) {
         )}
       </VStack>
       <HStack gap={2} mt="auto">
-        <Button
-          size="sm" colorPalette="blue" flex="1" loading={busy}
-          onClick={async () => { setBusy(true); try { await onCart() } finally { setBusy(false) } }}>
+        <HStack gap={0} borderWidth="1px" borderRadius="md" bg="white">
+          <IconButton size="xs" variant="ghost" onClick={() => setMenge((m) => Math.max(1, m - 1))} aria-label="Weniger">
+            <Minus size={12} />
+          </IconButton>
+          <Input
+            variant="flushed" size="sm" type="number" min={1} value={menge}
+            onChange={(e) => setMenge(Math.max(1, Number(e.target.value) || 1))}
+            textAlign="center" w="40px" border="none" px={0} />
+          <IconButton size="xs" variant="ghost" onClick={() => setMenge((m) => m + 1)} aria-label="Mehr">
+            <Plus size={12} />
+          </IconButton>
+        </HStack>
+        <Button size="sm" colorPalette="blue" flex="1" loading={busy} onClick={handleCart}>
           <ShoppingCart size={14} /> In Warenkorb
         </Button>
         {artikel.lieferant_url && (
@@ -64,9 +84,9 @@ export default function KatalogPage() {
     queryFn: listKategorien,
   })
   const { data: favIds = [] } = useQuery({
-    queryKey: ['shop-favoriten', currentUser?.id],
-    queryFn: () => listFavoritenIds(currentUser.id),
-    enabled: !!currentUser?.id,
+    queryKey: ['shop-favoriten', currentUser?.authId],
+    queryFn: () => listFavoritenIds(currentUser.authId),
+    enabled: !!currentUser?.authId,
   })
 
   const favSet = useMemo(() => new Set(favIds), [favIds])
@@ -84,13 +104,13 @@ export default function KatalogPage() {
   }, [artikelListe, suche, kategorieFilter])
 
   const favMutation = useMutation({
-    mutationFn: ({ artikelId, currently }) => toggleFavorit(currentUser.id, artikelId, currently),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['shop-favoriten', currentUser.id] }),
+    mutationFn: ({ artikelId, currently }) => toggleFavorit(currentUser.authId, artikelId, currently),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shop-favoriten', currentUser.authId] }),
   })
 
   const cartMutation = useMutation({
-    mutationFn: (artikelId) => addZuWarenkorb({ userId: currentUser.id, artikelId }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['shop-warenkorb', currentUser.id] }),
+    mutationFn: ({ artikelId, menge }) => addZuWarenkorb({ userId: currentUser.authId, artikelId, menge }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shop-warenkorb', currentUser.authId] }),
   })
 
   return (
@@ -129,7 +149,7 @@ export default function KatalogPage() {
               kategorieName={kategorieMap.get(a.kategorie_id)?.name}
               favorisiert={favSet.has(a.id)}
               onFav={() => favMutation.mutate({ artikelId: a.id, currently: favSet.has(a.id) })}
-              onCart={() => cartMutation.mutateAsync(a.id)}
+              onCart={(menge) => cartMutation.mutateAsync({ artikelId: a.id, menge })}
             />
           ))}
         </SimpleGrid>

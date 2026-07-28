@@ -71,7 +71,7 @@ export function AuthProvider({ children }) {
         setLoading(false)
         return
       }
-      setCurrentUser(profile)
+      setCurrentUser({ ...profile, authId: existingSession.user.id })
       setLoading(false)
     })()
 
@@ -86,7 +86,7 @@ export function AuthProvider({ children }) {
           setAccessDeniedMessage(NO_ACCESS_MESSAGE)
           return
         }
-        setCurrentUser(profile)
+        setCurrentUser({ ...profile, authId: newSession.user.id })
         setAccessDeniedMessage(null)
       } else if (event === 'SIGNED_OUT') {
         setCurrentUser(null)
@@ -116,7 +116,7 @@ export function AuthProvider({ children }) {
         return data
       }
       if (profile) {
-        setCurrentUser(profile)
+        setCurrentUser({ ...profile, authId: data.user.id })
         queryClient.invalidateQueries()
       }
     }
