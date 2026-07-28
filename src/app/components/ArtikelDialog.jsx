@@ -3,8 +3,8 @@ import {
   Dialog, Portal, Button, Field, Input, Textarea, VStack, HStack, Box, Text,
   Select, NativeSelect, IconButton, Flex, Spacer, createListCollection,
 } from '@chakra-ui/react'
-import { X, Upload, Link as LinkIcon, Image as ImgIcon } from 'lucide-react'
-import { createArtikel, updateArtikel, deleteArtikel } from '../../data/api/artikel.js'
+import { X, Upload, Link as LinkIcon, Image as ImgIcon, Plus, Trash2, Package, Layers } from 'lucide-react'
+import { createArtikel, updateArtikel, deleteArtikel, replaceVarianten, replaceGebinde } from '../../data/api/artikel.js'
 import { uploadArtikelBild, deleteArtikelBild } from '../../data/api/storage.js'
 import ArtikelBild from './ArtikelBild.jsx'
 
@@ -21,6 +21,8 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
   const [tagsRaw, setTagsRaw] = useState('')
   const [bildExternUrl, setBildExternUrl] = useState('')
   const [bildDatei, setBildDatei] = useState(null)
+  const [varianten, setVarianten] = useState([]) // [{ name }]
+  const [gebinde, setGebinde] = useState([])     // [{ name, stueckzahl, ist_default }]
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
@@ -37,6 +39,8 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       setAktiv(artikel.aktiv !== false)
       setTagsRaw((artikel.tags || []).map((t) => t.name).join(', '))
       setBildExternUrl(artikel.bild_ist_extern ? (artikel.bild_url || '') : '')
+      setVarianten((artikel.varianten || []).map((v) => ({ name: v.name })))
+      setGebinde((artikel.gebinde || []).map((g) => ({ name: g.name, stueckzahl: g.stueckzahl, ist_default: !!g.ist_default })))
     } else if (prefill) {
       setName(prefill.name || '')
       setBeschreibung(prefill.beschreibung || '')
@@ -48,10 +52,12 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       setAktiv(true)
       setTagsRaw(prefill.tags || '')
       setBildExternUrl(prefill.bild_extern_url || '')
+      setVarianten([]); setGebinde([])
     } else {
       setName(''); setBeschreibung(''); setKategorieId('')
       setLieferant(''); setLieferantUrl(''); setPreis(''); setEinheit('Stück')
       setAktiv(true); setTagsRaw(''); setBildExternUrl('')
+      setVarianten([]); setGebinde([])
     }
     setBildDatei(null); setError(null)
   }, [open, artikel, prefill])
@@ -92,7 +98,10 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
         saved = await updateArtikel(saved.id, { bild_url: path, bild_ist_extern: false })
       }
 
-      // Callback bekommt den final gespeicherten Artikel — Admin-Bedarf-Flow braucht die ID
+      // Varianten + Gebinde ersetzen (full replace, ist einfacher als Diff)
+      await replaceVarianten(saved.id, varianten)
+      await replaceGebinde(saved.id, gebinde)
+
       onSaved?.(saved)
       onClose()
     } catch (e) {
@@ -205,6 +214,61 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
                       <Field.Label><HStack gap={1}><LinkIcon size={12} /> Externe URL</HStack></Field.Label>
                       <Input value={bildExternUrl} onChange={(e) => setBildExternUrl(e.target.value)} placeholder="https://.../bild.jpg" />
                     </Field.Root>
+                  </VStack>
+                </Box>
+
+                <Box borderWidth="1px" borderRadius="md" p={3} bg="bg.subtle">
+                  <HStack mb={2} justify="space-between">
+                    <Text fontWeight="bold" fontSize="sm"><HStack gap={1} display="inline-flex"><Layers size={14} /> Varianten (z.B. Groesse 8, 10, 12)</HStack></Text>
+                    <Button size="xs" variant="ghost" onClick={() => setVarianten((v) => [...v, { name: '' }])}>
+                      <Plus size={12} /> Variante
+                    </Button>
+                  </HStack>
+                  <VStack gap={1} align="stretch">
+                    {varianten.length === 0 && <Text fontSize="xs" color="fg.muted">Keine Varianten. Ohne Varianten erscheint der Artikel normal im Katalog.</Text>}
+                    {varianten.map((v, i) => (
+                      <HStack key={i} gap={2}>
+                        <Input size="sm" placeholder="z.B. Groesse 8" value={v.name}
+                          onChange={(e) => setVarianten((prev) => prev.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))} />
+                        <IconButton size="xs" variant="ghost" colorPalette="red"
+                          onClick={() => setVarianten((prev) => prev.filter((_, idx) => idx !== i))}>
+                          <Trash2 size={12} />
+                        </IconButton>
+                      </HStack>
+                    ))}
+                  </VStack>
+                </Box>
+
+                <Box borderWidth="1px" borderRadius="md" p={3} bg="bg.subtle">
+                  <HStack mb={2} justify="space-between">
+                    <Text fontWeight="bold" fontSize="sm"><HStack gap={1} display="inline-flex"><Package size={14} /> Gebinde/Packgroessen (z.B. Pack à 10 Stk)</HStack></Text>
+                    <Button size="xs" variant="ghost" onClick={() => setGebinde((g) => [...g, { name: '', stueckzahl: 1, ist_default: g.length === 0 }])}>
+                      <Plus size={12} /> Gebinde
+                    </Button>
+                  </HStack>
+                  <VStack gap={1} align="stretch">
+                    {gebinde.length === 0 && <Text fontSize="xs" color="fg.muted">Keine Gebinde. User bestellt in Basis-Einheit.</Text>}
+                    {gebinde.map((g, i) => (
+                      <HStack key={i} gap={2}>
+                        <Input size="sm" placeholder="Name (z.B. Pack)" value={g.name}
+                          onChange={(e) => setGebinde((prev) => prev.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))} />
+                        <HStack gap={1}>
+                          <Text fontSize="xs" color="fg.muted">à</Text>
+                          <Input size="sm" type="number" min={1} w="70px" value={g.stueckzahl}
+                            onChange={(e) => setGebinde((prev) => prev.map((x, idx) => idx === i ? { ...x, stueckzahl: Math.max(1, Number(e.target.value) || 1) } : x))} />
+                          <Text fontSize="xs" color="fg.muted">Stk</Text>
+                        </HStack>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                          <input type="radio" name="gebinde-default" checked={!!g.ist_default}
+                            onChange={() => setGebinde((prev) => prev.map((x, idx) => ({ ...x, ist_default: idx === i })))} />
+                          Standard
+                        </label>
+                        <IconButton size="xs" variant="ghost" colorPalette="red"
+                          onClick={() => setGebinde((prev) => prev.filter((_, idx) => idx !== i))}>
+                          <Trash2 size={12} />
+                        </IconButton>
+                      </HStack>
+                    ))}
                   </VStack>
                 </Box>
 

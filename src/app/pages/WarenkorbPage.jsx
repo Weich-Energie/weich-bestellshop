@@ -10,6 +10,7 @@ import {
   listWarenkorb, updateWarenkorbPosition, removeWarenkorbPosition, bestellungAbschicken,
 } from '../../data/api/warenkorb.js'
 import ArtikelBild from '../components/ArtikelBild.jsx'
+import PositionText from '../components/PositionText.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 
 export default function WarenkorbPage() {
@@ -64,10 +65,11 @@ export default function WarenkorbPage() {
                 <HStack gap={3} align="flex-start">
                   <ArtikelBild artikel={p.shop_artikel} size="80px" />
                   <VStack align="stretch" gap={1} flex="1">
-                    <Text fontWeight="bold" fontSize="sm">{p.shop_artikel?.name}</Text>
-                    {p.shop_artikel?.einheit && (
-                      <Text fontSize="xs" color="fg.muted">Einheit: {p.shop_artikel.einheit}</Text>
-                    )}
+                    <PositionText
+                      artikel={p.shop_artikel}
+                      variante={p.variante}
+                      gebinde={p.gebinde}
+                      menge={p.menge} />
                     <Textarea size="sm" placeholder="Notiz (optional)..." rows={1}
                       defaultValue={p.notiz || ''}
                       onBlur={(e) => e.target.value !== (p.notiz || '') && updateMutation.mutate({ id: p.id, patch: { notiz: e.target.value || null } })} />

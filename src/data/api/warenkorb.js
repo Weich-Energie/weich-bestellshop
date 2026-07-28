@@ -2,13 +2,17 @@ import { supabase } from '../../supabaseClient.js'
 
 // Warenkorb = order_requests im Status 'draft' fuer den aktuellen User.
 
+const WARENKORB_SELECT = `
+  id, artikel_id, variante_id, gebinde_id, menge, notiz, projekt_ref, status, created_at,
+  shop_artikel ( id, name, bild_url, bild_ist_extern, einheit, kategorie_id ),
+  variante:shop_artikel_varianten ( id, name ),
+  gebinde:shop_artikel_gebinde ( id, name, stueckzahl )
+`
+
 export async function listWarenkorb(userId) {
   const { data, error } = await supabase
     .from('shop_order_requests')
-    .select(`
-      id, artikel_id, menge, notiz, projekt_ref, status, created_at,
-      shop_artikel ( id, name, bild_url, bild_ist_extern, einheit, kategorie_id )
-    `)
+    .select(WARENKORB_SELECT)
     .eq('user_id', userId)
     .eq('status', 'draft')
     .order('created_at', { ascending: true })
@@ -16,15 +20,21 @@ export async function listWarenkorb(userId) {
   return data || []
 }
 
-// Legt den Artikel in den Warenkorb (oder erhoeht die Menge, falls schon drin).
-export async function addZuWarenkorb({ userId, artikelId, menge = 1, notiz = null, projektRef = null }) {
-  const { data: existing } = await supabase
+// Legt den Artikel in den Warenkorb. Merged mit existierender Position, wenn Artikel,
+// Variante und Gebinde alle uebereinstimmen — sonst neue Position.
+export async function addZuWarenkorb({
+  userId, artikelId, menge = 1, notiz = null, projektRef = null,
+  varianteId = null, gebindeId = null,
+}) {
+  let q = supabase
     .from('shop_order_requests')
     .select('id, menge')
     .eq('user_id', userId)
     .eq('artikel_id', artikelId)
     .eq('status', 'draft')
-    .maybeSingle()
+  q = varianteId ? q.eq('variante_id', varianteId) : q.is('variante_id', null)
+  q = gebindeId ? q.eq('gebinde_id', gebindeId) : q.is('gebinde_id', null)
+  const { data: existing } = await q.maybeSingle()
 
   if (existing) {
     const { data, error } = await supabase
@@ -42,6 +52,8 @@ export async function addZuWarenkorb({ userId, artikelId, menge = 1, notiz = nul
     .insert({
       user_id: userId,
       artikel_id: artikelId,
+      variante_id: varianteId,
+      gebinde_id: gebindeId,
       menge,
       notiz,
       projekt_ref: projektRef,

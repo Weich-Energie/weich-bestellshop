@@ -15,11 +15,19 @@ import { useAuth } from '../contexts/AuthContext.jsx'
 function ArtikelKarte({ artikel, kategorieName, favorisiert, onFav, onCart }) {
   const [busy, setBusy] = useState(false)
   const [menge, setMenge] = useState(1)
+  const varianten = artikel.varianten || []
+  const gebinde = artikel.gebinde || []
+  const [varianteId, setVarianteId] = useState(() => varianten[0]?.id || '')
+  const [gebindeId, setGebindeId] = useState(() => (gebinde.find((g) => g.ist_default) || gebinde[0])?.id || '')
+
+  const gebindeObj = gebinde.find((g) => g.id === gebindeId) || null
+  const gesamtStk = gebindeObj ? menge * gebindeObj.stueckzahl : menge
 
   async function handleCart() {
+    if (varianten.length > 0 && !varianteId) return
     setBusy(true)
     try {
-      await onCart(menge)
+      await onCart({ menge, varianteId: varianteId || null, gebindeId: gebindeId || null })
       setMenge(1)
     } finally { setBusy(false) }
   }
@@ -43,6 +51,18 @@ function ArtikelKarte({ artikel, kategorieName, favorisiert, onFav, onCart }) {
           </HStack>
         )}
       </VStack>
+      {varianten.length > 0 && (
+        <select value={varianteId} onChange={(e) => setVarianteId(e.target.value)}
+          style={{ padding: '4px 6px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12 }}>
+          {varianten.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+        </select>
+      )}
+      {gebinde.length > 0 && (
+        <select value={gebindeId} onChange={(e) => setGebindeId(e.target.value)}
+          style={{ padding: '4px 6px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12 }}>
+          {gebinde.map((g) => <option key={g.id} value={g.id}>{g.name} (à {g.stueckzahl} Stk)</option>)}
+        </select>
+      )}
       <HStack gap={2} mt="auto">
         <HStack gap={0} borderWidth="1px" borderRadius="md" bg="white">
           <IconButton size="xs" variant="ghost" onClick={() => setMenge((m) => Math.max(1, m - 1))} aria-label="Weniger">
@@ -65,6 +85,9 @@ function ArtikelKarte({ artikel, kategorieName, favorisiert, onFav, onCart }) {
           </IconButton>
         )}
       </HStack>
+      {gebindeObj && menge > 0 && (
+        <Text fontSize="xs" color="fg.muted" textAlign="right">= {gesamtStk} Stk</Text>
+      )}
     </Box>
   )
 }
@@ -109,7 +132,8 @@ export default function KatalogPage() {
   })
 
   const cartMutation = useMutation({
-    mutationFn: ({ artikelId, menge }) => addZuWarenkorb({ userId: currentUser.authId, artikelId, menge }),
+    mutationFn: ({ artikelId, menge, varianteId, gebindeId }) =>
+      addZuWarenkorb({ userId: currentUser.authId, artikelId, menge, varianteId, gebindeId }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['shop-warenkorb', currentUser.authId] }),
   })
 
@@ -149,7 +173,7 @@ export default function KatalogPage() {
               kategorieName={kategorieMap.get(a.kategorie_id)?.name}
               favorisiert={favSet.has(a.id)}
               onFav={() => favMutation.mutate({ artikelId: a.id, currently: favSet.has(a.id) })}
-              onCart={(menge) => cartMutation.mutateAsync({ artikelId: a.id, menge })}
+              onCart={({ menge, varianteId, gebindeId }) => cartMutation.mutateAsync({ artikelId: a.id, menge, varianteId, gebindeId })}
             />
           ))}
         </SimpleGrid>

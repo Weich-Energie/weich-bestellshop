@@ -5,6 +5,7 @@ import {
 } from '@chakra-ui/react'
 import { Check, X, ExternalLink } from 'lucide-react'
 import { listOffeneFreigaben, freigeben, ablehnen } from '../../data/api/bestellungen.js'
+import PositionText from '../components/PositionText.jsx'
 
 function fmt(dateStr) {
   if (!dateStr) return ''
@@ -49,9 +50,8 @@ export default function AdminFreigabePage() {
               <Box key={b.id} borderWidth="1px" borderRadius="lg" p={4} bg="white">
                 <HStack align="flex-start" gap={4}>
                   <VStack align="stretch" flex="1" gap={1}>
-                    <HStack gap={2} flexWrap="wrap">
-                      <Text fontWeight="bold">{b.shop_artikel?.name}</Text>
-                      <Badge>Menge: {b.menge}{b.shop_artikel?.einheit ? ` ${b.shop_artikel.einheit}` : ''}</Badge>
+                    <HStack gap={2} flexWrap="wrap" align="center">
+                      <PositionText artikel={b.shop_artikel} variante={b.variante} gebinde={b.gebinde} menge={b.menge} size="md" />
                       {b.shop_artikel?.preis_netto != null && (
                         <Badge variant="outline">≈ {(Number(b.shop_artikel.preis_netto) * b.menge).toFixed(2)} €</Badge>
                       )}

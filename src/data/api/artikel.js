@@ -1,16 +1,17 @@
 import { supabase } from '../../supabaseClient.js'
 import { ensureTags } from './kategorien.js'
 
-// Liest Artikel-Liste mit Kategorie und Tags. Sichtbar fuer alle Shop-User.
+const ARTIKEL_SELECT = `
+  id, name, beschreibung, kategorie_id, bild_url, bild_ist_extern,
+  lieferant, lieferant_url, preis_netto, einheit, aktiv,
+  shop_artikel_tags ( tag_id, shop_tags ( id, name ) ),
+  shop_artikel_varianten ( id, name, sort_order ),
+  shop_artikel_gebinde ( id, name, stueckzahl, ist_default, sort_order )
+`
+
+// Liest Artikel-Liste mit Kategorie, Tags, Varianten und Gebinden.
 export async function listArtikel({ includeInaktiv = false } = {}) {
-  let q = supabase
-    .from('shop_artikel')
-    .select(`
-      id, name, beschreibung, kategorie_id, bild_url, bild_ist_extern,
-      lieferant, lieferant_url, preis_netto, einheit, aktiv,
-      shop_artikel_tags ( tag_id, shop_tags ( id, name ) )
-    `)
-    .order('name', { ascending: true })
+  let q = supabase.from('shop_artikel').select(ARTIKEL_SELECT).order('name', { ascending: true })
   if (!includeInaktiv) q = q.eq('aktiv', true)
   const { data, error } = await q
   if (error) throw error
@@ -18,24 +19,22 @@ export async function listArtikel({ includeInaktiv = false } = {}) {
 }
 
 export async function getArtikel(id) {
-  const { data, error } = await supabase
-    .from('shop_artikel')
-    .select(`
-      id, name, beschreibung, kategorie_id, bild_url, bild_ist_extern,
-      lieferant, lieferant_url, preis_netto, einheit, aktiv,
-      shop_artikel_tags ( tag_id, shop_tags ( id, name ) )
-    `)
-    .eq('id', id)
-    .single()
+  const { data, error } = await supabase.from('shop_artikel').select(ARTIKEL_SELECT).eq('id', id).single()
   if (error) throw error
   return normalizeArtikel(data)
 }
 
 function normalizeArtikel(row) {
-  const tags = (row.shop_artikel_tags || [])
-    .map((rel) => rel.shop_tags)
-    .filter(Boolean)
-  return { ...row, tags, shop_artikel_tags: undefined }
+  const tags = (row.shop_artikel_tags || []).map((rel) => rel.shop_tags).filter(Boolean)
+  const varianten = (row.shop_artikel_varianten || []).slice().sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))
+  const gebinde = (row.shop_artikel_gebinde || []).slice().sort((a, b) => a.sort_order - b.sort_order || a.stueckzahl - b.stueckzahl)
+  return {
+    ...row,
+    tags, varianten, gebinde,
+    shop_artikel_tags: undefined,
+    shop_artikel_varianten: undefined,
+    shop_artikel_gebinde: undefined,
+  }
 }
 
 export async function createArtikel(fields, tagNamen = []) {
@@ -81,4 +80,44 @@ export async function updateArtikel(id, fields, tagNamen) {
 export async function deleteArtikel(id) {
   const { error } = await supabase.from('shop_artikel').delete().eq('id', id)
   if (error) throw error
+}
+
+// ─── Varianten ──────────────────────────────────────────────────────────
+export async function replaceVarianten(artikelId, varianten) {
+  // varianten: [{ id?, name, sort_order? }]
+  await supabase.from('shop_artikel_varianten').delete().eq('artikel_id', artikelId)
+  const clean = varianten.filter((v) => v.name?.trim())
+  if (clean.length) {
+    const rows = clean.map((v, i) => ({
+      artikel_id: artikelId,
+      name: v.name.trim(),
+      sort_order: v.sort_order ?? i,
+    }))
+    const { error } = await supabase.from('shop_artikel_varianten').insert(rows)
+    if (error) throw error
+  }
+}
+
+// ─── Gebinde ────────────────────────────────────────────────────────────
+export async function replaceGebinde(artikelId, gebinde) {
+  // gebinde: [{ id?, name, stueckzahl, ist_default?, sort_order? }]
+  await supabase.from('shop_artikel_gebinde').delete().eq('artikel_id', artikelId)
+  const clean = gebinde.filter((g) => g.name?.trim() && Number(g.stueckzahl) >= 1)
+  if (clean.length) {
+    // Nur ein Default erlaubt — nimm den ersten mit ist_default, sonst gar keiner
+    let defaultTaken = false
+    const rows = clean.map((g, i) => {
+      const isDef = !!g.ist_default && !defaultTaken
+      if (isDef) defaultTaken = true
+      return {
+        artikel_id: artikelId,
+        name: g.name.trim(),
+        stueckzahl: Math.max(1, Number(g.stueckzahl) || 1),
+        ist_default: isDef,
+        sort_order: g.sort_order ?? i,
+      }
+    })
+    const { error } = await supabase.from('shop_artikel_gebinde').insert(rows)
+    if (error) throw error
+  }
 }

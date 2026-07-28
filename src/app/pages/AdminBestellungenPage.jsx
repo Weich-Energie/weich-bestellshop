@@ -8,6 +8,7 @@ import {
   listApprovedForSammel, createSammelbestellung,
   listAktiveSammelbestellungen, markiereBestellungReceived,
 } from '../../data/api/orders.js'
+import PositionText from '../components/PositionText.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 
 const NO_LIEFERANT = '— ohne Lieferant —'
@@ -81,12 +82,9 @@ function LieferantGruppe({ lieferant, requests, onAnlegen }) {
             bg={selected.has(r.id) ? 'blue.50' : undefined}
             _hover={{ bg: 'gray.50', cursor: 'pointer' }}
             onClick={() => toggle(r.id)}>
-            <HStack gap={2}>
+            <HStack gap={2} align="center">
               <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)} onClick={(e) => e.stopPropagation()} />
-              <Text fontSize="sm">
-                <strong>{r.menge}×</strong> {r.shop_artikel?.name}
-                {r.shop_artikel?.einheit ? ` (${r.shop_artikel.einheit})` : ''}
-              </Text>
+              <PositionText artikel={r.shop_artikel} variante={r.variante} gebinde={r.gebinde} menge={r.menge} />
               {r.projekt_ref && <Badge size="xs" variant="outline">Projekt: {r.projekt_ref}</Badge>}
             </HStack>
             <Text fontSize="xs" color="fg.muted">
@@ -141,8 +139,8 @@ function OrderKarte({ order, onReceived }) {
         {positionen.map((p) => {
           const req = p.shop_order_requests
           return (
-            <HStack key={p.id} justify="space-between" fontSize="sm">
-              <Text><strong>{p.menge}×</strong> {req?.shop_artikel?.name}{req?.shop_artikel?.einheit ? ` (${req.shop_artikel.einheit})` : ''}</Text>
+            <HStack key={p.id} justify="space-between" fontSize="sm" align="center">
+              <PositionText artikel={req?.shop_artikel} variante={req?.variante} gebinde={req?.gebinde} menge={p.menge} />
               <Text color="fg.muted">{euro(p.einzelpreis_netto)}</Text>
             </HStack>
           )

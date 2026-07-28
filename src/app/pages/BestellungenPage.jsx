@@ -5,6 +5,7 @@ import { XCircle, Check } from 'lucide-react'
 import { listEigeneBestellungen, zurueckziehen } from '../../data/api/bestellungen.js'
 import { markiereAbgeholt } from '../../data/api/orders.js'
 import ArtikelBild from '../components/ArtikelBild.jsx'
+import PositionText from '../components/PositionText.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 
 const STATUS_META = {
@@ -59,14 +60,11 @@ export default function BestellungenPage() {
                 <HStack gap={3} align="flex-start">
                   <ArtikelBild artikel={b.shop_artikel} size="72px" />
                   <VStack align="stretch" gap={1} flex="1">
-                    <HStack gap={2} flexWrap="wrap">
-                      <Text fontWeight="bold" fontSize="sm">{b.shop_artikel?.name}</Text>
+                    <HStack gap={2} align="center" flexWrap="wrap">
+                      <PositionText artikel={b.shop_artikel} variante={b.variante} gebinde={b.gebinde} menge={b.menge} />
                       <Badge colorPalette={meta.color} size="sm">{meta.label}</Badge>
                     </HStack>
-                    <HStack gap={4} fontSize="xs" color="fg.muted">
-                      <Text>Menge: {b.menge}{b.shop_artikel?.einheit ? ` ${b.shop_artikel.einheit}` : ''}</Text>
-                      <Text>Angefragt: {fmt(b.created_at)}</Text>
-                    </HStack>
+                    <Text fontSize="xs" color="fg.muted">Angefragt: {fmt(b.created_at)}</Text>
                     {b.notiz && <Text fontSize="sm" color="fg.muted">Notiz: {b.notiz}</Text>}
                     {b.reject_grund && <Text fontSize="sm" color="red.600">Abgelehnt: {b.reject_grund}</Text>}
                   </VStack>

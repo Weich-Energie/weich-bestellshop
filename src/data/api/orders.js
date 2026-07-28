@@ -7,13 +7,13 @@ export async function listApprovedForSammel() {
     .from('shop_order_requests')
     .select(`
       id, user_id, menge, notiz, projekt_ref, created_at,
-      shop_artikel ( id, name, lieferant, lieferant_url, preis_netto, einheit )
+      shop_artikel ( id, name, lieferant, lieferant_url, preis_netto, einheit ),
+      variante:shop_artikel_varianten ( id, name ),
+      gebinde:shop_artikel_gebinde ( id, name, stueckzahl )
     `)
     .eq('status', 'approved')
     .order('created_at', { ascending: true })
   if (error) throw error
-  // Filter: nicht in Position — approved-only impliziert das schon,
-  // weil bei Uebergang zu ordered wir auch requests.status auf ordered setzen.
   return data || []
 }
 
@@ -80,7 +80,9 @@ export async function listAktiveSammelbestellungen() {
         id, menge, einzelpreis_netto,
         shop_order_requests (
           id, user_id, notiz, projekt_ref,
-          shop_artikel ( id, name, einheit )
+          shop_artikel ( id, name, einheit ),
+          variante:shop_artikel_varianten ( id, name ),
+          gebinde:shop_artikel_gebinde ( id, name, stueckzahl )
         )
       )
     `)

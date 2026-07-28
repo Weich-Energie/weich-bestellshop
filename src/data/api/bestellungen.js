@@ -6,7 +6,9 @@ export async function listEigeneBestellungen(userId) {
     .from('shop_order_requests')
     .select(`
       id, menge, notiz, projekt_ref, status, reject_grund, created_at, updated_at,
-      shop_artikel ( id, name, bild_url, bild_ist_extern, einheit )
+      shop_artikel ( id, name, bild_url, bild_ist_extern, einheit ),
+      variante:shop_artikel_varianten ( id, name ),
+      gebinde:shop_artikel_gebinde ( id, name, stueckzahl )
     `)
     .eq('user_id', userId)
     .neq('status', 'draft')
@@ -21,7 +23,9 @@ export async function listOffeneFreigaben() {
     .from('shop_order_requests')
     .select(`
       id, user_id, menge, notiz, projekt_ref, status, created_at,
-      shop_artikel ( id, name, lieferant, lieferant_url, preis_netto, einheit )
+      shop_artikel ( id, name, lieferant, lieferant_url, preis_netto, einheit ),
+      variante:shop_artikel_varianten ( id, name ),
+      gebinde:shop_artikel_gebinde ( id, name, stueckzahl )
     `)
     .eq('status', 'pending')
     .order('created_at', { ascending: true })
