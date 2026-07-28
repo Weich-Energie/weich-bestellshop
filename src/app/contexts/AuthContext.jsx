@@ -1,0 +1,163 @@
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { supabase } from '../../supabaseClient.js'
+
+const AuthContext = createContext(null)
+
+// Fail-closed App-Access-Check gegen employees.berechtigungen.app_access.bestellshop.
+// Pattern uebernommen aus Ressourcenplanung (Phase 11 / AAC-04).
+const APP_KEY = 'bestellshop'
+const NO_ACCESS_MESSAGE = 'Du hast keinen Zugang zum Bestellshop. Wende dich an Patrick.'
+
+export function AuthProvider({ children }) {
+  const queryClient = useQueryClient()
+  const [currentUser, setCurrentUser] = useState(null)
+  const [session, setSession] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [accessDeniedMessage, setAccessDeniedMessage] = useState(null)
+
+  // Mitarbeiter-Profil per Email-Lookup laden (explizite Spaltenliste — CLAUDE.md Regel).
+  const loadUserProfile = useCallback(async (authUser) => {
+    const { data, error: fetchError } = await supabase
+      .from('employees')
+      .select('id, name, position, berechtigungen, email')
+      .eq('email', authUser.email)
+      .single()
+    if (fetchError) {
+      console.error('Profil laden fehlgeschlagen:', fetchError)
+      return null
+    }
+    return data
+  }, [])
+
+  // Fail-closed App-Access-Check.
+  const hasShopAccess = useCallback((profile) => {
+    if (!profile) return false
+    const access = profile.berechtigungen?.app_access
+    if (!access || typeof access !== 'object') return false
+    return access[APP_KEY] === true
+  }, [])
+
+  const isAdmin = useMemo(() => {
+    if (!currentUser) return false
+    const access = currentUser.berechtigungen?.app_access
+    // Rollen im app_access: entweder true (user) oder Objekt {enabled: true, role: 'admin'}.
+    // v1.0 vereinfacht: separates admin-Flag in berechtigungen.rolle == 'admin' ODER
+    // in berechtigungen.app_access.bestellshop_admin === true.
+    if (access?.bestellshop_admin === true) return true
+    return currentUser.berechtigungen?.rolle === 'admin'
+  }, [currentUser])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data: { session: existingSession } } = await supabase.auth.getSession()
+      if (cancelled) return
+      setSession(existingSession)
+      if (!existingSession?.user) {
+        setLoading(false)
+        return
+      }
+      const profile = await loadUserProfile(existingSession.user)
+      if (cancelled) return
+      if (!profile) {
+        setLoading(false)
+        return
+      }
+      if (!hasShopAccess(profile)) {
+        await supabase.auth.signOut()
+        setAccessDeniedMessage(NO_ACCESS_MESSAGE)
+        setLoading(false)
+        return
+      }
+      setCurrentUser(profile)
+      setLoading(false)
+    })()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      setSession(newSession)
+      if (newSession?.user) {
+        queryClient.invalidateQueries()
+        const profile = await loadUserProfile(newSession.user)
+        if (!profile) return
+        if (!hasShopAccess(profile)) {
+          await supabase.auth.signOut()
+          setAccessDeniedMessage(NO_ACCESS_MESSAGE)
+          return
+        }
+        setCurrentUser(profile)
+        setAccessDeniedMessage(null)
+      } else if (event === 'SIGNED_OUT') {
+        setCurrentUser(null)
+        queryClient.clear()
+      }
+    })
+
+    return () => {
+      cancelled = true
+      subscription.unsubscribe()
+    }
+  }, [loadUserProfile, hasShopAccess, queryClient])
+
+  const loginWithEmail = useCallback(async (email, password) => {
+    setError(null)
+    setAccessDeniedMessage(null)
+    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
+    if (authError) {
+      setError(authError.message)
+      throw authError
+    }
+    if (data.user) {
+      const profile = await loadUserProfile(data.user)
+      if (profile && !hasShopAccess(profile)) {
+        await supabase.auth.signOut()
+        setAccessDeniedMessage(NO_ACCESS_MESSAGE)
+        return data
+      }
+      if (profile) {
+        setCurrentUser(profile)
+        queryClient.invalidateQueries()
+      }
+    }
+    return data
+  }, [loadUserProfile, hasShopAccess, queryClient])
+
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut()
+    setSession(null)
+    setCurrentUser(null)
+    setError(null)
+  }, [])
+
+  const resetPassword = useCallback(async (email) => {
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/update-password`,
+    })
+    if (resetError) throw resetError
+  }, [])
+
+  const value = useMemo(
+    () => ({
+      currentUser,
+      session,
+      loading,
+      error,
+      accessDeniedMessage,
+      isAdmin,
+      isAuthenticated: !!currentUser,
+      loginWithEmail,
+      logout,
+      resetPassword,
+    }),
+    [currentUser, session, loading, error, accessDeniedMessage, isAdmin, loginWithEmail, logout, resetPassword],
+  )
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth muss innerhalb von AuthProvider verwendet werden.')
+  return ctx
+}
