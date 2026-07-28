@@ -3,7 +3,7 @@ import { ensureTags } from './kategorien.js'
 
 const ARTIKEL_SELECT = `
   id, name, beschreibung, kategorie_id, bild_url, bild_ist_extern,
-  lieferant, lieferant_url, preis_netto, einheit, aktiv,
+  lieferant, lieferant_url, artikelnr, preis_netto, einheit, aktiv,
   shop_artikel_tags ( tag_id, shop_tags ( id, name ) ),
   shop_artikel_varianten ( id, name, sort_order ),
   shop_artikel_gebinde ( id, name, stueckzahl, ist_default, sort_order )

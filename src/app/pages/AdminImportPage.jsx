@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import {
   uploadBeleg, processBeleg, listBelege, listPositionen, deleteBeleg,
-  markPositionUebernommen, markPositionIgnoriert, markPositionSpaeter,
+  markPositionUebernommen, markPositionIgnoriert, markPositionSpaeter, normalizeArtikelnr,
 } from '../../data/api/belege.js'
 import { listKategorien } from '../../data/api/kategorien.js'
 import ArtikelDialog from '../components/ArtikelDialog.jsx'
@@ -117,6 +117,7 @@ function PositionsAnsicht({ belegId, kategorien, onClose }) {
       name: pos.raw_beschreibung.slice(0, 80),
       beschreibung: pos.raw_beschreibung,
       preis_netto: pos.raw_einzelpreis,
+      artikelnr: pos.raw_artikelnr || '',
       einheit: pos.ki_einheit || '',
       tags: Array.isArray(pos.ki_tags) ? pos.ki_tags.join(', ') : '',
       kategorie_id: findKategorieId(pos.ki_kategorie, kategorien),
@@ -162,9 +163,17 @@ function PositionsAnsicht({ belegId, kategorien, onClose }) {
               <Table.Row key={p.id}>
                 <Table.Cell>
                   <Badge colorPalette={meta.color} size="sm">{meta.label}</Badge>
-                  {p.duplikat?.name && (
-                    <Text fontSize="xs" color="yellow.700" mt={1}>≈ {p.duplikat.name}</Text>
-                  )}
+                  {p.duplikat?.name && (() => {
+                    // Nummern-Treffer ist eindeutig, Name-Treffer nur wahrscheinlich —
+                    // der Admin soll auf einen Blick sehen, wie sicher der Fund ist.
+                    const nrTreffer = !!normalizeArtikelnr(p.raw_artikelnr) &&
+                      normalizeArtikelnr(p.raw_artikelnr) === normalizeArtikelnr(p.duplikat.artikelnr)
+                    return (
+                      <Text fontSize="xs" color={nrTreffer ? 'red.600' : 'yellow.700'} mt={1}>
+                        {nrTreffer ? `= gleiche Art-Nr: ${p.duplikat.name}` : `≈ ${p.duplikat.name}`}
+                      </Text>
+                    )
+                  })()}
                 </Table.Cell>
                 <Table.Cell>
                   <Text fontSize="sm">{p.raw_beschreibung}</Text>

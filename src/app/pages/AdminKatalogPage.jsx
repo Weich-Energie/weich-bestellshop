@@ -32,7 +32,7 @@ export default function AdminKatalogPage() {
     return artikelListe.filter((a) => {
       if (kategorieFilter && a.kategorie_id !== kategorieFilter) return false
       if (!s) return true
-      const haystack = [a.name, a.beschreibung, a.lieferant, ...(a.tags || []).map((t) => t.name)]
+      const haystack = [a.name, a.beschreibung, a.lieferant, a.artikelnr, ...(a.tags || []).map((t) => t.name)]
         .filter(Boolean).join(' ').toLowerCase()
       return haystack.includes(s)
     })
@@ -143,7 +143,10 @@ export default function AdminKatalogPage() {
                     )}
                   </Table.Cell>
                   <Table.Cell><Text fontSize="sm">{kategorieMap.get(a.kategorie_id)?.name || '—'}</Text></Table.Cell>
-                  <Table.Cell><Text fontSize="sm">{a.lieferant || '—'}</Text></Table.Cell>
+                  <Table.Cell>
+                    <Text fontSize="sm">{a.lieferant || '—'}</Text>
+                    {a.artikelnr && <Text fontSize="xs" color="fg.muted">Art-Nr: {a.artikelnr}</Text>}
+                  </Table.Cell>
                   <Table.Cell><Text fontSize="sm">{a.preis_netto != null ? `${Number(a.preis_netto).toFixed(2)} €` : '—'}</Text></Table.Cell>
                   <Table.Cell>
                     <Badge colorPalette={a.aktiv ? 'green' : 'gray'} size="sm">

@@ -17,6 +17,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
   const [kategorieId, setKategorieId] = useState('')
   const [lieferant, setLieferant] = useState('')
   const [lieferantUrl, setLieferantUrl] = useState('')
+  const [artikelnr, setArtikelnr] = useState('')
   const [preis, setPreis] = useState('')
   const [einheit, setEinheit] = useState('Stück')
   const [aktiv, setAktiv] = useState(true)
@@ -44,6 +45,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       setKategorieId(artikel.kategorie_id || '')
       setLieferant(artikel.lieferant || '')
       setLieferantUrl(artikel.lieferant_url || '')
+      setArtikelnr(artikel.artikelnr || '')
       setPreis(artikel.preis_netto != null ? String(artikel.preis_netto) : '')
       setEinheit(artikel.einheit || 'Stück')
       setAktiv(artikel.aktiv !== false)
@@ -57,6 +59,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       setKategorieId(prefill.kategorie_id || '')
       setLieferant(prefill.lieferant || '')
       setLieferantUrl(prefill.lieferant_url || '')
+      setArtikelnr(prefill.artikelnr || '')
       setPreis(prefill.preis_netto != null ? String(prefill.preis_netto) : '')
       setEinheit(prefill.einheit || 'Stück')
       setAktiv(true)
@@ -65,7 +68,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       setVarianten([]); setGebinde([])
     } else {
       setName(''); setBeschreibung(''); setKategorieId('')
-      setLieferant(''); setLieferantUrl(''); setPreis(''); setEinheit('Stück')
+      setLieferant(''); setLieferantUrl(''); setArtikelnr(''); setPreis(''); setEinheit('Stück')
       setAktiv(true); setTagsRaw(''); setBildExternUrl('')
       setVarianten([]); setGebinde([])
     }
@@ -84,6 +87,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
     if (result.einheit) setEinheit(result.einheit)
     if (Array.isArray(result.tags) && result.tags.length) setTagsRaw(result.tags.join(', '))
     if (result.lieferant) setLieferant(result.lieferant)
+    if (result.artikelnr) setArtikelnr(String(result.artikelnr).trim())
     if (quellUrl) setLieferantUrl(quellUrl)
     if (result.bild_url) setBildExternUrl(result.bild_url)
     if (result.bildsuche_query) setBildsucheQuery(result.bildsuche_query)
@@ -185,6 +189,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
         kategorie_id: kategorieId || null,
         lieferant: lieferant.trim() || null,
         lieferant_url: lieferantUrl.trim() || null,
+        artikelnr: artikelnr.trim() || null,
         preis_netto: preis ? Number(preis.replace(',', '.')) : null,
         einheit: einheit || null,
         aktiv,
@@ -375,12 +380,16 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
                   <Input value={tagsRaw} onChange={(e) => setTagsRaw(e.target.value)} placeholder="cat6, verbrauch, elektrik" />
                 </Field.Root>
 
-                <HStack gap={2}>
-                  <Field.Root>
+                <HStack gap={2} align="flex-end">
+                  <Field.Root flex="2">
                     <Field.Label>Lieferant</Field.Label>
                     <Input value={lieferant} onChange={(e) => setLieferant(e.target.value)} placeholder="Reichelt, Conrad, Amazon..." />
                   </Field.Root>
-                  <Field.Root>
+                  <Field.Root flex="1.5">
+                    <Field.Label>Artikel-Nr. (Lieferant)</Field.Label>
+                    <Input value={artikelnr} onChange={(e) => setArtikelnr(e.target.value)} placeholder="z.B. 12345-AB" />
+                  </Field.Root>
+                  <Field.Root flex="1">
                     <Field.Label>Preis (netto, €)</Field.Label>
                     <Input value={preis} onChange={(e) => setPreis(e.target.value)} placeholder="0,00" />
                   </Field.Root>

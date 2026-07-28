@@ -2,6 +2,15 @@ import { supabase } from '../../supabaseClient.js'
 
 const BELEG_BUCKET = 'shop-belege'
 
+// Lieferanten schreiben dieselbe Nummer unterschiedlich (12345-AB, 12345 ab,
+// 12345AB) → auf Alphanumerik reduzieren, damit der Vergleich trotzdem greift.
+// Weniger als 3 Zeichen ist zu unsicher fuer einen Treffer.
+export function normalizeArtikelnr(nr) {
+  if (!nr) return ''
+  const clean = String(nr).toUpperCase().replace(/[^A-Z0-9]/g, '')
+  return clean.length >= 3 ? clean : ''
+}
+
 // ─── Upload + Verarbeitung ─────────────────────────────────────────────
 
 // Speichert PDF im Storage, legt Beleg-Row (status=processing) an.
@@ -85,20 +94,29 @@ export async function processBeleg({ belegId, kategorien = [] }) {
   const positions = Array.isArray(extracted.positionen) ? extracted.positionen : []
   if (positions.length === 0) return { beleg_id: belegId, positions_count: 0 }
 
-  // Duplikat-Check: hole existierende Artikel-Namen fuer Fuzzy-Match
-  const { data: existArtikel } = await supabase.from('shop_artikel').select('id, name')
+  // Duplikat-Check: Artikel-Nr. schlaegt Name. Eine uebereinstimmende
+  // Lieferanten-Nummer ist ein harter Treffer, der Name-Match nur Heuristik.
+  const { data: existArtikel } = await supabase.from('shop_artikel').select('id, name, artikelnr')
+  const nrToArtikel = new Map()
+  for (const a of existArtikel || []) {
+    const nr = normalizeArtikelnr(a.artikelnr)
+    if (nr && !nrToArtikel.has(nr)) nrToArtikel.set(nr, a)
+  }
   const nameToArtikel = new Map((existArtikel || []).map((a) => [a.name.toLowerCase().trim(), a]))
 
   const rows = positions.map((p) => {
     const desc = String(p.beschreibung || '').trim()
     const key = desc.toLowerCase()
-    // Simpler Match: erste zwei Worte
-    const firstTwoWords = key.split(/\s+/).slice(0, 2).join(' ')
-    let duplikat = null
-    for (const [aName, a] of nameToArtikel) {
-      if (aName === key || aName.includes(firstTwoWords) || firstTwoWords.length > 4 && key.includes(aName)) {
-        duplikat = a
-        break
+    // 1) Harter Treffer per Lieferanten-Artikelnummer
+    let duplikat = nrToArtikel.get(normalizeArtikelnr(p.artikelnr)) || null
+    // 2) Fallback: Name-Heuristik ueber die ersten zwei Worte
+    if (!duplikat) {
+      const firstTwoWords = key.split(/\s+/).slice(0, 2).join(' ')
+      for (const [aName, a] of nameToArtikel) {
+        if (aName === key || (firstTwoWords.length > 4 && (aName.includes(firstTwoWords) || key.includes(aName)))) {
+          duplikat = a
+          break
+        }
       }
     }
     return {
@@ -156,7 +174,7 @@ export async function listPositionen(belegId) {
       id, seitennr, raw_beschreibung, raw_menge, raw_einzelpreis, raw_artikelnr,
       ki_kategorie, ki_tags, ki_einheit, duplikat_artikel_id, uebernommen_artikel_id,
       status, ignore_grund,
-      duplikat:shop_artikel!duplikat_artikel_id ( id, name )
+      duplikat:shop_artikel!duplikat_artikel_id ( id, name, artikelnr )
     `)
     .eq('beleg_id', belegId)
     .order('created_at', { ascending: true })

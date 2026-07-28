@@ -133,7 +133,7 @@ export default function KatalogPage() {
     return artikelListe.filter((a) => {
       if (kategorieFilter && a.kategorie_id !== kategorieFilter) return false
       if (!s) return true
-      const haystack = [a.name, a.beschreibung, a.lieferant, ...(a.tags || []).map((t) => t.name)]
+      const haystack = [a.name, a.beschreibung, a.lieferant, a.artikelnr, ...(a.tags || []).map((t) => t.name)]
         .filter(Boolean).join(' ').toLowerCase()
       return haystack.includes(s)
     })
