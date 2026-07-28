@@ -16,7 +16,7 @@ Phase 11 / AAC-04 implementiert — als **JSON-Feld** in `employees.berechtigung
   "rolle": "admin" | "monteur",
   "app_access": {
     "ressourcenplanung": true,
-    "service_ticket": true,
+    "service_tickets": true,
     "betriebsradar": true,
     "bestellshop": true
   },
@@ -24,6 +24,12 @@ Phase 11 / AAC-04 implementiert — als **JSON-Feld** in `employees.berechtigung
   "aktionen": { ... }
 }
 ```
+
+**Naming-Convention der App-Keys** (aus der DB verifiziert):
+- `ressourcenplanung` (Singular)
+- `service_tickets` (Plural!)
+- `betriebsradar` (Singular)
+- `bestellshop` (Singular)
 
 Der Zugriffs-Check ist fail-closed: `access?.[APP_KEY] === true`. Alle drei bestehenden
 Apps nutzen dieses Pattern bereits.
