@@ -1,9 +1,9 @@
-# Bestellshop — Weich Solartechnik GmbH
+# Bestellshop — WEICHENERGIE (Weich GmbH)
 
 ## Projekt
 Interner Bestellshop fuer Verbrauchsmaterial (C-Teile). Monteure/Arbeiter melden Bedarf,
 Admins pflegen Katalog, geben Bestellungen frei, KI unterstuetzt bei Anlage und
-Bestell-Abwicklung. Vierte App im Weich-Solar-Oekosystem — shared Supabase mit
+Bestell-Abwicklung. Vierte App im WEICHENERGIE-App-Oekosystem — shared Supabase mit
 Ressourcenplanung, Service-Ticket und Betriebsradar.
 
 ## Tech Stack

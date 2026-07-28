@@ -1,6 +1,6 @@
 # weich-bestellshop — Domain-Glossar
 
-Interner Bestellshop fuer Weich Solartechnik GmbH. Verbrauchsmaterial (C-Teile) —
+Interner Bestellshop fuer WEICHENERGIE (Weich GmbH). Verbrauchsmaterial (C-Teile) —
 Lagergefuehrte B-Teile bleiben im ERP. Vierte App im Oekosystem (nach Ressourcenplanung,
 Service-Ticket, Betriebsradar), shared Supabase.
 

@@ -5,7 +5,7 @@
 
 ## Kontext
 
-Der Bestellshop ist die vierte App im Weich-Solar-Oekosystem (Ressourcenplanung,
+Der Bestellshop ist die vierte App im WEICHENERGIE-App-Oekosystem (Ressourcenplanung,
 Service-Ticket, Betriebsradar, Bestellshop). Es gibt vier plausible
 Architektur-Optionen:
 

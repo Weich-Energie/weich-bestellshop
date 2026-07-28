@@ -1,6 +1,6 @@
 # weich-bestellshop (Planung)
 
-Interner Bestellshop fuer Weich Solartechnik GmbH. Verbrauchsmaterial (C-Teile).
+Interner Bestellshop fuer WEICHENERGIE (Weich GmbH). Verbrauchsmaterial (C-Teile).
 Vierte App im Oekosystem, shared Supabase.
 
 **Status:** Planungsphase. Repo/Code existiert noch nicht — nur Konzept-Doku.

@@ -30,7 +30,7 @@ export default function LoginPage() {
           <VStack gap={2}>
             <ShoppingCart size={40} color="#3182CE" />
             <Heading size="lg">Bestellshop</Heading>
-            <Text fontSize="sm" color="fg.muted">Weich Solartechnik</Text>
+            <Text fontSize="sm" color="fg.muted">WEICHENERGIE</Text>
           </VStack>
 
           <form onSubmit={onSubmit}>
