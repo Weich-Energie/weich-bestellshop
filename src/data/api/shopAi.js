@@ -28,3 +28,12 @@ export async function analyzeBedarfBild({ bildUrl, beschreibung = '', kategorien
     kategorien,
   })
 }
+
+// Produkt-Daten aus einer Shop-URL extrahieren (server-side HTML-Fetch + Sonnet).
+export async function extractShopLink({ url, kategorien = [] }) {
+  return invoke({
+    task: 'extract_shop_link',
+    url,
+    kategorien,
+  })
+}

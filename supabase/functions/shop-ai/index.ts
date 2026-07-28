@@ -1,5 +1,5 @@
 // shop-ai — KI-Support fuer Bestellshop.
-// Task-Routing: enrich_artikel + analyze_bedarf_bild + extract_beleg.
+// Task-Routing: enrich_artikel + analyze_bedarf_bild + extract_beleg + extract_shop_link.
 // Modell-Politik (siehe ADR 0003): Sonnet 4.6 fuer alle Tasks — Konsistenz + bessere
 // Qualitaet bei Kategorie/Tag-Matching und Vision-Praezision. Kosten pro Aufruf bleiben
 // bei einem internen Shop absolut vernachlaessigbar (~$0.01). Haiku waere fuer spaetere
@@ -22,6 +22,7 @@ const SONNET = "claude-sonnet-4-6"
 const MODEL_ENRICH = SONNET
 const MODEL_VISION = SONNET
 const MODEL_BELEG = SONNET
+const MODEL_LINK = SONNET
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: CORS_HEADERS })
@@ -190,6 +191,72 @@ async function extractBeleg(body: any) {
   return json({ result: parsed })
 }
 
+// ─── Task: extract_shop_link ─────────────────────────────────────────
+// Laedt HTML einer Produkt-URL (server-side, umgeht CORS), reduziert auf lesbaren
+// Inhalt, laesst Sonnet Produkt-Daten extrahieren.
+async function extractShopLink(body: any) {
+  const { url, kategorien } = body
+  if (!url || typeof url !== "string") return json({ error: "url fehlt" }, 400)
+  let parsedUrl: URL
+  try { parsedUrl = new URL(url) } catch { return json({ error: "URL ungueltig" }, 400) }
+  if (!["http:", "https:"].includes(parsedUrl.protocol)) return json({ error: "Nur http/https" }, 400)
+
+  let html: string
+  try {
+    const resp = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
+      },
+      redirect: "follow",
+    })
+    if (!resp.ok) return json({ error: `Shop hat ${resp.status} zurueckgegeben (evtl. Bot-Blockade)` }, 502)
+    html = await resp.text()
+  } catch (e) {
+    return json({ error: `Fetch fehlgeschlagen: ${(e as any)?.message || e}` }, 502)
+  }
+
+  // Sanitize: script/style/comments raus, HTML-Boilerplate reduzieren
+  html = html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/\s+/g, " ")
+  // Limit auf 100 KB — Sonnet hat viel Context, aber wir sparen Tokens
+  if (html.length > 100_000) html = html.slice(0, 100_000)
+
+  const katListe = Array.isArray(kategorien) ? kategorien.filter((k: any) => typeof k === "string") : []
+  const katHint = katListe.length ? `Vorhandene Kategorien: ${katListe.join(", ")}. ` : ""
+
+  const systemPrompt =
+    `Du bist Produkt-Extractor fuer den internen Bestellshop von WEICHENERGIE (Weich GmbH) — ` +
+    `Solartechnik-Firma. Aus einer HTML-Produktseite extrahiere die Artikel-Daten. ` +
+    `${katHint} ` +
+    `Antworte STRIKT nur mit JSON (kein Prosa, kein Codeblock). Schema:\n` +
+    `{\n` +
+    `  "name": "praeziser Artikelname",\n` +
+    `  "beschreibung": "1-2 Saetze mit erkennbaren Merkmalen",\n` +
+    `  "preis_netto": 12.34,\n` +
+    `  "einheit": "Stueck|Meter|Packung|...",\n` +
+    `  "kategorie": "passende Kategorie oder NEU:<name>",\n` +
+    `  "tags": ["tag1", "tag2"],\n` +
+    `  "bildsuche_query": "praeziser Suchbegriff falls kein direktes Bild",\n` +
+    `  "bild_url": "absolute URL des Produktbildes (leer wenn nicht sicher findbar)",\n` +
+    `  "lieferant": "Name des Shops/Herstellers",\n` +
+    `  "artikelnr": "Artikel-/Bestell-Nr (leer wenn nicht angegeben)"\n` +
+    `}\n` +
+    `WICHTIG: Preis IMMER netto. Wenn Brutto ausgewiesen (deutscher Shop, meist 19% MwSt), ` +
+    `netto berechnen: brutto / 1.19. Bei "zzgl. MwSt": Preis ist bereits netto.`
+
+  const userMessage = `URL: ${url}\n\nHTML-Auszug:\n${html}`
+  const text = await callClaude(MODEL_LINK, systemPrompt, [{ role: "user", content: userMessage }], 1024)
+  const parsed = extractJson(text)
+  if (!parsed) return json({ error: "KI-Antwort nicht parsebar", raw: text }, 502)
+  return json({ result: parsed })
+}
+
 // ─── Entry ────────────────────────────────────────────────────────────
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -219,6 +286,7 @@ Deno.serve(async (req: Request) => {
     if (task === "enrich_artikel") return await enrichArtikel(body)
     if (task === "analyze_bedarf_bild") return await analyzeBedarfBild(body)
     if (task === "extract_beleg") return await extractBeleg(body)
+    if (task === "extract_shop_link") return await extractShopLink(body)
     return json({ error: `Unbekannte task: ${task}` }, 400)
   } catch (err) {
     return json({ error: String(err?.message || err) }, 500)

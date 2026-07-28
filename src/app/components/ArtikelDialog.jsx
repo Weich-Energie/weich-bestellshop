@@ -7,7 +7,7 @@ import { X, Upload, Link as LinkIcon, Image as ImgIcon, Plus, Trash2, Package, L
 import { createArtikel, updateArtikel, deleteArtikel, replaceVarianten, replaceGebinde } from '../../data/api/artikel.js'
 import { createKategorie } from '../../data/api/kategorien.js'
 import { uploadArtikelBild, deleteArtikelBild } from '../../data/api/storage.js'
-import { enrichArtikel } from '../../data/api/shopAi.js'
+import { enrichArtikel, extractShopLink } from '../../data/api/shopAi.js'
 import ArtikelBild from './ArtikelBild.jsx'
 
 export default function ArtikelDialog({ open, onClose, artikel, prefill, kategorien, onSaved }) {
@@ -30,6 +30,9 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
   const [aiBusy, setAiBusy] = useState(false)
   const [aiError, setAiError] = useState(null)
   const [bildsucheQuery, setBildsucheQuery] = useState('') // Fuer Google-Bildsuche-Link nach KI-Enrich
+  const [linkUrl, setLinkUrl] = useState('')
+  const [linkBusy, setLinkBusy] = useState(false)
+  const [linkError, setLinkError] = useState(null)
 
   useEffect(() => {
     if (!open) return
@@ -65,7 +68,51 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       setVarianten([]); setGebinde([])
     }
     setBildDatei(null); setError(null); setAiError(null); setBildsucheQuery('')
+    setLinkUrl(''); setLinkError(null)
   }, [open, artikel, prefill])
+
+  async function handleLinkImport() {
+    if (!linkUrl.trim()) { setLinkError('Bitte URL eingeben.'); return }
+    setLinkBusy(true); setLinkError(null)
+    try {
+      const result = await extractShopLink({
+        url: linkUrl.trim(),
+        kategorien: kategorien.map((k) => k.name),
+      })
+      if (!result) throw new Error('Keine Antwort von der KI')
+
+      // Alle Felder fuellen — Link-Import ist "Neuanlage aus URL", darf ueberschreiben
+      if (result.name) setName(result.name)
+      if (result.beschreibung) setBeschreibung(result.beschreibung)
+      if (result.preis_netto != null && !isNaN(Number(result.preis_netto))) {
+        setPreis(String(Number(result.preis_netto).toFixed(2)))
+      }
+      if (result.einheit) setEinheit(result.einheit)
+      if (Array.isArray(result.tags) && result.tags.length) setTagsRaw(result.tags.join(', '))
+      if (result.lieferant) setLieferant(result.lieferant)
+      // Lieferanten-URL = die eingegebene URL
+      setLieferantUrl(linkUrl.trim())
+      if (result.bild_url) setBildExternUrl(result.bild_url)
+      if (result.bildsuche_query) setBildsucheQuery(result.bildsuche_query)
+
+      // Kategorie matchen oder neu anlegen
+      if (result.kategorie) {
+        const cleaned = String(result.kategorie).replace(/^NEU:\s*/i, '').trim()
+        const existing = kategorien.find((k) => k.name.toLowerCase() === cleaned.toLowerCase())
+        if (existing) setKategorieId(existing.id)
+        else if (cleaned) {
+          try {
+            const neu = await createKategorie({ name: cleaned })
+            setKategorieId(neu.id)
+          } catch { /* ignore */ }
+        }
+      }
+    } catch (e) {
+      setLinkError(e.message || 'Import fehlgeschlagen')
+    } finally {
+      setLinkBusy(false)
+    }
+  }
 
   async function handleKiVorschlag() {
     if (!name.trim()) { setAiError('Name eingeben, bevor die KI arbeitet.'); return }
@@ -192,6 +239,21 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
             </Dialog.Header>
             <Dialog.Body>
               <VStack gap={3} align="stretch">
+                {isNew && (
+                  <Box borderWidth="1px" borderRadius="md" p={3} bg="purple.50" borderColor="purple.200">
+                    <Text fontWeight="bold" fontSize="sm" mb={2} color="purple.900">
+                      <HStack gap={1} display="inline-flex"><LinkIcon size={12} /> Aus Shop-Link importieren</HStack>
+                    </Text>
+                    <HStack gap={2}>
+                      <Input size="sm" placeholder="https://shop.example.de/produkt/xyz"
+                        value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} flex="1" />
+                      <Button size="sm" colorPalette="purple" onClick={handleLinkImport} loading={linkBusy} disabled={!linkUrl.trim()}>
+                        <Sparkles size={14} /> Importieren
+                      </Button>
+                    </HStack>
+                    {linkError && <Text color="red.500" fontSize="xs" mt={2}>{linkError}</Text>}
+                  </Box>
+                )}
                 <HStack align="flex-start" gap={4}>
                   <VStack gap={2} align="stretch">
                     <ArtikelBild artikel={artikel} size="100px" />
