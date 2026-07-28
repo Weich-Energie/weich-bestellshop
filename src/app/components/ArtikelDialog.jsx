@@ -10,6 +10,13 @@ import { uploadArtikelBild, deleteArtikelBild } from '../../data/api/storage.js'
 import { enrichArtikel, extractShopLink, extractShopScreenshot } from '../../data/api/shopAi.js'
 import ArtikelBild from './ArtikelBild.jsx'
 
+// Konnte die Produktseite gar nicht geladen werden (Bot-Blockade, SPA, Login-Wall)?
+// Nur dann ist der Screenshot-Fallback ein sinnvoller naechster Schritt.
+function istShopBlockade(msg) {
+  const t = String(msg || '')
+  return /HTTP 502|Bot-Blockade|Fetch fehlgeschlagen|zurueckgegeben|zurückgegeben/i.test(t)
+}
+
 export default function ArtikelDialog({ open, onClose, artikel, prefill, kategorien, onSaved }) {
   const isNew = !artikel?.id
   const [name, setName] = useState('')
@@ -282,7 +289,10 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
                     </HStack>
                     {linkError && (
                       <Text color="red.500" fontSize="xs" mt={2}>
-                        {linkError} — versuche es mit einem Screenshot.
+                        {linkError}
+                        {/* Screenshot hilft nur, wenn der Shop das Laden blockiert hat.
+                            Bei KI-/Backend-Fehlern scheitert er genauso — dann nicht anbieten. */}
+                        {istShopBlockade(linkError) && ' — versuche es mit einem Screenshot.'}
                       </Text>
                     )}
 
