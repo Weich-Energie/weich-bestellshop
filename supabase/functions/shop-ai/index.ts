@@ -90,7 +90,7 @@ async function enrichArtikel(body: any) {
     `Antworte STRIKT nur mit einem JSON-Objekt (kein Prosa, kein Codeblock), Schema:\n` +
     `{"kategorie": "...", "tags": ["tag1", "tag2", "tag3"], "beschreibung": "1-2 kurze Saetze", ` +
     `"bildsuche_query": "praeziser Suchbegriff fuer Google Bildersuche", ` +
-    `"einheit": "Stueck|Meter|Packung|Karton|..."}`
+    `"einheit": "Stück|Meter|Packung|Karton|..."}`
 
   const userMessage = `Artikel-Name: ${name}\n${beschreibung ? `Zusatzinfo: ${beschreibung}\n` : ""}`
   const text = await callClaude(MODEL_ENRICH, systemPrompt, [{ role: "user", content: userMessage }], 512)
@@ -123,7 +123,7 @@ async function analyzeBedarfBild(body: any) {
     `{"name": "kurzer praeziser Artikelname", "kategorie": "...", "tags": ["tag1","tag2"], ` +
     `"beschreibung": "1-2 Saetze mit erkennbaren Merkmalen (Marke, Groesse, Farbe, Material)", ` +
     `"bildsuche_query": "Suchbegriff fuer Google Bildersuche", ` +
-    `"einheit": "Stueck|Meter|Packung|..."}`
+    `"einheit": "Stück|Meter|Packung|..."}`
 
   const userContent = [
     { type: "image", source: { type: "base64", media_type: mimeType, data: base64 } },
@@ -171,7 +171,7 @@ async function extractBeleg(body: any) {
     `      "artikelnr": "Artikelnummer (leer wenn nicht angegeben)",\n` +
     `      "kategorie": "passende Katalog-Kategorie oder NEU:<name>",\n` +
     `      "tags": ["tag1", "tag2"],\n` +
-    `      "einheit": "Stueck|Meter|Packung|..."\n` +
+    `      "einheit": "Stück|Meter|Packung|..."\n` +
     `    }\n` +
     `  ]\n` +
     `}\n` +
@@ -217,6 +217,14 @@ async function extractShopLink(body: any) {
     return json({ error: `Fetch fehlgeschlagen: ${(e as any)?.message || e}` }, 502)
   }
 
+  // JSON-LD RETTEN, bevor die script-Tags fallen: viele Shops liefern die
+  // verlaessliche Produktbild-URL nur dort (Schema.org "image") oder in og:image.
+  // Ohne das strippt die Sanitize-Zeile unten genau die beste Bildquelle weg.
+  const jsonLd = [...html.matchAll(/<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)]
+    .map((m) => m[1].trim())
+    .join("\n")
+    .slice(0, 20_000)
+
   // Sanitize: script/style/comments raus, HTML-Boilerplate reduzieren
   html = html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
@@ -239,21 +247,36 @@ async function extractShopLink(body: any) {
     `  "name": "praeziser Artikelname",\n` +
     `  "beschreibung": "1-2 Saetze mit erkennbaren Merkmalen",\n` +
     `  "preis_netto": 12.34,\n` +
-    `  "einheit": "Stueck|Meter|Packung|...",\n` +
+    `  "einheit": "Stück|Meter|Packung|...",\n` +
     `  "kategorie": "passende Kategorie oder NEU:<name>",\n` +
     `  "tags": ["tag1", "tag2"],\n` +
     `  "bildsuche_query": "praeziser Suchbegriff falls kein direktes Bild",\n` +
-    `  "bild_url": "absolute URL des Produktbildes (leer wenn nicht sicher findbar)",\n` +
+    `  "bild_url": "URL des Produktbildes — bevorzugt in dieser Reihenfolge: JSON-LD \\"image\\", ` +
+    `og:image, danach das Haupt-Produktbild aus dem HTML. Relative Pfade sind erlaubt, ` +
+    `sie werden serverseitig aufgeloest. Nimm KEINE Platzhalter-, Logo- oder Icon-Bilder.",\n` +
     `  "lieferant": "Name des Shops/Herstellers",\n` +
     `  "artikelnr": "Artikel-/Bestell-Nr (leer wenn nicht angegeben)"\n` +
     `}\n` +
     `WICHTIG: Preis IMMER netto. Wenn Brutto ausgewiesen (deutscher Shop, meist 19% MwSt), ` +
     `netto berechnen: brutto / 1.19. Bei "zzgl. MwSt": Preis ist bereits netto.`
 
-  const userMessage = `URL: ${url}\n\nHTML-Auszug:\n${html}`
+  const userMessage =
+    `URL: ${url}\n\n` +
+    (jsonLd ? `JSON-LD der Seite (verlaesslichste Quelle):\n${jsonLd}\n\n` : "") +
+    `HTML-Auszug:\n${html}`
   const text = await callClaude(MODEL_LINK, systemPrompt, [{ role: "user", content: userMessage }], 1024)
   const parsed = extractJson(text)
   if (!parsed) return json({ error: "KI-Antwort nicht parsebar", raw: text }, 502)
+
+  // Relative Bild-Pfade gegen die Produktseite aufloesen — ein "/media/x.jpg"
+  // waere im Browser sonst nicht ladbar und die Vorschau bliebe leer.
+  if (parsed.bild_url) {
+    try {
+      parsed.bild_url = new URL(String(parsed.bild_url), parsedUrl).toString()
+    } catch {
+      parsed.bild_url = ""
+    }
+  }
   return json({ result: parsed })
 }
 
@@ -279,7 +302,7 @@ async function extractShopScreenshot(body: any) {
     `  "name": "praeziser Artikelname",\n` +
     `  "beschreibung": "1-2 Saetze mit erkennbaren Merkmalen",\n` +
     `  "preis_netto": 12.34,\n` +
-    `  "einheit": "Stueck|Meter|Packung|...",\n` +
+    `  "einheit": "Stück|Meter|Packung|...",\n` +
     `  "kategorie": "passende Kategorie oder NEU:<name>",\n` +
     `  "tags": ["tag1", "tag2"],\n` +
     `  "bildsuche_query": "praeziser Suchbegriff falls kein direktes Bild",\n` +

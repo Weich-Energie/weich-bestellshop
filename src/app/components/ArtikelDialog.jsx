@@ -10,6 +10,24 @@ import { uploadArtikelBild, deleteArtikelBild } from '../../data/api/storage.js'
 import { enrichArtikel, extractShopLink, extractShopScreenshot } from '../../data/api/shopAi.js'
 import ArtikelBild from './ArtikelBild.jsx'
 
+// KI-Antworten und Altdaten enthalten Varianten wie "Stueck", "Stk" oder "pcs".
+// Im Katalog soll durchgehend die korrekte deutsche Schreibweise stehen.
+const EINHEIT_ALIASE = {
+  stueck: 'Stück', stuck: 'Stück', stk: 'Stück', st: 'Stück', piece: 'Stück', pieces: 'Stück', pcs: 'Stück',
+  meter: 'Meter', m: 'Meter', lfm: 'Laufmeter', laufmeter: 'Laufmeter',
+  packung: 'Packung', pack: 'Packung', pck: 'Packung', pkg: 'Packung',
+  karton: 'Karton', ktn: 'Karton', kt: 'Karton',
+  rolle: 'Rolle', beutel: 'Beutel', dose: 'Dose', kanister: 'Kanister',
+  liter: 'Liter', l: 'Liter', kilogramm: 'Kilogramm', kg: 'Kilogramm',
+  paar: 'Paar', satz: 'Satz', set: 'Satz',
+}
+function normalizeEinheit(wert) {
+  const raw = String(wert || '').trim()
+  if (!raw) return ''
+  const key = raw.toLowerCase().replace(/\.$/, '')
+  return EINHEIT_ALIASE[key] || raw
+}
+
 // Konnte die Produktseite gar nicht geladen werden (Bot-Blockade, SPA, Login-Wall)?
 // Nur dann ist der Screenshot-Fallback ein sinnvoller naechster Schritt.
 function istShopBlockade(msg) {
@@ -44,6 +62,15 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
   const [screenshotBusy, setScreenshotBusy] = useState(false)
   const [screenshotError, setScreenshotError] = useState(null)
 
+  // Blob-URL der gewaehlten Datei, damit die Vorschau schon vor dem Upload stimmt.
+  const [dateiVorschau, setDateiVorschau] = useState(null)
+  useEffect(() => {
+    if (!bildDatei) { setDateiVorschau(null); return }
+    const url = URL.createObjectURL(bildDatei)
+    setDateiVorschau(url)
+    return () => URL.revokeObjectURL(url)
+  }, [bildDatei])
+
   useEffect(() => {
     if (!open) return
     if (artikel) {
@@ -54,7 +81,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       setLieferantUrl(artikel.lieferant_url || '')
       setArtikelnr(artikel.artikelnr || '')
       setPreis(artikel.preis_netto != null ? String(artikel.preis_netto) : '')
-      setEinheit(artikel.einheit || 'Stück')
+      setEinheit(normalizeEinheit(artikel.einheit) || 'Stück')
       setAktiv(artikel.aktiv !== false)
       setTagsRaw((artikel.tags || []).map((t) => t.name).join(', '))
       setBildExternUrl(artikel.bild_ist_extern ? (artikel.bild_url || '') : '')
@@ -68,7 +95,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       setLieferantUrl(prefill.lieferant_url || '')
       setArtikelnr(prefill.artikelnr || '')
       setPreis(prefill.preis_netto != null ? String(prefill.preis_netto) : '')
-      setEinheit(prefill.einheit || 'Stück')
+      setEinheit(normalizeEinheit(prefill.einheit) || 'Stück')
       setAktiv(true)
       setTagsRaw(prefill.tags || '')
       setBildExternUrl(prefill.bild_extern_url || '')
@@ -91,7 +118,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
     if (result.preis_netto != null && !isNaN(Number(result.preis_netto))) {
       setPreis(String(Number(result.preis_netto).toFixed(2)))
     }
-    if (result.einheit) setEinheit(result.einheit)
+    if (result.einheit) setEinheit(normalizeEinheit(result.einheit))
     if (Array.isArray(result.tags) && result.tags.length) setTagsRaw(result.tags.join(', '))
     if (result.lieferant) setLieferant(result.lieferant)
     if (result.artikelnr) setArtikelnr(String(result.artikelnr).trim())
@@ -163,7 +190,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       if (Array.isArray(result.tags) && result.tags.length && !tagsRaw.trim()) {
         setTagsRaw(result.tags.join(', '))
       }
-      if (result.einheit && einheit === 'Stück') setEinheit(result.einheit)
+      if (result.einheit && einheit === 'Stück') setEinheit(normalizeEinheit(result.einheit))
       if (result.bildsuche_query) setBildsucheQuery(result.bildsuche_query)
 
       // Kategorie: matching per Name (case-insensitive). Wenn KI "NEU: X" liefert → anlegen.
@@ -340,7 +367,11 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
                 )}
                 <HStack align="flex-start" gap={4}>
                   <VStack gap={2} align="stretch">
-                    <ArtikelBild artikel={artikel} size="100px" />
+                    <ArtikelBild
+                      artikel={artikel}
+                      previewUrl={dateiVorschau || bildExternUrl.trim() || null}
+                      size="100px"
+                    />
                     <Text fontSize="xs" color="fg.muted" textAlign="center">Vorschau</Text>
                   </VStack>
                   <VStack gap={2} align="stretch" flex="1">
