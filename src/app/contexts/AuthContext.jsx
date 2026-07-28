@@ -16,6 +16,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [accessDeniedMessage, setAccessDeniedMessage] = useState(null)
+  const [viewAsUser, setViewAsUser] = useState(false) // Admin-Selbst-Testmodus
 
   // Mitarbeiter-Profil per Email-Lookup laden (explizite Spaltenliste — CLAUDE.md Regel).
   const loadUserProfile = useCallback(async (authUser) => {
@@ -39,15 +40,18 @@ export function AuthProvider({ children }) {
     return access[APP_KEY] === true
   }, [])
 
-  const isAdmin = useMemo(() => {
+  // "Roher" Admin-Status: unabhaengig vom View-Toggle. Wird gebraucht, um den Toggle-Button
+  // im UI zu zeigen (auch wenn der User gerade im "als User anzeigen"-Modus ist).
+  const hasAdminRights = useMemo(() => {
     if (!currentUser) return false
     const access = currentUser.berechtigungen?.app_access
-    // Rollen im app_access: entweder true (user) oder Objekt {enabled: true, role: 'admin'}.
-    // v1.0 vereinfacht: separates admin-Flag in berechtigungen.rolle == 'admin' ODER
-    // in berechtigungen.app_access.bestellshop_admin === true.
     if (access?.bestellshop_admin === true) return true
     return currentUser.berechtigungen?.rolle === 'admin'
   }, [currentUser])
+
+  // Effektiver Admin-Status: rohes Admin-Recht, aber respektiert View-Toggle.
+  // Alle Route-Guards und Nav-Sichtbarkeit nutzen diesen Wert.
+  const isAdmin = hasAdminRights && !viewAsUser
 
   useEffect(() => {
     let cancelled = false
@@ -145,12 +149,15 @@ export function AuthProvider({ children }) {
       error,
       accessDeniedMessage,
       isAdmin,
+      hasAdminRights,
+      viewAsUser,
+      setViewAsUser,
       isAuthenticated: !!currentUser,
       loginWithEmail,
       logout,
       resetPassword,
     }),
-    [currentUser, session, loading, error, accessDeniedMessage, isAdmin, loginWithEmail, logout, resetPassword],
+    [currentUser, session, loading, error, accessDeniedMessage, isAdmin, hasAdminRights, viewAsUser, loginWithEmail, logout, resetPassword],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

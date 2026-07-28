@@ -1,7 +1,7 @@
 import React from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { Box, Flex, HStack, Text, Button, Spacer } from '@chakra-ui/react'
-import { ShoppingCart, Package, ClipboardList, Heart, Send, LayoutGrid, LogOut, ShieldCheck } from 'lucide-react'
+import { Box, Flex, HStack, Text, Button, Spacer, Badge } from '@chakra-ui/react'
+import { ShoppingCart, Package, ClipboardList, Heart, Send, LayoutGrid, LogOut, ShieldCheck, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.jsx'
 
 function Nav({ to, icon: Icon, children }) {
@@ -22,7 +22,7 @@ function Nav({ to, icon: Icon, children }) {
 }
 
 export default function Layout() {
-  const { currentUser, isAdmin, logout } = useAuth()
+  const { currentUser, isAdmin, hasAdminRights, viewAsUser, setViewAsUser, logout } = useAuth()
 
   return (
     <Flex minH="100vh" direction="column">
@@ -50,6 +50,14 @@ export default function Layout() {
           </HStack>
           <Spacer />
           <HStack gap={3}>
+            {hasAdminRights && (
+              <Button size="sm" variant={viewAsUser ? 'solid' : 'outline'}
+                colorPalette={viewAsUser ? 'orange' : 'gray'}
+                onClick={() => setViewAsUser((v) => !v)}
+                title={viewAsUser ? 'Zurueck zur Admin-Sicht' : 'Als User anzeigen'}>
+                {viewAsUser ? <><EyeOff size={14} /> User-Sicht</> : <><Eye size={14} /> Als User anzeigen</>}
+              </Button>
+            )}
             <Text fontSize="sm" color="fg.muted">{currentUser?.name}</Text>
             <Button size="sm" variant="ghost" onClick={logout}>
               <LogOut size={14} /> Abmelden
