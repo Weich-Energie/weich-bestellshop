@@ -33,6 +33,40 @@ schreibt Ergebnisse zurueck.
 Passwoerter fuer Lieferanten-Accounts in `supplier_credentials`-Tabelle,
 verschluesselt mit `pgcrypto` und einem Master-Key als Env-Var auf dem Bot-Service.
 
+## Nachtrag 2026-07-28 — Zugangsdaten: Tabelle und Verschluesselung praezisiert
+
+Bei der Umsetzung (Migration `007_lieferanten_zugaenge.sql`) sind zwei Punkte
+anders entschieden worden als oben skizziert:
+
+**1. Tabellenname `shop_lieferanten` statt `supplier_credentials`.** Alle Tabellen
+dieser App tragen den `shop_`-Praefix, und ein Lieferant ist mehr als sein Zugang:
+Login-URL, Playbook und Zugangsdaten gehoeren in eine Zeile pro Lieferant. Der Bot
+braucht damit keinen Join.
+
+**2. Verschluesselung ausserhalb von Postgres (AES-256-GCM) statt `pgcrypto`.**
+Der Grund ist ein Sicherheitsproblem der pgcrypto-Variante: `pgp_sym_encrypt`
+verlangt den Master-Key **im SQL-Aufruf**. Wer schreibt, muss ihn also besitzen —
+bei einer Pflege-Oberflaeche im Shop waere das der Browser. Damit laege der
+Schluessel genau dort, wo er nie sein darf, und ein Datenbank-Log oder ein
+mitgeschnittener Request wuerde ihn preisgeben.
+
+Jetzt gilt:
+- Ver- und Entschluesselung passieren im Bot (`/opt/weich-browser/zugang.mjs`,
+  spaeter zusaetzlich in einer Edge Function fuer die Pflege-Oberflaeche).
+- `SUPPLIER_CRED_KEY` (32 Byte, base64) liegt in `/opt/weich-browser/.env` auf
+  `weich-code` und verlaesst diesen Host nicht.
+- Postgres speichert in `shop_lieferanten.zugang_chiffre` nur einen opaken
+  base64-Blob (`iv|tag|ciphertext`) und kennt den Schluessel nicht.
+- **Schreibbar, nicht lesbar:** `zugang_chiffre` ist per Spalten-REVOKE fuer
+  `anon` und `authenticated` nicht SELECT-bar (Muster wie bei `employees`).
+  Ein Shop-Admin kann einen Zugang setzen, aber nie zurueckholen — auch nicht
+  ueber `update ... returning`, weil Postgres dafuer das SELECT-Recht prueft.
+  Entschluesseln kann nur `service_role`, also der Bot.
+
+**Konsequenz, die mitgedacht werden muss:** Geht `SUPPLIER_CRED_KEY` verloren,
+sind alle gespeicherten Zugaenge unbrauchbar und muessen neu gesetzt werden. Der
+Schluessel gehoert deshalb zusaetzlich in den Passwortmanager.
+
 ## Konsequenzen
 
 **Positiv:**
