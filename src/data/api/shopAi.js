@@ -1,9 +1,32 @@
 import { supabase } from '../../supabaseClient.js'
 
+// functions.invoke wirft bei non-2xx nur "Edge Function returned a non-2xx status
+// code" und verschluckt den Response-Body — dort steht aber unsere echte
+// Fehlermeldung (z.B. der Anthropic-API-Fehler). Also nachlesen.
+async function readFunctionError(error) {
+  const res = error?.context
+  if (!res || typeof res.text !== 'function') return null
+  try {
+    const raw = await res.text()
+    if (!raw) return null
+    try {
+      const body = JSON.parse(raw)
+      return body?.error || raw.slice(0, 300)
+    } catch {
+      return raw.slice(0, 300)
+    }
+  } catch {
+    return null
+  }
+}
+
 // Ruft die shop-ai Edge Function mit gegebenem Task-Payload.
 async function invoke(payload) {
   const { data, error } = await supabase.functions.invoke('shop-ai', { body: payload })
-  if (error) throw error
+  if (error) {
+    const detail = await readFunctionError(error)
+    throw new Error(detail || error.message || 'Unbekannter Fehler der Edge Function')
+  }
   if (data?.error) throw new Error(data.error)
   return data?.result || null
 }
