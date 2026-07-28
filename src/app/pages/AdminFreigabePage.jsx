@@ -6,6 +6,8 @@ import {
 import { Check, X, ExternalLink } from 'lucide-react'
 import { listOffeneFreigaben, freigeben, ablehnen } from '../../data/api/bestellungen.js'
 import PositionText from '../components/PositionText.jsx'
+import DoppelBestellHinweis from '../components/DoppelBestellHinweis.jsx'
+import { listAktiveOrderCounts } from '../../data/api/artikel.js'
 
 function fmt(dateStr) {
   if (!dateStr) return ''
@@ -21,6 +23,11 @@ export default function AdminFreigabePage() {
   const { data: liste = [], isLoading } = useQuery({
     queryKey: ['shop-freigaben'],
     queryFn: listOffeneFreigaben,
+  })
+  const { data: aktiveCounts = [] } = useQuery({
+    queryKey: ['shop-aktive-counts'],
+    queryFn: listAktiveOrderCounts,
+    staleTime: 30_000,
   })
 
   const freigMutation = useMutation({
@@ -46,6 +53,15 @@ export default function AdminFreigabePage() {
         <VStack align="stretch" gap={3}>
           {liste.map((b) => {
             const isAbl = ablehnOpen[b.id]
+            // "andere" aktive Bestellungen fuer denselben Artikel/Variante — die aktuelle Position rausrechnen
+            const doppelInfo = (() => {
+              const raw = aktiveCounts.find((c) => c.artikel_id === b.shop_artikel?.id && (c.variante_id || '') === (b.variante?.id || ''))
+              if (!raw) return null
+              const restAnzahl = raw.anzahl - 1
+              const restMenge = raw.menge_summe - b.menge
+              if (restAnzahl <= 0) return null
+              return { ...raw, anzahl: restAnzahl, menge_summe: restMenge }
+            })()
             return (
               <Box key={b.id} borderWidth="1px" borderRadius="lg" p={4} bg="white">
                 <HStack align="flex-start" gap={4}>
@@ -55,6 +71,7 @@ export default function AdminFreigabePage() {
                       {b.shop_artikel?.preis_netto != null && (
                         <Badge variant="outline">≈ {(Number(b.shop_artikel.preis_netto) * b.menge).toFixed(2)} €</Badge>
                       )}
+                      <DoppelBestellHinweis info={doppelInfo} />
                     </HStack>
                     <HStack fontSize="xs" color="fg.muted" gap={4} flexWrap="wrap">
                       <Text>Lieferant: {b.shop_artikel?.lieferant || '—'}</Text>

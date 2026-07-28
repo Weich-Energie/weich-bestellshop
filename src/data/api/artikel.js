@@ -82,6 +82,29 @@ export async function deleteArtikel(id) {
   if (error) throw error
 }
 
+// Aktive Bestellwuensche (pending/approved/ordered) — hilft Doppelbestellungen zu erkennen.
+// Rueckgabe: Liste { artikel_id, variante_id, menge_summe, anzahl, letztes_datum }
+export async function listAktiveOrderCounts() {
+  const { data, error } = await supabase
+    .from('shop_order_requests')
+    .select('artikel_id, variante_id, menge, created_at, status')
+    .in('status', ['pending', 'approved', 'ordered'])
+  if (error) throw error
+  const map = new Map()
+  for (const r of data || []) {
+    const key = `${r.artikel_id}::${r.variante_id || ''}`
+    const cur = map.get(key) || {
+      artikel_id: r.artikel_id, variante_id: r.variante_id,
+      anzahl: 0, menge_summe: 0, letztes_datum: null,
+    }
+    cur.anzahl += 1
+    cur.menge_summe += r.menge
+    if (!cur.letztes_datum || r.created_at > cur.letztes_datum) cur.letztes_datum = r.created_at
+    map.set(key, cur)
+  }
+  return [...map.values()]
+}
+
 // ─── Varianten ──────────────────────────────────────────────────────────
 export async function replaceVarianten(artikelId, varianten) {
   // varianten: [{ id?, name, sort_order? }]

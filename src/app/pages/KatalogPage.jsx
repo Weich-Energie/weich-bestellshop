@@ -5,14 +5,15 @@ import {
   SimpleGrid, IconButton,
 } from '@chakra-ui/react'
 import { Search, Heart, ShoppingCart, ExternalLink, Plus, Minus } from 'lucide-react'
-import { listArtikel } from '../../data/api/artikel.js'
+import { listArtikel, listAktiveOrderCounts } from '../../data/api/artikel.js'
 import { listKategorien } from '../../data/api/kategorien.js'
 import { listFavoritenIds, toggleFavorit } from '../../data/api/favoriten.js'
 import { addZuWarenkorb } from '../../data/api/warenkorb.js'
 import ArtikelBild from '../components/ArtikelBild.jsx'
+import DoppelBestellHinweis from '../components/DoppelBestellHinweis.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 
-function ArtikelKarte({ artikel, kategorieName, favorisiert, onFav, onCart }) {
+function ArtikelKarte({ artikel, kategorieName, favorisiert, aktiveCounts, onFav, onCart }) {
   const [busy, setBusy] = useState(false)
   const [menge, setMenge] = useState(1)
   const varianten = artikel.varianten || []
@@ -22,6 +23,12 @@ function ArtikelKarte({ artikel, kategorieName, favorisiert, onFav, onCart }) {
 
   const gebindeObj = gebinde.find((g) => g.id === gebindeId) || null
   const gesamtStk = gebindeObj ? menge * gebindeObj.stueckzahl : menge
+
+  // Warnung: aehnliche aktive Bestellungen fuer diese (artikel, variante)-Kombi
+  const doppelInfo = useMemo(() => {
+    if (!aktiveCounts) return null
+    return aktiveCounts.find((c) => c.artikel_id === artikel.id && (c.variante_id || '') === (varianteId || '')) || null
+  }, [aktiveCounts, artikel.id, varianteId])
 
   async function handleCart() {
     if (varianten.length > 0 && !varianteId) return
@@ -88,6 +95,7 @@ function ArtikelKarte({ artikel, kategorieName, favorisiert, onFav, onCart }) {
       {gebindeObj && menge > 0 && (
         <Text fontSize="xs" color="fg.muted" textAlign="right">= {gesamtStk} Stk</Text>
       )}
+      <DoppelBestellHinweis info={doppelInfo} />
     </Box>
   )
 }
@@ -110,6 +118,11 @@ export default function KatalogPage() {
     queryKey: ['shop-favoriten', currentUser?.authId],
     queryFn: () => listFavoritenIds(currentUser.authId),
     enabled: !!currentUser?.authId,
+  })
+  const { data: aktiveCounts = [] } = useQuery({
+    queryKey: ['shop-aktive-counts'],
+    queryFn: listAktiveOrderCounts,
+    staleTime: 30_000,
   })
 
   const favSet = useMemo(() => new Set(favIds), [favIds])
@@ -172,6 +185,7 @@ export default function KatalogPage() {
               artikel={a}
               kategorieName={kategorieMap.get(a.kategorie_id)?.name}
               favorisiert={favSet.has(a.id)}
+              aktiveCounts={aktiveCounts}
               onFav={() => favMutation.mutate({ artikelId: a.id, currently: favSet.has(a.id) })}
               onCart={({ menge, varianteId, gebindeId }) => cartMutation.mutateAsync({ artikelId: a.id, menge, varianteId, gebindeId })}
             />
