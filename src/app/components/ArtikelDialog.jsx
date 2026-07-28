@@ -8,7 +8,7 @@ import { createArtikel, updateArtikel, deleteArtikel } from '../../data/api/arti
 import { uploadArtikelBild, deleteArtikelBild } from '../../data/api/storage.js'
 import ArtikelBild from './ArtikelBild.jsx'
 
-export default function ArtikelDialog({ open, onClose, artikel, kategorien, onSaved }) {
+export default function ArtikelDialog({ open, onClose, artikel, prefill, kategorien, onSaved }) {
   const isNew = !artikel?.id
   const [name, setName] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
@@ -37,13 +37,24 @@ export default function ArtikelDialog({ open, onClose, artikel, kategorien, onSa
       setAktiv(artikel.aktiv !== false)
       setTagsRaw((artikel.tags || []).map((t) => t.name).join(', '))
       setBildExternUrl(artikel.bild_ist_extern ? (artikel.bild_url || '') : '')
+    } else if (prefill) {
+      setName(prefill.name || '')
+      setBeschreibung(prefill.beschreibung || '')
+      setKategorieId(prefill.kategorie_id || '')
+      setLieferant(prefill.lieferant || '')
+      setLieferantUrl(prefill.lieferant_url || '')
+      setPreis(prefill.preis_netto != null ? String(prefill.preis_netto) : '')
+      setEinheit(prefill.einheit || 'Stück')
+      setAktiv(true)
+      setTagsRaw(prefill.tags || '')
+      setBildExternUrl(prefill.bild_extern_url || '')
     } else {
       setName(''); setBeschreibung(''); setKategorieId('')
       setLieferant(''); setLieferantUrl(''); setPreis(''); setEinheit('Stück')
       setAktiv(true); setTagsRaw(''); setBildExternUrl('')
     }
     setBildDatei(null); setError(null)
-  }, [open, artikel])
+  }, [open, artikel, prefill])
 
   async function save() {
     setSaving(true); setError(null)
@@ -74,15 +85,15 @@ export default function ArtikelDialog({ open, onClose, artikel, kategorien, onSa
 
       // Bild-Datei-Upload NACH Artikel-Erstellung (braucht artikel.id fuer Storage-Pfad)
       if (bildDatei) {
-        // Bei Update: altes internes Bild loeschen
         if (!isNew && artikel?.bild_url && !artikel?.bild_ist_extern) {
           try { await deleteArtikelBild(artikel.bild_url) } catch { /* egal */ }
         }
         const path = await uploadArtikelBild(saved.id, bildDatei)
-        await updateArtikel(saved.id, { bild_url: path, bild_ist_extern: false })
+        saved = await updateArtikel(saved.id, { bild_url: path, bild_ist_extern: false })
       }
 
-      onSaved?.()
+      // Callback bekommt den final gespeicherten Artikel — Admin-Bedarf-Flow braucht die ID
+      onSaved?.(saved)
       onClose()
     } catch (e) {
       setError(e.message || 'Speichern fehlgeschlagen')
