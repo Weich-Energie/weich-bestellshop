@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import {
   Dialog, Portal, Button, Field, Input, Textarea, VStack, HStack, Box, Text,
-  Select, NativeSelect, IconButton, Flex, Spacer, createListCollection,
+  Select, NativeSelect, IconButton, Flex, Spacer, Spinner, createListCollection,
 } from '@chakra-ui/react'
 import { X, Upload, Link as LinkIcon, Image as ImgIcon, Plus, Trash2, Package, Layers, Sparkles, ExternalLink } from 'lucide-react'
 import { createArtikel, updateArtikel, deleteArtikel, replaceVarianten, replaceGebinde } from '../../data/api/artikel.js'
 import { createKategorie } from '../../data/api/kategorien.js'
 import { uploadArtikelBild, deleteArtikelBild } from '../../data/api/storage.js'
-import { enrichArtikel, extractShopLink } from '../../data/api/shopAi.js'
+import { enrichArtikel, extractShopLink, extractShopScreenshot } from '../../data/api/shopAi.js'
 import ArtikelBild from './ArtikelBild.jsx'
 
 export default function ArtikelDialog({ open, onClose, artikel, prefill, kategorien, onSaved }) {
@@ -33,6 +33,8 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
   const [linkUrl, setLinkUrl] = useState('')
   const [linkBusy, setLinkBusy] = useState(false)
   const [linkError, setLinkError] = useState(null)
+  const [screenshotBusy, setScreenshotBusy] = useState(false)
+  const [screenshotError, setScreenshotError] = useState(null)
 
   useEffect(() => {
     if (!open) return
@@ -68,8 +70,53 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       setVarianten([]); setGebinde([])
     }
     setBildDatei(null); setError(null); setAiError(null); setBildsucheQuery('')
-    setLinkUrl(''); setLinkError(null)
+    setLinkUrl(''); setLinkError(null); setScreenshotError(null)
   }, [open, artikel, prefill])
+
+  // Uebernimmt ein KI-Extract-Ergebnis (aus Link oder Screenshot) in die Formularfelder.
+  async function applyExtractResult(result, quellUrl) {
+    if (!result) return
+    if (result.name) setName(result.name)
+    if (result.beschreibung) setBeschreibung(result.beschreibung)
+    if (result.preis_netto != null && !isNaN(Number(result.preis_netto))) {
+      setPreis(String(Number(result.preis_netto).toFixed(2)))
+    }
+    if (result.einheit) setEinheit(result.einheit)
+    if (Array.isArray(result.tags) && result.tags.length) setTagsRaw(result.tags.join(', '))
+    if (result.lieferant) setLieferant(result.lieferant)
+    if (quellUrl) setLieferantUrl(quellUrl)
+    if (result.bild_url) setBildExternUrl(result.bild_url)
+    if (result.bildsuche_query) setBildsucheQuery(result.bildsuche_query)
+    if (result.kategorie) {
+      const cleaned = String(result.kategorie).replace(/^NEU:\s*/i, '').trim()
+      const existing = kategorien.find((k) => k.name.toLowerCase() === cleaned.toLowerCase())
+      if (existing) setKategorieId(existing.id)
+      else if (cleaned) {
+        try {
+          const neu = await createKategorie({ name: cleaned })
+          setKategorieId(neu.id)
+        } catch { /* ignore */ }
+      }
+    }
+  }
+
+  async function handleScreenshotImport(file) {
+    if (!file) return
+    setScreenshotBusy(true); setScreenshotError(null)
+    try {
+      const result = await extractShopScreenshot({
+        file,
+        url: linkUrl.trim(),
+        kategorien: kategorien.map((k) => k.name),
+      })
+      if (!result) throw new Error('Keine Antwort von der KI')
+      await applyExtractResult(result, linkUrl.trim() || null)
+    } catch (e) {
+      setScreenshotError(e.message || 'Screenshot-Analyse fehlgeschlagen')
+    } finally {
+      setScreenshotBusy(false)
+    }
+  }
 
   async function handleLinkImport() {
     if (!linkUrl.trim()) { setLinkError('Bitte URL eingeben.'); return }
@@ -80,33 +127,8 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
         kategorien: kategorien.map((k) => k.name),
       })
       if (!result) throw new Error('Keine Antwort von der KI')
-
-      // Alle Felder fuellen — Link-Import ist "Neuanlage aus URL", darf ueberschreiben
-      if (result.name) setName(result.name)
-      if (result.beschreibung) setBeschreibung(result.beschreibung)
-      if (result.preis_netto != null && !isNaN(Number(result.preis_netto))) {
-        setPreis(String(Number(result.preis_netto).toFixed(2)))
-      }
-      if (result.einheit) setEinheit(result.einheit)
-      if (Array.isArray(result.tags) && result.tags.length) setTagsRaw(result.tags.join(', '))
-      if (result.lieferant) setLieferant(result.lieferant)
-      // Lieferanten-URL = die eingegebene URL
-      setLieferantUrl(linkUrl.trim())
-      if (result.bild_url) setBildExternUrl(result.bild_url)
-      if (result.bildsuche_query) setBildsucheQuery(result.bildsuche_query)
-
-      // Kategorie matchen oder neu anlegen
-      if (result.kategorie) {
-        const cleaned = String(result.kategorie).replace(/^NEU:\s*/i, '').trim()
-        const existing = kategorien.find((k) => k.name.toLowerCase() === cleaned.toLowerCase())
-        if (existing) setKategorieId(existing.id)
-        else if (cleaned) {
-          try {
-            const neu = await createKategorie({ name: cleaned })
-            setKategorieId(neu.id)
-          } catch { /* ignore */ }
-        }
-      }
+      // Link-Import ist "Neuanlage aus URL" — darf alle Felder ueberschreiben
+      await applyExtractResult(result, linkUrl.trim())
     } catch (e) {
       setLinkError(e.message || 'Import fehlgeschlagen')
     } finally {
@@ -242,16 +264,63 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
                 {isNew && (
                   <Box borderWidth="1px" borderRadius="md" p={3} bg="purple.50" borderColor="purple.200">
                     <Text fontWeight="bold" fontSize="sm" mb={2} color="purple.900">
-                      <HStack gap={1} display="inline-flex"><LinkIcon size={12} /> Aus Shop-Link importieren</HStack>
+                      <HStack gap={1} display="inline-flex"><Sparkles size={12} /> Artikel automatisch übernehmen</HStack>
                     </Text>
                     <HStack gap={2}>
-                      <Input size="sm" placeholder="https://shop.example.de/produkt/xyz"
-                        value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} flex="1" />
-                      <Button size="sm" colorPalette="purple" onClick={handleLinkImport} loading={linkBusy} disabled={!linkUrl.trim()}>
-                        <Sparkles size={14} /> Importieren
+                      <Input size="sm" bg="white" placeholder="https://shop.example.de/produkt/xyz"
+                        value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} flex="1"
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleLinkImport() } }} />
+                      <Button size="sm" colorPalette="purple" onClick={handleLinkImport}
+                        loading={linkBusy} disabled={!linkUrl.trim() || screenshotBusy}>
+                        <LinkIcon size={14} /> Aus Link
                       </Button>
                     </HStack>
-                    {linkError && <Text color="red.500" fontSize="xs" mt={2}>{linkError}</Text>}
+                    {linkError && (
+                      <Text color="red.500" fontSize="xs" mt={2}>
+                        {linkError} — versuche es mit einem Screenshot.
+                      </Text>
+                    )}
+
+                    <HStack gap={2} my={2} align="center">
+                      <Box flex="1" h="1px" bg="purple.200" />
+                      <Text fontSize="xs" color="purple.700">oder Screenshot der Produktseite</Text>
+                      <Box flex="1" h="1px" bg="purple.200" />
+                    </HStack>
+
+                    {/* Fallback fuer Bot-Blockaden, SPA-Shops und Login-Walls: Screenshot
+                        einfuegen (Win+Shift+S → Strg+V) oder Datei waehlen. */}
+                    <Box
+                      tabIndex={0}
+                      onPaste={(e) => {
+                        const item = Array.from(e.clipboardData?.items || [])
+                          .find((i) => i.type.startsWith('image/'))
+                        if (!item) return
+                        e.preventDefault()
+                        handleScreenshotImport(item.getAsFile())
+                      }}
+                      borderWidth="1px" borderStyle="dashed" borderColor="purple.300"
+                      borderRadius="md" p={2} bg="white"
+                      _focusVisible={{ borderColor: 'purple.500', outline: 'none', boxShadow: '0 0 0 1px var(--chakra-colors-purple-500)' }}
+                    >
+                      <VStack gap={2} align="stretch">
+                        <Text fontSize="xs" color="fg.muted">
+                          Hierhin klicken und mit <b>Strg+V</b> einfügen (Screenshot mit Win+Shift+S) — oder Datei wählen:
+                        </Text>
+                        <Input size="sm" type="file" accept="image/*" disabled={screenshotBusy || linkBusy}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            e.target.value = ''
+                            handleScreenshotImport(file)
+                          }} />
+                        {screenshotBusy && (
+                          <HStack gap={2}>
+                            <Spinner size="xs" colorPalette="purple" />
+                            <Text fontSize="xs" color="purple.700">Screenshot wird analysiert…</Text>
+                          </HStack>
+                        )}
+                      </VStack>
+                    </Box>
+                    {screenshotError && <Text color="red.500" fontSize="xs" mt={2}>{screenshotError}</Text>}
                   </Box>
                 )}
                 <HStack align="flex-start" gap={4}>

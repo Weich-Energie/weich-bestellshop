@@ -1,5 +1,5 @@
 // shop-ai — KI-Support fuer Bestellshop.
-// Task-Routing: enrich_artikel + analyze_bedarf_bild + extract_beleg + extract_shop_link.
+// Task-Routing: enrich_artikel + analyze_bedarf_bild + extract_beleg + extract_shop_link + extract_shop_screenshot.
 // Modell-Politik (siehe ADR 0003): Sonnet 4.6 fuer alle Tasks — Konsistenz + bessere
 // Qualitaet bei Kategorie/Tag-Matching und Vision-Praezision. Kosten pro Aufruf bleiben
 // bei einem internen Shop absolut vernachlaessigbar (~$0.01). Haiku waere fuer spaetere
@@ -257,6 +257,50 @@ async function extractShopLink(body: any) {
   return json({ result: parsed })
 }
 
+// ─── Task: extract_shop_screenshot ────────────────────────────────────
+// Fallback wenn URL-Import scheitert (Bot-Block, SPA, Login-Wall):
+// User schickt Screenshot der Produktseite als base64 direkt, Sonnet Vision
+// extrahiert die gleichen Felder wie extract_shop_link.
+async function extractShopScreenshot(body: any) {
+  const { image_base64, image_mime_type, url, kategorien } = body
+  if (!image_base64) return json({ error: "image_base64 fehlt" }, 400)
+  let mimeType = image_mime_type || "image/jpeg"
+  if (!["image/jpeg", "image/png", "image/gif", "image/webp"].includes(mimeType)) mimeType = "image/jpeg"
+
+  const katListe = Array.isArray(kategorien) ? kategorien.filter((k: any) => typeof k === "string") : []
+  const katHint = katListe.length ? `Vorhandene Kategorien: ${katListe.join(", ")}. ` : ""
+
+  const systemPrompt =
+    `Du bist Produkt-Extractor fuer den internen Bestellshop von WEICHENERGIE (Weich GmbH) — ` +
+    `Solartechnik-Firma. Aus einem Screenshot einer Produktseite extrahiere die Artikel-Daten. ` +
+    `${katHint} ` +
+    `Antworte STRIKT nur mit JSON (kein Prosa, kein Codeblock). Schema:\n` +
+    `{\n` +
+    `  "name": "praeziser Artikelname",\n` +
+    `  "beschreibung": "1-2 Saetze mit erkennbaren Merkmalen",\n` +
+    `  "preis_netto": 12.34,\n` +
+    `  "einheit": "Stueck|Meter|Packung|...",\n` +
+    `  "kategorie": "passende Kategorie oder NEU:<name>",\n` +
+    `  "tags": ["tag1", "tag2"],\n` +
+    `  "bildsuche_query": "praeziser Suchbegriff falls kein direktes Bild",\n` +
+    `  "lieferant": "Name des Shops/Herstellers",\n` +
+    `  "artikelnr": "Artikel-/Bestell-Nr (leer wenn nicht erkennbar)"\n` +
+    `}\n` +
+    `WICHTIG: Preis IMMER netto. Wenn Brutto ausgewiesen (deutscher Shop, meist 19% MwSt), ` +
+    `netto berechnen: brutto / 1.19. Bei "zzgl. MwSt": Preis ist bereits netto. ` +
+    `Wenn kein Preis erkennbar (Login-Wall etc.): preis_netto null lassen.`
+
+  const userContent = [
+    { type: "image", source: { type: "base64", media_type: mimeType, data: image_base64 } },
+    { type: "text", text: `${url ? `Ursprungs-URL (Kontext): ${url}\n\n` : ""}Extrahiere die Produktdaten aus dem Screenshot.` },
+  ]
+
+  const text = await callClaude(MODEL_LINK, systemPrompt, [{ role: "user", content: userContent }], 1024)
+  const parsed = extractJson(text)
+  if (!parsed) return json({ error: "KI-Antwort nicht parsebar", raw: text }, 502)
+  return json({ result: parsed })
+}
+
 // ─── Entry ────────────────────────────────────────────────────────────
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -287,6 +331,7 @@ Deno.serve(async (req: Request) => {
     if (task === "analyze_bedarf_bild") return await analyzeBedarfBild(body)
     if (task === "extract_beleg") return await extractBeleg(body)
     if (task === "extract_shop_link") return await extractShopLink(body)
+    if (task === "extract_shop_screenshot") return await extractShopScreenshot(body)
     return json({ error: `Unbekannte task: ${task}` }, 400)
   } catch (err) {
     return json({ error: String(err?.message || err) }, 500)

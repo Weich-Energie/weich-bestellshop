@@ -37,3 +37,33 @@ export async function extractShopLink({ url, kategorien = [] }) {
     kategorien,
   })
 }
+
+// Produkt-Daten aus einem Screenshot der Produktseite extrahieren (Sonnet Vision).
+// Fallback fuer Bot-Blockaden, SPA-Shops und Login-Walls.
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = String(reader.result || '')
+      const base64 = dataUrl.split(',')[1] || ''
+      resolve(base64)
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+export async function extractShopScreenshot({ file, url = '', kategorien = [] }) {
+  if (!file) throw new Error('Datei fehlt')
+  const image_base64 = await fileToBase64(file)
+  const mime = file.type && ['image/jpeg','image/png','image/gif','image/webp'].includes(file.type)
+    ? file.type
+    : 'image/jpeg'
+  return invoke({
+    task: 'extract_shop_screenshot',
+    image_base64,
+    image_mime_type: mime,
+    url,
+    kategorien,
+  })
+}
