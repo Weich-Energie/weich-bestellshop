@@ -1,34 +1,44 @@
 import { supabase } from '../../supabaseClient.js'
 
-// functions.invoke wirft bei non-2xx nur "Edge Function returned a non-2xx status
-// code" und verschluckt den Response-Body — dort steht aber unsere echte
-// Fehlermeldung (z.B. der Anthropic-API-Fehler). Also nachlesen.
-async function readFunctionError(error) {
-  const res = error?.context
-  if (!res || typeof res.text !== 'function') return null
-  try {
-    const raw = await res.text()
-    if (!raw) return null
-    try {
-      const body = JSON.parse(raw)
-      return body?.error || raw.slice(0, 300)
-    } catch {
-      return raw.slice(0, 300)
-    }
-  } catch {
-    return null
-  }
-}
+const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/shop-ai`
 
-// Ruft die shop-ai Edge Function mit gegebenem Task-Payload.
+// Bewusst kein supabase.functions.invoke: das wirft bei non-2xx nur
+// "Edge Function returned a non-2xx status code" und macht den Response-Body
+// unzugaenglich — dort steht aber die eigentliche Ursache (z.B. der
+// Anthropic-API-Fehler). Mit fetch lesen wir Status und Body selbst und
+// bekommen immer eine konkrete Meldung, auch wenn der Body leer ist.
 async function invoke(payload) {
-  const { data, error } = await supabase.functions.invoke('shop-ai', { body: payload })
-  if (error) {
-    const detail = await readFunctionError(error)
-    throw new Error(detail || error.message || 'Unbekannter Fehler der Edge Function')
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData?.session?.access_token
+  if (!token) throw new Error('Keine gültige Session — bitte neu anmelden.')
+
+  let res
+  try {
+    res = await fetch(FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify(payload),
+    })
+  } catch (e) {
+    throw new Error(`Netzwerkfehler beim Aufruf der KI-Funktion: ${e.message || e}`)
   }
-  if (data?.error) throw new Error(data.error)
-  return data?.result || null
+
+  const raw = await res.text()
+  let body = null
+  if (raw) {
+    try { body = JSON.parse(raw) } catch { /* kein JSON — raw unten anzeigen */ }
+  }
+
+  if (!res.ok) {
+    const detail = body?.error || (raw ? raw.slice(0, 400) : '(leere Antwort)')
+    throw new Error(`KI-Funktion HTTP ${res.status}: ${detail}`)
+  }
+  if (body?.error) throw new Error(body.error)
+  return body?.result || null
 }
 
 // KI-Vorschlaege fuer einen neu anzulegenden Artikel (Text-only, Haiku).
