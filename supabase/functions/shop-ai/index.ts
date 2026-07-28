@@ -1,6 +1,6 @@
 // shop-ai — KI-Support fuer Bestellshop.
-// Task-Routing: enrich_artikel + analyze_bedarf_bild.
-// Modell-Politik (siehe ADR 0003): Sonnet 4.6 fuer beide Tasks — Konsistenz + bessere
+// Task-Routing: enrich_artikel + analyze_bedarf_bild + extract_beleg.
+// Modell-Politik (siehe ADR 0003): Sonnet 4.6 fuer alle Tasks — Konsistenz + bessere
 // Qualitaet bei Kategorie/Tag-Matching und Vision-Praezision. Kosten pro Aufruf bleiben
 // bei einem internen Shop absolut vernachlaessigbar (~$0.01). Haiku waere fuer spaetere
 // Live-Suggestion-Szenarien oder Bot-Klick-Entscheidungen die richtige Wahl.
@@ -18,9 +18,10 @@ const CORS_HEADERS = {
 
 const HAIKU = "claude-haiku-4-5"
 const SONNET = "claude-sonnet-4-6"
-// Modell-Zuordnung pro Task (siehe Kommentar in enrichArtikel/analyzeBedarfBild).
+// Modell-Zuordnung pro Task (siehe Kommentar oben — Konsistenz + Qualitaet).
 const MODEL_ENRICH = SONNET
 const MODEL_VISION = SONNET
+const MODEL_BELEG = SONNET
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: CORS_HEADERS })
@@ -134,6 +135,61 @@ async function analyzeBedarfBild(body: any) {
   return json({ result: parsed })
 }
 
+// ─── Task: extract_beleg ─────────────────────────────────────────────
+// Laedt PDF von signed URL, sendet als "document"-Content an Sonnet Vision,
+// erwartet strukturiertes JSON mit Meta (Lieferant, Datum, Nr, Summe) + Positionen.
+async function extractBeleg(body: any) {
+  const { pdf_url, kategorien } = body
+  if (!pdf_url) return json({ error: "pdf_url fehlt" }, 400)
+
+  const pdfRes = await fetch(pdf_url)
+  if (!pdfRes.ok) return json({ error: `PDF-Download fehlgeschlagen: ${pdfRes.status}` }, 502)
+  const buf = await pdfRes.arrayBuffer()
+  if (buf.byteLength > 32 * 1024 * 1024) return json({ error: "PDF > 32 MB — Anthropic-Limit" }, 413)
+  const base64 = bytesToBase64(new Uint8Array(buf))
+
+  const katListe = Array.isArray(kategorien) ? kategorien.filter((k: any) => typeof k === "string") : []
+  const katHint = katListe.length ? `Vorhandene Kategorien: ${katListe.join(", ")}. ` : ""
+
+  const systemPrompt =
+    `Du bist Rechnungs-Extractor fuer den internen Bestellshop von WEICHENERGIE (Weich GmbH) — ` +
+    `Solartechnik-Firma (PV, Waermepumpen, Wallboxen, Speicher). ` +
+    `Analysiere die PDF-Rechnung und liefere strukturierte Daten. ` +
+    `${katHint} ` +
+    `Antworte STRIKT nur mit JSON (kein Prosa, kein Codeblock). Schema:\n` +
+    `{\n` +
+    `  "lieferant": "Name des Rechnungsstellers",\n` +
+    `  "rechnungsnr": "Rechnungs-Nr (leer wenn nicht erkennbar)",\n` +
+    `  "rechnungsdatum": "YYYY-MM-DD (leer wenn nicht erkennbar)",\n` +
+    `  "gesamtbetrag": 1234.56,\n` +
+    `  "positionen": [\n` +
+    `    {\n` +
+    `      "beschreibung": "Artikel-Text von der Rechnung",\n` +
+    `      "menge": 5,\n` +
+    `      "einzelpreis": 12.34,\n` +
+    `      "artikelnr": "Artikelnummer (leer wenn nicht angegeben)",\n` +
+    `      "kategorie": "passende Katalog-Kategorie oder NEU:<name>",\n` +
+    `      "tags": ["tag1", "tag2"],\n` +
+    `      "einheit": "Stueck|Meter|Packung|..."\n` +
+    `    }\n` +
+    `  ]\n` +
+    `}\n` +
+    `WICHTIG: Nur echte Warenpositionen extrahieren, KEINE Zeilen wie "Zwischensumme", ` +
+    `"MwSt", "Versandkosten", "Rabatt", "Endbetrag", "Fracht". ` +
+    `Preise IMMER netto (falls brutto ausgewiesen, netto berechnen falls MwSt-Satz erkennbar). ` +
+    `Deutsche Zahlen (Komma als Dezimal) in Zahlen mit Punkt umwandeln.`
+
+  const userContent = [
+    { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
+    { type: "text", text: "Extrahiere aus dieser Rechnung die Meta-Daten und alle Warenpositionen." },
+  ]
+
+  const text = await callClaude(MODEL_BELEG, systemPrompt, [{ role: "user", content: userContent }], 4096)
+  const parsed = extractJson(text)
+  if (!parsed) return json({ error: "KI-Antwort nicht parsebar", raw: text }, 502)
+  return json({ result: parsed })
+}
+
 // ─── Entry ────────────────────────────────────────────────────────────
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -162,6 +218,7 @@ Deno.serve(async (req: Request) => {
     const task = body?.task
     if (task === "enrich_artikel") return await enrichArtikel(body)
     if (task === "analyze_bedarf_bild") return await analyzeBedarfBild(body)
+    if (task === "extract_beleg") return await extractBeleg(body)
     return json({ error: `Unbekannte task: ${task}` }, 400)
   } catch (err) {
     return json({ error: String(err?.message || err) }, 500)
