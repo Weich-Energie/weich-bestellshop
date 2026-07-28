@@ -1,5 +1,9 @@
 // shop-ai — KI-Support fuer Bestellshop.
-// Task-Routing: enrich_artikel (Text, Haiku), analyze_bedarf_bild (Vision, Sonnet).
+// Task-Routing: enrich_artikel + analyze_bedarf_bild.
+// Modell-Politik (siehe ADR 0003): Sonnet 4.6 fuer beide Tasks — Konsistenz + bessere
+// Qualitaet bei Kategorie/Tag-Matching und Vision-Praezision. Kosten pro Aufruf bleiben
+// bei einem internen Shop absolut vernachlaessigbar (~$0.01). Haiku waere fuer spaetere
+// Live-Suggestion-Szenarien oder Bot-Klick-Entscheidungen die richtige Wahl.
 // JWT-Auth ueber Supabase getUser. Anthropic-Key aus Env (shared mit ai-chat/ai-analyze).
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
@@ -14,6 +18,9 @@ const CORS_HEADERS = {
 
 const HAIKU = "claude-haiku-4-5"
 const SONNET = "claude-sonnet-4-6"
+// Modell-Zuordnung pro Task (siehe Kommentar in enrichArtikel/analyzeBedarfBild).
+const MODEL_ENRICH = SONNET
+const MODEL_VISION = SONNET
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: CORS_HEADERS })
@@ -84,7 +91,7 @@ async function enrichArtikel(body: any) {
     `"einheit": "Stueck|Meter|Packung|Karton|..."}`
 
   const userMessage = `Artikel-Name: ${name}\n${beschreibung ? `Zusatzinfo: ${beschreibung}\n` : ""}`
-  const text = await callClaude(HAIKU, systemPrompt, [{ role: "user", content: userMessage }], 512)
+  const text = await callClaude(MODEL_ENRICH, systemPrompt, [{ role: "user", content: userMessage }], 512)
   const parsed = extractJson(text)
   if (!parsed) return json({ error: "KI-Antwort nicht parsebar", raw: text }, 502)
   return json({ result: parsed })
@@ -121,7 +128,7 @@ async function analyzeBedarfBild(body: any) {
     { type: "text", text: `Foto-Kontext: ${beschreibung || "(kein Text vom Anfrager)"}\n\nAnalysiere das Bild.` },
   ]
 
-  const text = await callClaude(SONNET, systemPrompt, [{ role: "user", content: userContent }], 800)
+  const text = await callClaude(MODEL_VISION, systemPrompt, [{ role: "user", content: userContent }], 800)
   const parsed = extractJson(text)
   if (!parsed) return json({ error: "KI-Antwort nicht parsebar", raw: text }, 502)
   return json({ result: parsed })
