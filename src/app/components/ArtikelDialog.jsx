@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import {
-  Dialog, Portal, Button, Field, Input, Textarea, VStack, HStack, Box, Text,
+  Dialog, Portal, Button, Field, Input, Textarea, VStack, HStack, Stack, Box, Text,
   Select, NativeSelect, IconButton, Flex, Spacer, Spinner, createListCollection,
 } from '@chakra-ui/react'
 import { X, Upload, Link as LinkIcon, Image as ImgIcon, Plus, Trash2, Package, Layers, Sparkles, ExternalLink } from 'lucide-react'
@@ -399,7 +399,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
                   </VStack>
                 </HStack>
 
-                <HStack gap={2}>
+                <Stack direction={{ base: 'column', md: 'row' }} gap={2}>
                   <Field.Root>
                     <Field.Label>Kategorie</Field.Label>
                     <NativeSelect.Root>
@@ -414,14 +414,14 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
                     <Field.Label>Einheit</Field.Label>
                     <Input value={einheit} onChange={(e) => setEinheit(e.target.value)} placeholder="Stück, Meter, Packung..." />
                   </Field.Root>
-                </HStack>
+                </Stack>
 
                 <Field.Root>
                   <Field.Label>Tags (kommagetrennt)</Field.Label>
                   <Input value={tagsRaw} onChange={(e) => setTagsRaw(e.target.value)} placeholder="cat6, verbrauch, elektrik" />
                 </Field.Root>
 
-                <HStack gap={2} align="flex-end">
+                <Stack direction={{ base: 'column', md: 'row' }} gap={2} align={{ base: 'stretch', md: 'flex-end' }}>
                   <Field.Root flex="2">
                     <Field.Label>Lieferant</Field.Label>
                     <Input value={lieferant} onChange={(e) => setLieferant(e.target.value)} placeholder="Reichelt, Conrad, Amazon..." />
@@ -434,7 +434,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
                     <Field.Label>Preis (netto, €)</Field.Label>
                     <Input value={preis} onChange={(e) => setPreis(e.target.value)} placeholder="0,00" />
                   </Field.Root>
-                </HStack>
+                </Stack>
 
                 <Field.Root>
                   <Field.Label>Lieferanten-URL</Field.Label>

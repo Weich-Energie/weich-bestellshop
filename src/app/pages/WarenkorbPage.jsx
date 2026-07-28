@@ -63,7 +63,7 @@ export default function WarenkorbPage() {
             {positionen.map((p) => (
               <Box key={p.id} borderWidth="1px" borderRadius="lg" p={3} bg="white">
                 <HStack gap={3} align="flex-start">
-                  <ArtikelBild artikel={p.shop_artikel} size="80px" />
+                  <ArtikelBild artikel={p.shop_artikel} size="80px" kantenlaenge={200} />
                   <VStack align="stretch" gap={1} flex="1">
                     <PositionText
                       artikel={p.shop_artikel}

@@ -42,13 +42,31 @@ export async function deleteBedarfBild(path) {
 
 // Signed-URL fuer ein privates Bild — Bucket wird per Prefix des Pfads bestimmt.
 // Fallback: shop-artikel (Rueckwaertskompatibilitaet).
-export async function getSignedUrl(path, expiresIn = 3600, bucket = ARTIKEL_BUCKET) {
+export async function getSignedUrl(path, expiresIn = 3600, bucket = ARTIKEL_BUCKET, transform = null) {
   if (!path) return null
-  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, expiresIn)
+  const options = transform ? { transform } : undefined
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, expiresIn, options)
   if (error) throw error
   return data?.signedUrl || null
 }
 
+// Serverseitig skaliertes Vorschaubild (Supabase Image Transformation, Pro-Plan).
+// Wichtig fuer Mobilfunk: ein 4-MB-Handyfoto wird sonst in Originalgroesse
+// geladen, nur um in einer 120-px-Kachel zu landen.
+// Quadratisch + cover, weil alle Kacheln quadratisch sind und objectFit="cover" nutzen.
+// Die Anfrage laeuft ueber die Einzel-API, weil createSignedUrls (Batch) kein
+// transform kennt — die Ersparnis an Bytes wiegt die Extra-Requests deutlich auf.
+export async function getBildVorschauUrl(path, kantenlaenge = 400, bucket = ARTIKEL_BUCKET) {
+  return getSignedUrl(path, 3600, bucket, {
+    width: kantenlaenge,
+    height: kantenlaenge,
+    resize: 'cover',
+    quality: 75,
+  })
+}
+
+// Ohne transform — die Bedarfs-Bilder gehen so auch an die KI-Bildanalyse,
+// die von voller Auflösung profitiert.
 export async function getBedarfSignedUrl(path, expiresIn = 3600) {
   return getSignedUrl(path, expiresIn, BEDARF_BUCKET)
 }

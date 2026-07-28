@@ -117,7 +117,8 @@ export default function AdminKatalogPage() {
         {loadingArt ? (
           <Flex justify="center" p={8}><Spinner /></Flex>
         ) : (
-          <Table.Root variant="line" size="sm">
+          <Box overflowX="auto">
+          <Table.Root variant="line" size="sm" minW="720px">
             <Table.Header>
               <Table.Row>
                 <Table.ColumnHeader></Table.ColumnHeader>
@@ -132,7 +133,7 @@ export default function AdminKatalogPage() {
             <Table.Body>
               {gefiltert.map((a) => (
                 <Table.Row key={a.id}>
-                  <Table.Cell><ArtikelBild artikel={a} size="48px" /></Table.Cell>
+                  <Table.Cell><ArtikelBild artikel={a} size="48px" kantenlaenge={120} /></Table.Cell>
                   <Table.Cell>
                     <Text fontWeight="medium" fontSize="sm">{a.name}</Text>
                     {a.tags?.length > 0 && (
@@ -171,6 +172,7 @@ export default function AdminKatalogPage() {
               )}
             </Table.Body>
           </Table.Root>
+          </Box>
         )}
       </Box>
 

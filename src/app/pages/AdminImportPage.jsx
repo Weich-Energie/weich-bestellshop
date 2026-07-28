@@ -143,7 +143,8 @@ function PositionsAnsicht({ belegId, kategorien, onClose }) {
         <Text fontSize="sm" color="fg.muted">{positionen.length} Position{positionen.length !== 1 ? 'en' : ''}</Text>
       </HStack>
 
-      <Table.Root variant="line" size="sm">
+      <Box overflowX="auto">
+          <Table.Root variant="line" size="sm" minW="720px">
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader>Status</Table.ColumnHeader>
@@ -220,6 +221,7 @@ function PositionsAnsicht({ belegId, kategorien, onClose }) {
           })}
         </Table.Body>
       </Table.Root>
+          </Box>
 
       <ArtikelDialog
         open={dialogOpen}

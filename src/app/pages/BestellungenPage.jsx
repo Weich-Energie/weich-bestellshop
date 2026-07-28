@@ -58,7 +58,7 @@ export default function BestellungenPage() {
             return (
               <Box key={b.id} borderWidth="1px" borderRadius="lg" p={3} bg="white">
                 <HStack gap={3} align="flex-start">
-                  <ArtikelBild artikel={b.shop_artikel} size="72px" />
+                  <ArtikelBild artikel={b.shop_artikel} size="72px" kantenlaenge={200} />
                   <VStack align="stretch" gap={1} flex="1">
                     <HStack gap={2} align="center" flexWrap="wrap">
                       <PositionText artikel={b.shop_artikel} variante={b.variante} gebinde={b.gebinde} menge={b.menge} />
