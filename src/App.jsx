@@ -45,7 +45,9 @@ export default function App() {
           path="/"
           element={<ProtectedRoute><Layout /></ProtectedRoute>}
         >
-          <Route index element={<KatalogPage />} />
+          {/* Auf /katalog umleiten statt den Katalog auch unter "/" zu rendern:
+              sonst ist auf der Startseite kein Navigationspunkt als aktiv markiert. */}
+          <Route index element={<Navigate to="/katalog" replace />} />
           <Route path="katalog" element={<KatalogPage />} />
           <Route path="warenkorb" element={<WarenkorbPage />} />
           <Route path="bestellungen" element={<BestellungenPage />} />

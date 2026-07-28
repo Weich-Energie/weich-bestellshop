@@ -55,7 +55,7 @@ export default function WarenkorbPage() {
         <Flex direction="column" align="center" gap={3} py={12}>
           <ShoppingCart size={48} color="#9ca3af" />
           <Text color="fg.muted">Dein Warenkorb ist leer.</Text>
-          <Button size="sm" onClick={() => navigate('/katalog')}>Zum Katalog</Button>
+          <Button size="sm" colorPalette="blue" onClick={() => navigate('/katalog')}>Zum Katalog</Button>
         </Flex>
       ) : (
         <>

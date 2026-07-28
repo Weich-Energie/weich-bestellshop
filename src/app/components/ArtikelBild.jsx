@@ -11,10 +11,14 @@ import { getBildVorschauUrl } from '../../data/api/storage.js'
 // Performance: jede Kachel braucht eine eigene signierte URL. Damit ein Katalog mit
 // 60 Artikeln nicht 60 Requests auf einmal feuert, wird erst geladen, wenn die Kachel
 // in Sichtweite kommt. Beim ersten Rendern sind das nur die sichtbaren Kacheln.
+// verhaeltnis: statt fester Hoehe ein Seitenverhaeltnis (1 = quadratisch). Ohne das
+// bekamen Karten mit und ohne Bild unterschiedlich hohe Bildflaechen und die
+// Katalog-Reihen franste aus.
 export default function ArtikelBild({
   artikel,
   previewUrl = null,
   size = '120px',
+  verhaeltnis = null,
   kantenlaenge = 400,
   rounded = 'md',
   bg = 'gray.50',
@@ -53,7 +57,11 @@ export default function ArtikelBild({
   return (
     <Box
       ref={boxRef}
-      w={size} h={size} borderRadius={rounded} bg={bg} borderWidth="1px"
+      w={size}
+      h={verhaeltnis ? undefined : size}
+      aspectRatio={verhaeltnis || undefined}
+      flexShrink={0}
+      borderRadius={rounded} bg={bg} borderWidth="1px"
       overflow="hidden" display="flex" alignItems="center" justifyContent="center"
     >
       {src && !fehlt ? (

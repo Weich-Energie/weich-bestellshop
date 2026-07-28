@@ -33,7 +33,7 @@ function FavKarte({ artikel, onUnfav, onCart }) {
           <Heart size={16} fill="currentColor" />
         </IconButton>
       </Box>
-      <ArtikelBild artikel={artikel} size="100%" />
+      <ArtikelBild artikel={artikel} size="100%" verhaeltnis={1} />
       <VStack align="stretch" gap={1}>
         <Text fontWeight="bold" fontSize="sm" lineClamp={2}>{artikel.name}</Text>
         {artikel.tags?.length > 0 && (
@@ -54,23 +54,27 @@ function FavKarte({ artikel, onUnfav, onCart }) {
           {gebinde.map((g) => <option key={g.id} value={g.id}>{g.name} (à {g.stueckzahl} Stk)</option>)}
         </select>
       )}
-      <HStack gap={2} mt="auto">
-        <HStack gap={0} borderWidth="1px" borderRadius="md" bg="white">
-          <IconButton size="xs" variant="ghost" onClick={() => setMenge((m) => Math.max(1, m - 1))} aria-label="Weniger"><Minus size={12} /></IconButton>
-          <Input variant="flushed" size="sm" type="number" min={1} value={menge}
-            onChange={(e) => setMenge(Math.max(1, Number(e.target.value) || 1))}
-            textAlign="center" w="40px" border="none" px={0} />
-          <IconButton size="xs" variant="ghost" onClick={() => setMenge((m) => m + 1)} aria-label="Mehr"><Plus size={12} /></IconButton>
+      {/* Gleiche Aufteilung wie im Katalog — eine Zeile reichte nicht, der Button
+          war abgeschnitten. */}
+      <VStack align="stretch" gap={2} mt="auto">
+        <HStack gap={2} justify="space-between">
+          <HStack gap={0} borderWidth="1px" borderRadius="md" bg="white">
+            <IconButton size="sm" variant="ghost" onClick={() => setMenge((m) => Math.max(1, m - 1))} aria-label="Weniger"><Minus size={14} /></IconButton>
+            <Input variant="flushed" size="sm" type="number" min={1} value={menge}
+              onChange={(e) => setMenge(Math.max(1, Number(e.target.value) || 1))}
+              textAlign="center" w="44px" border="none" px={0} />
+            <IconButton size="sm" variant="ghost" onClick={() => setMenge((m) => m + 1)} aria-label="Mehr"><Plus size={14} /></IconButton>
+          </HStack>
+          {artikel.lieferant_url && (
+            <IconButton size="sm" variant="outline" asChild aria-label="Lieferant">
+              <a href={artikel.lieferant_url} target="_blank" rel="noreferrer"><ExternalLink size={14} /></a>
+            </IconButton>
+          )}
         </HStack>
-        <Button size="sm" colorPalette="blue" flex="1" loading={busy} onClick={handleCart}>
-          <ShoppingCart size={14} /> In Warenkorb
+        <Button size="sm" colorPalette="blue" w="100%" minW={0} loading={busy} onClick={handleCart}>
+          <ShoppingCart size={14} /> In den Warenkorb
         </Button>
-        {artikel.lieferant_url && (
-          <IconButton size="sm" variant="outline" asChild aria-label="Lieferant">
-            <a href={artikel.lieferant_url} target="_blank" rel="noreferrer"><ExternalLink size={14} /></a>
-          </IconButton>
-        )}
-      </HStack>
+      </VStack>
       {gebindeObj && menge > 0 && (
         <Text fontSize="xs" color="fg.muted" textAlign="right">= {gesamtStk} Stk</Text>
       )}
