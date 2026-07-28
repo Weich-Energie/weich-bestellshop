@@ -1,8 +1,9 @@
 import React from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Box, Heading, Text, HStack, VStack, Badge, Spinner, Flex, Button } from '@chakra-ui/react'
-import { XCircle } from 'lucide-react'
+import { XCircle, Check } from 'lucide-react'
 import { listEigeneBestellungen, zurueckziehen } from '../../data/api/bestellungen.js'
+import { markiereAbgeholt } from '../../data/api/orders.js'
 import ArtikelBild from '../components/ArtikelBild.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 
@@ -34,6 +35,10 @@ export default function BestellungenPage() {
 
   const withdrawMutation = useMutation({
     mutationFn: zurueckziehen,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shop-bestellungen', currentUser?.authId] }),
+  })
+  const abgeholtMutation = useMutation({
+    mutationFn: markiereAbgeholt,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['shop-bestellungen', currentUser?.authId] }),
   })
 
@@ -68,6 +73,11 @@ export default function BestellungenPage() {
                   {canWithdraw && (
                     <Button size="xs" variant="ghost" colorPalette="red" onClick={() => withdrawMutation.mutate(b.id)}>
                       <XCircle size={14} /> Zurückziehen
+                    </Button>
+                  )}
+                  {b.status === 'received' && (
+                    <Button size="xs" colorPalette="green" onClick={() => abgeholtMutation.mutate(b.id)}>
+                      <Check size={14} /> Abgeholt
                     </Button>
                   )}
                 </HStack>

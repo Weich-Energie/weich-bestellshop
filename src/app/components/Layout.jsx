@@ -1,7 +1,7 @@
 import React from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Box, Flex, HStack, Text, Button, Spacer, Badge } from '@chakra-ui/react'
-import { ShoppingCart, Package, ClipboardList, Heart, Send, LayoutGrid, LogOut, ShieldCheck, Eye, EyeOff } from 'lucide-react'
+import { ShoppingCart, Package, ClipboardList, Heart, Send, LayoutGrid, LogOut, ShieldCheck, Eye, EyeOff, Truck } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.jsx'
 
 function Nav({ to, icon: Icon, children }) {
@@ -43,6 +43,7 @@ export default function Layout() {
                 <Box borderLeftWidth="1px" mx={2} h={6} />
                 <Nav to="/admin/katalog" icon={Package}>Katalog verwalten</Nav>
                 <Nav to="/admin/freigabe" icon={ShieldCheck}>Freigaben</Nav>
+                <Nav to="/admin/bestellungen" icon={Truck}>Bestellungen</Nav>
                 <Nav to="/admin/bedarf" icon={Send}>Bedarfsmeldungen</Nav>
                 <Nav to="/admin/import" icon={Package}>Beleg-Import</Nav>
               </>

@@ -13,6 +13,7 @@ import AdminKatalogPage from './app/pages/AdminKatalogPage.jsx'
 import AdminFreigabePage from './app/pages/AdminFreigabePage.jsx'
 import AdminImportPage from './app/pages/AdminImportPage.jsx'
 import AdminBedarfPage from './app/pages/AdminBedarfPage.jsx'
+import AdminBestellungenPage from './app/pages/AdminBestellungenPage.jsx'
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { isAuthenticated, isAdmin, loading } = useAuth()
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="favoriten" element={<FavoritenPage />} />
         <Route path="admin/katalog" element={<ProtectedRoute adminOnly><AdminKatalogPage /></ProtectedRoute>} />
         <Route path="admin/freigabe" element={<ProtectedRoute adminOnly><AdminFreigabePage /></ProtectedRoute>} />
+        <Route path="admin/bestellungen" element={<ProtectedRoute adminOnly><AdminBestellungenPage /></ProtectedRoute>} />
         <Route path="admin/import" element={<ProtectedRoute adminOnly><AdminImportPage /></ProtectedRoute>} />
         <Route path="admin/bedarf" element={<ProtectedRoute adminOnly><AdminBedarfPage /></ProtectedRoute>} />
       </Route>
