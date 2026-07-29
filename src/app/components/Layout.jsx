@@ -51,6 +51,7 @@ export default function Layout() {
           <Nav to="/admin/historie" icon={History}>Historie</Nav>
           <Nav to="/admin/bedarf" icon={Send}>Bedarfsmeldungen</Nav>
           <Nav to="/admin/import" icon={Package}>Beleg-Import</Nav>
+          <Nav to="/admin/lieferanten" icon={Truck}>Lieferanten</Nav>
         </>
       )}
     </>

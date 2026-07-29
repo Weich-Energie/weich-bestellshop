@@ -20,6 +20,7 @@ const AdminImportPage = lazy(() => import('./app/pages/AdminImportPage.jsx'))
 const AdminBedarfPage = lazy(() => import('./app/pages/AdminBedarfPage.jsx'))
 const AdminBestellungenPage = lazy(() => import('./app/pages/AdminBestellungenPage.jsx'))
 const AdminHistoriePage = lazy(() => import('./app/pages/AdminHistoriePage.jsx'))
+const AdminLieferantenPage = lazy(() => import('./app/pages/AdminLieferantenPage.jsx'))
 
 function Ladeanzeige() {
   return <Flex minH="60vh" align="center" justify="center"><Spinner size="xl" /></Flex>
@@ -58,6 +59,7 @@ export default function App() {
           <Route path="admin/bestellungen" element={<ProtectedRoute adminOnly><AdminBestellungenPage /></ProtectedRoute>} />
           <Route path="admin/historie" element={<ProtectedRoute adminOnly><AdminHistoriePage /></ProtectedRoute>} />
           <Route path="admin/import" element={<ProtectedRoute adminOnly><AdminImportPage /></ProtectedRoute>} />
+          <Route path="admin/lieferanten" element={<ProtectedRoute adminOnly><AdminLieferantenPage /></ProtectedRoute>} />
           <Route path="admin/bedarf" element={<ProtectedRoute adminOnly><AdminBedarfPage /></ProtectedRoute>} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
