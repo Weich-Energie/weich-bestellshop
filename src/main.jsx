@@ -23,7 +23,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <ChakraProvider value={defaultSystem}>
-        <BrowserRouter>
+        {/* basename aus Vite BASE_URL ('/bestellshop/'), damit der Pfad-Praefix nur
+            an einer Stelle (vite.config.js) definiert ist. */}
+        <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
           <AuthProvider>
             <App />
           </AuthProvider>

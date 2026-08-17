@@ -5,6 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#3182CE" />
     <title>Weich Bestellshop</title>
+    <script>
+      // Alte Adresse leitet auf die Dach-App um. Muss inline und vor dem Modul-Skript
+      // stehen: seit base='/bestellshop/' zeigen die Bundle-Pfade auf
+      // /bestellshop/assets/..., die es unter der alten Origin nicht gibt.
+      // Unter der Dach-Origin liefert der Rewrite dieselbe Datei aus, dort greift die
+      // Bedingung nicht.
+      ;(function () {
+        var ALT_HOST = 'weich-bestellshop.vercel.app'
+        var DACH_URL = 'https://weich-energie-app.vercel.app/bestellshop'
+        if (window.location.hostname === ALT_HOST) {
+          window.location.replace(
+            DACH_URL + window.location.pathname + window.location.search + window.location.hash
+          )
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

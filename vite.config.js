@@ -1,7 +1,13 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+// Die App laeuft unter der Dach-App (Weich-Energie-App) im Pfad /bestellshop/.
+// BASE ist die einzige Stelle mit dem Praefix: Vite leitet daraus die Asset-URLs
+// und import.meta.env.BASE_URL ab, der Router zieht ihn in main.jsx daraus.
+const BASE = '/bestellshop/'
+
 export default defineConfig({
+  base: BASE,
   plugins: [react()],
   build: {
     rolldownOptions: {

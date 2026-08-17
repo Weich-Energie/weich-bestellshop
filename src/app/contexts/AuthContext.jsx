@@ -70,7 +70,8 @@ export function AuthProvider({ children }) {
         return
       }
       if (!hasShopAccess(profile)) {
-        await supabase.auth.signOut()
+        // Kein signOut: Unter der gemeinsamen Origin der Dach-App wuerde das den
+        // Nutzer auch aus den Apps werfen, fuer die er freigeschaltet ist.
         setAccessDeniedMessage(NO_ACCESS_MESSAGE)
         setLoading(false)
         return
@@ -86,7 +87,7 @@ export function AuthProvider({ children }) {
         const profile = await loadUserProfile(newSession.user)
         if (!profile) return
         if (!hasShopAccess(profile)) {
-          await supabase.auth.signOut()
+          // Kein signOut: Die Session gehoert der ganzen Dach-App.
           setAccessDeniedMessage(NO_ACCESS_MESSAGE)
           return
         }
@@ -136,7 +137,9 @@ export function AuthProvider({ children }) {
 
   const resetPassword = useCallback(async (email) => {
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/update-password`,
+      // BASE_URL ('/bestellshop/') muss mit rein: unter der Dach-App liegt die Route
+      // nicht auf der Origin-Wurzel, sonst landet der Reset-Link bei der Shell.
+      redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}update-password`,
     })
     if (resetError) throw resetError
   }, [])
