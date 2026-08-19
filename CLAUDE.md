@@ -23,8 +23,10 @@ Ressourcenplanung, Service-Ticket und Betriebsradar.
   `berechtigungen.rolle === 'admin'`
 
 ## Deploy
-- Auto-Deploy: Vercel↔GitHub, Production-Branch `master`
-- Nach Aenderungen: `npx vite build` (Check), commit, push — Deploy folgt automatisch
+- **Kein Auto-Deploy** (nachgeprueft 19.08.2026: nur CLI-Deployments in `vercel ls`,
+  ein `git push` loeste nichts aus)
+- Nach Aenderungen: `npx vite build` (Check), commit, push, dann **manuell**
+  `npx vercel --prod --yes --scope patrick-weichs-projects`
 - `.env` wird via Vercel-Env-Vars gepflegt, `.env.example` im Repo
 
 ## Cross-App-Integration
