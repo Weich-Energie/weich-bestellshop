@@ -23,10 +23,18 @@ Ressourcenplanung, Service-Ticket und Betriebsradar.
   `berechtigungen.rolle === 'admin'`
 
 ## Deploy
-- **Kein Auto-Deploy** (nachgeprueft 19.08.2026: nur CLI-Deployments in `vercel ls`,
-  ein `git push` loeste nichts aus)
-- Nach Aenderungen: `npx vite build` (Check), commit, push, dann **manuell**
-  `npx vercel --prod --yes --scope patrick-weichs-projects`
+- **Auto-Deploy ist aktiv** (Stand 21.08.2026). Das Vercel-Projekt ist mit
+  `pawe1307/weich-bestellshop` verbunden; ein Push nach `master` loest ein
+  Production-Deployment aus. Die aeltere Notiz „kein Auto-Deploy" vom 19.08.
+  ist ueberholt.
+- Ablauf: `npx vite build` (Check), commit, `git push` — ab da ist es live.
+- **Unfertiges gehoert auf einen Branch**, nicht auf `master`. Branch-Pushes
+  erzeugen Vorschau-Deployments und lassen die Produktion unberuehrt.
+- `npx vercel --prod` geht weiterhin, deployt aber den **lokalen Ordner** statt
+  des Repos — im August hat das bei der Service-Ticket-App vier Monate Arbeit
+  aus der Produktion entfernt. Im Zweifel nicht verwenden.
+- Das Projekt zieht ins Vercel-Team `weich-team` um; danach gilt fuer die CLI
+  `--scope weich-team`.
 - `.env` wird via Vercel-Env-Vars gepflegt, `.env.example` im Repo
 
 ## Cross-App-Integration
