@@ -7,3 +7,7 @@ dist
 .vite
 *.local
 .vercel
+
+.env*
+# Muss nach .env* stehen: die letzte passende Regel gewinnt.
+!.env.example
