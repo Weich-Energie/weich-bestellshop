@@ -80,9 +80,52 @@ Muster C ist der Glücksfall: dort ist das Ist bereits in PDS erfasst und muss
 nicht nachgetragen werden. `pds-auftrag-soll` weist es als
 `soll.ist_bereits_erfasst` aus und sagt im Hinweis, welcher Art der Auftrag folgt.
 
-Muster C ist noch nicht an einem Auftrag verifiziert — die PDS-Verbindung fiel
-während der Prüfung aus. Die Logik ist auf `positionsTyp` gebaut und deckt alle
-drei Fälle ab, aber die Zahlen dafür fehlen noch.
+Eine Katalogsuche nach einer Leistung „Vielen Dank" liefert allerdings null
+Treffer. Muster C ist an keinem Auftrag belegt; die Logik hängt an `positionsTyp`
+und deckt den Fall ab, falls er auftritt.
+
+## Der eigentliche Stolperstein: Einkaufspreis gleich Verkaufspreis
+
+Auftrag 2026-127 (belegt 31.03.2026) zeigt, wie neuere Aufträge aussehen. Die
+Montagepositionen tragen jetzt einen Katalogbezug — aber sieh auf die Preise:
+
+| Position | Menge | EK | VK |
+|---|---|---|---|
+| Perfera Außengerät 5,0 kW | 2 Stck | 2.015,14 € | 4.840,00 € |
+| Perfera Wandgerät 5,0 kW | 2 Stck | 1.408,54 € | 2.640,00 € |
+| Rohrpaket im Kabelkanal | 4 lfm | **320,00 €** | **320,00 €** |
+| Zuleitung 230 V inkl. Kanal | 15 lfm | **375,00 €** | **375,00 €** |
+| Gerüststellung Klimaanlage | 2 Stck | 0,00 € | 700,00 € |
+
+Bei Rohrpaket und Zuleitung ist der Einkaufspreis gleich dem Verkaufspreis. Die
+Ursache steht im Katalog: der Artikel „Zuleitung(230V) inkl. Kanal"
+(`24c0ee16-…`) führt `ekEinzelpreis 25.00` gegen `vkEinzelpreis 25`, und sein
+einziger Lieferanteneintrag ist `6139e897-1a04-48fa-bdd5-b9ac2e47ebd2` — **die
+Weich GmbH selbst**, in PDS als Lieferant mit der Nummer 70022 angelegt.
+
+Diese Positionen sind Eigenleistungen. Ihr ausgewiesener „EK" ist der
+Verkaufspreis, kein Einstandspreis. Was das ausmacht, zeigt derselbe Artikel
+zweimal: das Rohrpaket steht im Auftrag mit 80 €/lfm als Einkauf, während der
+Katalog beim echten Fremdlieferanten **8,84 €/lfm** führt. Bei 4 lfm sind das
+35,36 € tatsächliche Kosten gegenüber 320 € ausgewiesenen.
+
+Für die Kennzahl heisst das: Eigenleistungs-Positionen dürfen nicht als
+Materialkosten abgezogen werden. Täte man es, würde die Deckung um genau ihren
+eigenen Erlös gekürzt und der Auftrag zu schlecht dargestellt.
+
+Erkannt werden sie an zwei Merkmalen — eigene Firma als `lieferantUUID`, oder
+`ekPreis` gleich `vkPreis` bei EK über null. Die Funktion weist sie getrennt als
+`positionen.eigenleistung` aus, mit dem Grund je Zeile.
+
+Für 2026-127 ergibt das:
+
+| Grösse | Betrag |
+|---|---|
+| Auftrag gesamt (VK) | 8.875,00 € |
+| − echter Fremdeinkauf (die zwei Geräte) | 3.423,68 € |
+| **= nach Fremdeinkauf übrig** | **5.451,32 €** |
+| davon als Eigenleistung ausgewiesen | 1.395,00 € Erlös |
+| − Ist-Materialeinsatz | zu erfassen |
 
 ## Zielbild: der Klimarechner
 

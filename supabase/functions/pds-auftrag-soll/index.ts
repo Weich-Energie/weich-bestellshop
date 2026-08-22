@@ -8,18 +8,19 @@
 //   { aktion: "suchen",   suchwort }        -> Auftragsliste zur Auswahl
 //   { aktion: "importieren", vorgang_uuid } -> Soll-Werte in shop_nachkalkulation
 //
-// Die Positionen werden in drei Gruppen geteilt, weil die Klima-Aufträge drei
-// Erfassungsarten folgen (hergeleitet in docs/nachkalkulation-datenmodell.md):
+// Die Positionen werden in vier Gruppen geteilt, weil die Klima-Aufträge über
+// die Jahre unterschiedlich erfasst wurden (docs/nachkalkulation-datenmodell.md):
 //
-//   geraete    — positionsTyp ARTIKEL mit katalogUUID, echter Einkaufspreis
-//   leistungen — positionsTyp LEISTUNG oder LOHN. Hier sammelt der Betrieb das
-//                Material, das nicht als eigene Angebotszeile steht. Trägt die
-//                Position einen ekPreis, ist das der Materialeinstand und damit
-//                schon eine Ist-Zahl.
-//   montage    — freie Textpositionen ohne Katalogbezug, EK 0,00 (älterer Stil)
+//   geraete       — ARTIKEL mit katalogUUID und echtem Fremdlieferanten-EK
+//   eigenleistung — eigene Firma als Lieferant oder EK gleich VK. Ihr Erlös ist
+//                   echt, ihr ausgewiesener EK ist keiner. Genau hier fehlt das
+//                   verbaute Material.
+//   leistungen    — LEISTUNG oder LOHN. Trägt die Position einen ekPreis, ist das
+//                   der Materialeinstand und schon eine Ist-Zahl.
+//   montage       — freie Textpositionen ohne Katalogbezug, EK 0,00 (älterer Stil)
 //
-// Leitgrösse über alle drei: Gesamt-VK minus Geräte-EK. Das ist der Betrag, aus
-// dem Material, Lohn und Gewinn bezahlt werden.
+// Leitgrösse: Gesamt-VK minus die Einkaufspreise, die wirklich Einkaufspreise
+// sind. Das ist der Betrag, aus dem Material, Lohn und Gewinn bezahlt werden.
 //
 // PDS-Key aus integration_secrets, Muster wie in pds-katalog-sync.
 
@@ -34,6 +35,14 @@ const CORS = {
 // als POST erwartet — ein schreibender Pfad hat hier nichts zu suchen.
 const ERLAUBTE_PFADE = new Set(["/vorgang/listauftraege", "/vorgang/details"])
 
+// Die Weich GmbH ist in PDS selbst als Lieferant angelegt (Lieferantennummer
+// 70022). Positionen mit diesem Lieferanten sind Eigenleistungen — Rohrpaket,
+// Zuleitung, Gerüststellung. Bei ihnen steht im Katalog der Verkaufspreis auch
+// im Einkaufspreis (nachgewiesen an "Zuleitung(230V) inkl. Kanal":
+// ekEinzelpreis 25.00 gegen vkEinzelpreis 25). Ihr ekPreis ist deshalb KEIN
+// Einstandspreis und darf nicht als Materialkosten zählen.
+const EIGENE_FIRMA_ALS_LIEFERANT = "6139e897-1a04-48fa-bdd5-b9ac2e47ebd2"
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: CORS })
 }
@@ -44,6 +53,7 @@ type Position = {
   menge?: number
   katalogUUID?: string | null
   positionsTyp?: string
+  lieferantUUID?: string | null
   masseinheit?: { bezeichnung?: string } | null
   ekPreis?: { gesamtPreis?: number } | null
   vkPreis?: { gesamtPreis?: number } | null
@@ -71,7 +81,17 @@ function bauHinweis(z: {
   istBereitsErfasst: number
   erloesMontage: number
   deckung: number
+  anzahlEigenleistung: number
+  vkEigenleistung: number
 }) {
+  if (z.anzahlEigenleistung > 0) {
+    return (
+      `${z.anzahlEigenleistung} Positionen mit ${z.vkEigenleistung} Euro Erloes tragen die eigene ` +
+      "Firma als Lieferant oder einen Einkaufspreis in Hoehe des Verkaufspreises — ihr " +
+      "ausgewiesener EK ist kein Einstandspreis. Genau hier fehlt das echte Material. " +
+      `Zu deckende Summe: ${z.deckung} Euro.`
+    )
+  }
   if (z.istBereitsErfasst > 0) {
     return (
       `${z.anzahlLeistungen} Leistungspositionen mit ${z.istBereitsErfasst} Euro Einstandspreis. ` +
@@ -218,13 +238,17 @@ Deno.serve(async (req: Request) => {
 
       let vkGesamt = 0
       let erloesMontage = 0
-      let ekGeraete = 0
+      let ekFremd = 0        // nur echte Fremdeinkaeufe
       let vkGeraete = 0
       let ekLeistungen = 0
       let vkLeistungen = 0
+      let vkEigenleistung = 0
 
       const montage: Array<Record<string, unknown>> = []
       const geraete: Array<Record<string, unknown>> = []
+      // Positionen, deren ekPreis kein Einstandspreis ist: eigene Firma als
+      // Lieferant oder EK gleich VK. Ihr Erloes ist echt, ihre Kosten nicht.
+      const eigenleistung: Array<Record<string, unknown>> = []
       // Leistungspositionen sind der Kern des Workarounds: dort wird das Material
       // gesammelt, das nicht als eigene Angebotszeile steht — im Klimarechner der
       // Sammelposten "Montagematerial", in aelteren Auftraegen die Leistung
@@ -247,15 +271,27 @@ Deno.serve(async (req: Request) => {
         vkGesamt += vk
 
         const istLeistung = p.positionsTyp === "LEISTUNG" || p.positionsTyp === "LOHN"
+        const istEigenleistung =
+          p.lieferantUUID === EIGENE_FIRMA_ALS_LIEFERANT || (ek > 0 && Math.abs(ek - vk) < 0.005)
 
-        if (istLeistung) {
+        if (istEigenleistung && !istLeistung) {
+          // Erloes zaehlt, der ausgewiesene EK nicht. Was hier wirklich verbaut
+          // wurde, ist gegenueberzustellen.
+          vkEigenleistung += vk
+          eigenleistung.push({
+            ...zeile,
+            grund: p.lieferantUUID === EIGENE_FIRMA_ALS_LIEFERANT
+              ? "eigene Firma als Lieferant"
+              : "Einkaufspreis gleich Verkaufspreis",
+          })
+        } else if (istLeistung) {
           // Traegt der Eintrag einen EK, ist das der erfasste Materialeinstand
           // bzw. Lohnkosten — schon eine Ist-Zahl, nicht nur ein Plan.
           ekLeistungen += ek
           vkLeistungen += vk
           leistungen.push({ ...zeile, typ: p.positionsTyp })
         } else if (p.katalogUUID) {
-          ekGeraete += ek
+          ekFremd += ek
           vkGeraete += vk
           geraete.push({ ...zeile, katalog_uuid: p.katalogUUID })
         } else {
@@ -266,10 +302,11 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // Leitgroesse ueber alle Erfassungsarten: was nach dem Geraeteeinkauf
-      // uebrig bleibt, muss Material, Lohn und Gewinn tragen. Bei Auftraegen
-      // ohne eigene Montageposition ist erloesMontage null, diese Groesse nicht.
-      const deckungMaterialUndLohn = vkGesamt - ekGeraete
+      // Leitgroesse: Gesamterloes minus die Einkaufspreise, die wirklich
+      // Einkaufspreise sind. Eigenleistungs-Positionen bleiben aussen vor, weil
+      // ihr EK der VK ist — sie abzuziehen wuerde die Deckung um genau ihren
+      // eigenen Erloes kuerzen und den Auftrag zu schlecht darstellen.
+      const deckungMaterialUndLohn = vkGesamt - ekFremd
 
       // Was in den Leistungspositionen als EK steht, ist bereits erfasst und
       // muss nicht erneut von Hand eingetragen werden.
@@ -284,7 +321,7 @@ Deno.serve(async (req: Request) => {
             bezeichnung: det.bezeichnung ?? "",
             pds_projektakte_uuid: det.projektakteUUID ?? null,
             soll_vk_gesamt: runde(vkGesamt),
-            soll_ek_geraete: runde(ekGeraete),
+            soll_ek_geraete: runde(ekFremd),
             soll_vk_geraete: runde(vkGeraete),
             soll_erloes_montage: runde(erloesMontage),
             soll_ek_leistungen: runde(ekLeistungen),
@@ -303,21 +340,24 @@ Deno.serve(async (req: Request) => {
         nachkalkulation_id: gespeichert.id,
         soll: {
           vk_gesamt: runde(vkGesamt),
-          ek_geraete: runde(ekGeraete),
+          ek_fremdeinkauf: runde(ekFremd),
           vk_geraete: runde(vkGeraete),
+          vk_eigenleistung: runde(vkEigenleistung),
           erloes_montage: runde(erloesMontage),
           ek_leistungen: runde(ekLeistungen),
           vk_leistungen: runde(vkLeistungen),
           deckung_material_und_lohn: runde(deckungMaterialUndLohn),
           ist_bereits_erfasst: runde(istBereitsErfasst),
         },
-        positionen: { geraete, leistungen, montage },
+        positionen: { geraete, leistungen, eigenleistung, montage },
         hinweis: bauHinweis({
           anzahlLeistungen: leistungen.length,
           anzahlMontage: montage.length,
           istBereitsErfasst: runde(istBereitsErfasst),
           erloesMontage: runde(erloesMontage),
           deckung: runde(deckungMaterialUndLohn),
+          anzahlEigenleistung: eigenleistung.length,
+          vkEigenleistung: runde(vkEigenleistung),
         }),
       })
     }

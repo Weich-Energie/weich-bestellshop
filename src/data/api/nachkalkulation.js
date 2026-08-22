@@ -44,9 +44,10 @@ function normalize(row) {
   const istAusAuftrag = Number(row.soll_ek_leistungen || 0)
   const istMaterial = istErfasst + istAusAuftrag
 
-  // Leitgroesse: was nach dem Geraeteeinkauf uebrig ist, muss Montagematerial,
-  // Lohn und Gewinn tragen. Traegt ueber beide Auftragsmuster — auch dort, wo
-  // keine eigene Montageposition existiert und soll_erloes_montage null ist.
+  // Leitgroesse: Gesamterloes minus die Einkaufspreise, die wirklich
+  // Einkaufspreise sind. soll_ek_geraete enthaelt nur echten Fremdeinkauf —
+  // Eigenleistungs-Positionen (eigene Firma als Lieferant, oder EK gleich VK)
+  // bleiben aussen vor, siehe docs/nachkalkulation-datenmodell.md.
   const deckung = Number(row.soll_vk_gesamt || 0) - Number(row.soll_ek_geraete || 0)
 
   return {
