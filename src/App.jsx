@@ -21,6 +21,8 @@ const AdminBedarfPage = lazy(() => import('./app/pages/AdminBedarfPage.jsx'))
 const AdminBestellungenPage = lazy(() => import('./app/pages/AdminBestellungenPage.jsx'))
 const AdminHistoriePage = lazy(() => import('./app/pages/AdminHistoriePage.jsx'))
 const AdminLieferantenPage = lazy(() => import('./app/pages/AdminLieferantenPage.jsx'))
+const AdminPdsSyncPage = lazy(() => import('./app/pages/AdminPdsSyncPage.jsx'))
+const AdminNachkalkulationPage = lazy(() => import('./app/pages/AdminNachkalkulationPage.jsx'))
 
 function Ladeanzeige() {
   return <Flex minH="60vh" align="center" justify="center"><Spinner size="xl" /></Flex>
@@ -61,6 +63,8 @@ export default function App() {
           <Route path="admin/import" element={<ProtectedRoute adminOnly><AdminImportPage /></ProtectedRoute>} />
           <Route path="admin/lieferanten" element={<ProtectedRoute adminOnly><AdminLieferantenPage /></ProtectedRoute>} />
           <Route path="admin/bedarf" element={<ProtectedRoute adminOnly><AdminBedarfPage /></ProtectedRoute>} />
+          <Route path="admin/pds-sync" element={<ProtectedRoute adminOnly><AdminPdsSyncPage /></ProtectedRoute>} />
+          <Route path="admin/nachkalkulation" element={<ProtectedRoute adminOnly><AdminNachkalkulationPage /></ProtectedRoute>} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
