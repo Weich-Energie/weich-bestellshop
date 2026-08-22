@@ -108,7 +108,8 @@ function Uebersicht({ onOeffnen }) {
           <Box mt={3} borderWidth="1px" borderRadius="md" p={3} bg="blue.50" borderColor="blue.200">
             <Text fontSize="sm" fontWeight="medium" mb={1}>Soll übernommen</Text>
             <Text fontSize="sm">
-              Erlös Montagematerial {euro(importiert.soll.erloes_montage)} · Gerätemarge {euro(importiert.soll.geraetemarge)}
+              Auftrag {euro(importiert.soll.vk_gesamt)} · Geräteeinkauf {euro(importiert.soll.ek_geraete)} ·
+              bleibt für Material, Lohn und Gewinn {euro(importiert.soll.deckung_material_und_lohn)}
             </Text>
             <Text fontSize="xs" color="fg.muted" mt={1}>{importiert.hinweis}</Text>
           </Box>
@@ -124,10 +125,10 @@ function Uebersicht({ onOeffnen }) {
               <Table.Header>
                 <Table.Row>
                   <Table.ColumnHeader>Auftrag</Table.ColumnHeader>
-                  <Table.ColumnHeader textAlign="right">Erlös Montage</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="right">Nach Geräteeinkauf</Table.ColumnHeader>
                   <Table.ColumnHeader textAlign="right">Ist-Material</Table.ColumnHeader>
-                  <Table.ColumnHeader textAlign="right">Abweichung</Table.ColumnHeader>
-                  <Table.ColumnHeader textAlign="right">Gerätemarge</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="right">Rest für Lohn</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="right">Auftrag gesamt</Table.ColumnHeader>
                   <Table.ColumnHeader>Status</Table.ColumnHeader>
                   <Table.ColumnHeader></Table.ColumnHeader>
                 </Table.Row>
@@ -139,10 +140,10 @@ function Uebersicht({ onOeffnen }) {
                       <Text fontSize="sm" fontWeight="medium">{n.pds_vorgangs_nummer}</Text>
                       <Text fontSize="xs" color="fg.muted">{n.bezeichnung}</Text>
                     </Table.Cell>
-                    <Table.Cell textAlign="right"><Text fontSize="sm">{euro(n.soll_erloes_montage)}</Text></Table.Cell>
-                    <Table.Cell textAlign="right"><Text fontSize="sm">{euro(n.ist_montage)}</Text></Table.Cell>
-                    <Table.Cell textAlign="right"><Abweichung wert={n.abweichung_montage} /></Table.Cell>
-                    <Table.Cell textAlign="right"><Text fontSize="sm">{euro(n.geraetemarge)}</Text></Table.Cell>
+                    <Table.Cell textAlign="right"><Text fontSize="sm">{euro(n.deckung_material_und_lohn)}</Text></Table.Cell>
+                    <Table.Cell textAlign="right"><Text fontSize="sm">{euro(n.ist_material)}</Text></Table.Cell>
+                    <Table.Cell textAlign="right"><Abweichung wert={n.rest_fuer_lohn} /></Table.Cell>
+                    <Table.Cell textAlign="right"><Text fontSize="sm">{euro(n.soll_vk_gesamt)}</Text></Table.Cell>
                     <Table.Cell>
                       <Badge size="sm" colorPalette={n.status === 'geprueft' ? 'green' : n.status === 'erfasst' ? 'blue' : 'gray'}>
                         {n.status}
@@ -171,8 +172,8 @@ function Uebersicht({ onOeffnen }) {
   )
 }
 
-// Vorzeichen bewusst deutlich: negativ heisst, das Montagematerial hat mehr
-// gekostet als dafuer erloest wurde.
+// Vorzeichen bewusst deutlich: negativ heisst, das Material allein hat den Rest
+// nach dem Geraeteeinkauf aufgezehrt — fuer Lohn und Gewinn bleibt nichts.
 function Abweichung({ wert }) {
   if (wert == null) return <Text fontSize="sm">—</Text>
   const negativ = Number(wert) < 0
@@ -253,11 +254,11 @@ function Detail({ id, onZurueck }) {
       </Flex>
 
       <HStack gap={4} mb={4} flexWrap="wrap" align="stretch">
-        <Kennzahl titel="Erlös Montagematerial" wert={euro(nk.soll_erloes_montage)} />
-        <Kennzahl titel="Ist-Materialeinsatz" wert={euro(nk.ist_montage)} />
-        <Kennzahl titel="Abweichung" wert={euro(nk.abweichung_montage)}
-          farbe={Number(nk.abweichung_montage) < 0 ? 'red.600' : 'green.700'} />
-        <Kennzahl titel="Gerätemarge (aus PDS)" wert={euro(nk.geraetemarge)} />
+        <Kennzahl titel="Nach Geräteeinkauf übrig" wert={euro(nk.deckung_material_und_lohn)} />
+        <Kennzahl titel="Ist-Materialeinsatz" wert={euro(nk.ist_material)} />
+        <Kennzahl titel="Rest für Lohn und Gewinn" wert={euro(nk.rest_fuer_lohn)}
+          farbe={Number(nk.rest_fuer_lohn) < 0 ? 'red.600' : 'green.700'} />
+        <Kennzahl titel="Auftrag gesamt (VK)" wert={euro(nk.soll_vk_gesamt)} />
       </HStack>
 
       <Box borderWidth="1px" borderRadius="lg" p={4} mb={4} bg="white">
@@ -349,8 +350,8 @@ function Detail({ id, onZurueck }) {
                 <Table.Row>
                   <Table.Cell colSpan={6}>
                     <Text py={4} textAlign="center" color="fg.muted">
-                      Noch nichts erfasst. Der Erlös von {euro(nk.soll_erloes_montage)} steht bisher
-                      0 € Materialeinsatz gegenüber.
+                      Noch nichts erfasst. Nach dem Geräteeinkauf stehen {euro(nk.deckung_material_und_lohn)}
+                      für Material, Lohn und Gewinn zur Verfügung.
                     </Text>
                   </Table.Cell>
                 </Table.Row>

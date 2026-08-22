@@ -8,8 +8,19 @@
 --
 -- Warum nicht Soll-EK gegen Ist-EK: die Montagematerial-Positionen in PDS sind
 -- freie Textpositionen mit EK 0,00. Ein geplanter Materialeinsatz existiert also
--- nicht. Verglichen wird deshalb der Erlös dieser Positionen gegen das, was
--- wirklich verbaut wurde.
+-- nicht.
+--
+-- Und warum nicht nur der Erlös dieser Textpositionen: die Aufträge folgen zwei
+-- Mustern. Bei 2025-10263 stehen Rohrpaket und Zuleitung als eigene Positionen
+-- mit 3.780 € Erlös. Bei 2025-10313 — dem einzigen abgerechneten Klima-Auftrag —
+-- gibt es überhaupt keine Montageposition: dort sind nur zwei Geräte erfasst,
+-- 1.536,34 € EK gegen 3.740,00 € VK, die Montage steckt im Geräte-Verkaufspreis.
+-- Eine Kennzahl, die nur die Textpositionen summiert, wäre dort null und damit
+-- unbrauchbar.
+--
+-- Belastbar über beide Muster ist deshalb: Gesamterlös des Auftrags minus
+-- Geräte-Einkauf. Das ist der Betrag, aus dem Montagematerial, Lohn und Gewinn
+-- bezahlt werden. Ihm wird der tatsächliche Materialeinsatz gegenübergestellt.
 
 create table public.shop_nachkalkulation (
   id                   uuid primary key default gen_random_uuid(),
@@ -18,9 +29,10 @@ create table public.shop_nachkalkulation (
   bezeichnung          text not null,
 
   -- Aus PDS übernommene Soll-Werte, zum Zeitpunkt des Imports eingefroren.
-  soll_erloes_montage  numeric(12,2),   -- Summe vkPreis der Positionen ohne katalogUUID
-  soll_ek_geraete      numeric(12,2),
+  soll_vk_gesamt       numeric(12,2),   -- alle Positionen, die Leitgrösse
+  soll_ek_geraete      numeric(12,2),   -- Positionen mit katalogUUID
   soll_vk_geraete      numeric(12,2),
+  soll_erloes_montage  numeric(12,2),   -- Positionen ohne katalogUUID, nur Muster A
   soll_stand           timestamptz,
 
   status               text not null default 'offen'
@@ -35,9 +47,15 @@ comment on table public.shop_nachkalkulation is
   'Eine Zeile je nachkalkuliertem PDS-Auftrag. pds_vorgang_uuid ist unique — ein '
   'Auftrag wird nicht zweimal nachkalkuliert.';
 
+comment on column public.shop_nachkalkulation.soll_vk_gesamt is
+  'Summe aller vkPreis.gesamtPreis des Auftrags. Zusammen mit soll_ek_geraete '
+  'ergibt sich der Betrag, aus dem Montagematerial, Lohn und Gewinn bezahlt '
+  'werden — die einzige Grösse, die über beide Auftragsmuster hinweg trägt.';
+
 comment on column public.shop_nachkalkulation.soll_erloes_montage is
-  'Summe der vkPreis.gesamtPreis aller Auftragspositionen ohne katalogUUID. Das '
-  'ist der Erlös für Montagematerial, dem der tatsächliche Einsatz gegenübersteht.';
+  'Summe der Positionen ohne katalogUUID. Bei Aufträgen, die Montage separat '
+  'ausweisen, ist das der Montageerlös; wo die Montage im Geräte-VK steckt, ist '
+  'der Wert null. Deshalb Zusatzinformation und nicht Leitgrösse.';
 
 comment on column public.shop_nachkalkulation.soll_stand is
   'Zeitpunkt des Soll-Imports. Die Werte werden eingefroren, damit eine '

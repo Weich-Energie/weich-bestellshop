@@ -174,6 +174,7 @@ Deno.serve(async (req: Request) => {
       const positionen: Position[] = []
       sammle((det.rootEbene ?? {}) as Ebene, positionen)
 
+      let vkGesamt = 0
       let erloesMontage = 0
       let ekGeraete = 0
       let vkGeraete = 0
@@ -193,6 +194,8 @@ Deno.serve(async (req: Request) => {
           vk_gesamt: runde(vk),
         }
 
+        vkGesamt += vk
+
         // Die Trennlinie ist der Katalogbezug: Positionen ohne katalogUUID sind
         // die freien Textpositionen fuer Montagematerial.
         if (p.katalogUUID) {
@@ -205,6 +208,12 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      // Leitgroesse ueber beide Auftragsmuster: was nach dem Geraeteeinkauf
+      // uebrig bleibt, muss Montagematerial, Lohn und Gewinn tragen. Bei
+      // Auftraegen ohne eigene Montageposition ist erloesMontage null, diese
+      // Groesse aber nicht.
+      const deckungMaterialUndLohn = vkGesamt - ekGeraete
+
       const { data: gespeichert, error } = await sb
         .from("shop_nachkalkulation")
         .upsert(
@@ -212,9 +221,10 @@ Deno.serve(async (req: Request) => {
             pds_vorgang_uuid: vorgangUUID,
             pds_vorgangs_nummer: det.vorgangsNummer ?? "",
             bezeichnung: det.bezeichnung ?? "",
-            soll_erloes_montage: runde(erloesMontage),
+            soll_vk_gesamt: runde(vkGesamt),
             soll_ek_geraete: runde(ekGeraete),
             soll_vk_geraete: runde(vkGeraete),
+            soll_erloes_montage: runde(erloesMontage),
             soll_stand: new Date().toISOString(),
           },
           { onConflict: "pds_vorgang_uuid" },
@@ -228,18 +238,19 @@ Deno.serve(async (req: Request) => {
         status: "importiert",
         nachkalkulation_id: gespeichert.id,
         soll: {
-          erloes_montage: runde(erloesMontage),
+          vk_gesamt: runde(vkGesamt),
           ek_geraete: runde(ekGeraete),
           vk_geraete: runde(vkGeraete),
-          geraetemarge: runde(vkGeraete - ekGeraete),
+          erloes_montage: runde(erloesMontage),
+          deckung_material_und_lohn: runde(deckungMaterialUndLohn),
         },
         positionen: { geraete, montage },
         hinweis:
-          montage.length > 0 && erloesMontage > 0
-            ? `${montage.length} Montagepositionen mit ${runde(erloesMontage)} Euro Erloes und ` +
-              "0 Euro geplantem Materialeinsatz. Diesem Erloes ist der tatsaechliche " +
-              "Verbrauch gegenueberzustellen."
-            : "Keine Montagepositionen ohne Katalogbezug gefunden.",
+          montage.length > 0
+            ? `${montage.length} eigene Montagepositionen mit ${runde(erloesMontage)} Euro Erloes ` +
+              "und 0 Euro geplantem Materialeinsatz."
+            : "Keine eigene Montageposition — die Montage steckt im Geraete-Verkaufspreis. " +
+              `Zu vergleichen ist der Rest nach Geraeteeinkauf: ${runde(deckungMaterialUndLohn)} Euro.`,
       })
     }
 

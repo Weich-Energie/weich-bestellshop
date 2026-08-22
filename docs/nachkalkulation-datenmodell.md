@@ -36,19 +36,61 @@ Innengerät (pro laufendem Meter)" (`a8b265d6-…`, EK 8,84 €). Die Auftragspo
 verweist nicht darauf, obwohl der Text bis auf die Gross-/Kleinschreibung von
 „meter" identisch ist. Der Katalogbezug wurde beim Anlegen nicht gesetzt.
 
+## Zweites Muster: Montage im Geräte-Verkaufspreis
+
+Auftrag 2025-10313 — der **einzige abgerechnete** der 51 Klima-Aufträge — sieht
+völlig anders aus. Er hat gar keine Montageposition:
+
+| Position | katalogUUID | EK | VK |
+|---|---|---|---|
+| 001 Comfora Außengerät 5,0 kW | gesetzt | 832,07 € | 2.420,00 € |
+| 002 Perfera Wandgerät 5,0 kW | gesetzt | 704,27 € | 1.320,00 € |
+| **Summe** | | **1.536,34 €** | **3.740,00 €** |
+
+Beim Außengerät stehen 832 € Einkauf gegen 2.420 € Verkauf. Dieser Aufschlag ist
+keine Gerätemarge, sondern enthält die Montage — es gibt keine andere Position,
+die sie tragen könnte.
+
+Es gibt also zwei Muster:
+
+- **A** wie 2025-10263: Montage als eigene Textposition, `katalogUUID` null, EK 0
+- **B** wie 2025-10313: keine Montageposition, Montage im Geräte-VK eingerechnet
+
 ## Daraus folgt die Vergleichsgrösse
 
-Nicht Soll-EK gegen Ist-EK, sondern **Erlös gegen tatsächlichen Materialeinsatz**:
+Eine Kennzahl, die nur die Positionen ohne `katalogUUID` summiert, ist bei Muster
+B null und damit unbrauchbar. Belastbar über beide Muster ist:
 
-| Grösse | Quelle | Beispiel oben |
+| Grösse | Quelle | 2025-10313 |
 |---|---|---|
-| Erlös Montagematerial | Summe `vkPreis.gesamtPreis` der Positionen ohne `katalogUUID` | 3.780,00 € |
-| Ist-Materialeinsatz | Summe der im Shop erfassten Mengen × EK | zu erfassen |
-| Deckungsbeitrag Montage | Erlös − Ist | ergibt sich |
-| Gerätemarge | `vkPreis` − `ekPreis` der Positionen mit `katalogUUID` | 498,59 € |
+| Auftrag gesamt (VK) | Summe aller `vkPreis.gesamtPreis` | 3.740,00 € |
+| Geräteeinkauf | `ekPreis` der Positionen mit `katalogUUID` | 1.536,34 € |
+| **Nach Geräteeinkauf übrig** | Differenz der beiden | **2.203,66 €** |
+| Ist-Materialeinsatz | im Shop erfasste Mengen × EK | zu erfassen |
+| **Rest für Lohn und Gewinn** | übrig − Ist | ergibt sich |
 
-Die Gerätemarge steht bereits belastbar in PDS. Der Montageteil ist das, was das
-Werkzeug beitragen muss.
+„Nach Geräteeinkauf übrig" ist der Betrag, aus dem Montagematerial, Lohn und
+Gewinn bezahlt werden. Ihm steht der tatsächliche Materialeinsatz gegenüber. Was
+bleibt, muss die Arbeitsstunden decken — wird die Zahl negativ, hat allein das
+Material den Auftrag aufgezehrt.
+
+Der Montageerlös aus Muster A wird weiter mitgeführt (`soll_erloes_montage`),
+aber als Zusatzinformation, nicht als Leitgrösse.
+
+## Status: „abgeschlossen" ist nicht am Status erkennbar
+
+Von den 51 Klima-Aufträgen steht **einer** auf `Abgerechnet` (2025-10313), die
+übrigen 50 auf `Offen` — auch solche von Anfang 2025. Der Vorgangsstatus wird
+nach dem Bau offenbar nicht durchgängig nachgezogen.
+
+Für das Werkzeug heisst das: die Auswahl „abgeschlossener Auftrag" kann nicht
+über `vorgangStatus` laufen. Die Nachkalkulation muss jeden Auftrag zulassen und
+den Status nur anzeigen.
+
+Nebenbefund: viele Aufträge sind Mischaufträge — „Klima Daikin (+PV-Anlage mit
+Speicher)", „WP Kermi (+Daikin Klima)". Dort enthält der Gesamt-VK auch PV- und
+Wärmepumpenanteile, und „nach Geräteeinkauf übrig" ist entsprechend zu lesen.
+Diese Aufträge gehören nicht als erste nachkalkuliert.
 
 ## Soll-Werte lesen
 
@@ -63,7 +105,7 @@ Je Position relevant: `nummer`, `kurztext`, `menge`, `masseinheit.bezeichnung`,
 
 Aufträge finden: `POST /vorgang/listauftraege` mit `suchwort`. Eine Suche nach
 `Klima` liefert derzeit **51 Aufträge** — das ist der nachzukalkulierende
-Bestand. Alle tragen das Selektionskriterium `Gewerk: SHK`; ein eigenes Gewerk
+Bestand, davon einer abgerechnet. Alle tragen das Selektionskriterium `Gewerk: SHK`; ein eigenes Gewerk
 Klima gibt es nicht. Filtern lässt sich nur über `suchwort` und `statusUUIDs`,
 nicht über Warengruppe oder Gewerk, deshalb bleibt die Trefferliste über den
 Auftragstitel eine Heuristik und gehört einmal bestätigt.
@@ -80,7 +122,7 @@ Kundendokument wären eine Änderung am Verkaufsdokument.
 ```
 shop_nachkalkulation
   id, pds_vorgang_uuid, pds_vorgangs_nummer, bezeichnung,
-  soll_erloes_montage, soll_ek_geraete, soll_vk_geraete,
+  soll_vk_gesamt, soll_ek_geraete, soll_vk_geraete, soll_erloes_montage,
   status (offen | erfasst | geprueft), erfasst_von, erfasst_am
 
 shop_nachkalkulation_positionen

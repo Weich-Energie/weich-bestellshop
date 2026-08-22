@@ -2,7 +2,7 @@ import { supabase } from '../../supabaseClient.js'
 
 const NK_SELECT = `
   id, pds_vorgang_uuid, pds_vorgangs_nummer, bezeichnung,
-  soll_erloes_montage, soll_ek_geraete, soll_vk_geraete, soll_stand,
+  soll_vk_gesamt, soll_ek_geraete, soll_vk_geraete, soll_erloes_montage, soll_stand,
   status, notiz, created_at, updated_at,
   shop_nachkalkulation_positionen (
     id, artikel_id, freitext, menge, einheit, ek_einzel, ek_gesamt, quelle, notiz,
@@ -34,17 +34,22 @@ function normalize(row) {
     shop_artikel: undefined,
   }))
 
-  const istMontage = positionen.reduce((s, p) => s + Number(p.ek_gesamt || 0), 0)
-  const erloesMontage = Number(row.soll_erloes_montage || 0)
+  const istMaterial = positionen.reduce((s, p) => s + Number(p.ek_gesamt || 0), 0)
+
+  // Leitgroesse: was nach dem Geraeteeinkauf uebrig ist, muss Montagematerial,
+  // Lohn und Gewinn tragen. Traegt ueber beide Auftragsmuster — auch dort, wo
+  // keine eigene Montageposition existiert und soll_erloes_montage null ist.
+  const deckung = Number(row.soll_vk_gesamt || 0) - Number(row.soll_ek_geraete || 0)
 
   return {
     ...row,
     positionen,
     shop_nachkalkulation_positionen: undefined,
-    ist_montage: runde(istMontage),
-    // Positiv = es bleibt etwas uebrig, negativ = das Montagematerial hat mehr
-    // gekostet als dafuer erloest wurde.
-    abweichung_montage: runde(erloesMontage - istMontage),
+    ist_material: runde(istMaterial),
+    deckung_material_und_lohn: runde(deckung),
+    // Was nach dem tatsaechlichen Materialeinsatz fuer Lohn und Gewinn bleibt.
+    // Negativ heisst: das Material allein hat den Rest aufgezehrt.
+    rest_fuer_lohn: runde(deckung - istMaterial),
     geraetemarge: runde(Number(row.soll_vk_geraete || 0) - Number(row.soll_ek_geraete || 0)),
   }
 }
