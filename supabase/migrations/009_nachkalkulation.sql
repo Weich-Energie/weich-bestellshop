@@ -27,6 +27,9 @@ create table public.shop_nachkalkulation (
   pds_vorgang_uuid     uuid not null unique,
   pds_vorgangs_nummer  text not null,
   bezeichnung          text not null,
+  -- Klammer zum Materialeinkauf: Bestellungen tragen dieselbe projektakteUUID
+  -- wie der Auftrag. Darüber kommt das Ist aus PDS statt vom Zettel.
+  pds_projektakte_uuid uuid,
 
   -- Aus PDS übernommene Soll-Werte, zum Zeitpunkt des Imports eingefroren.
   soll_vk_gesamt       numeric(12,2),   -- alle Positionen, die Leitgrösse
@@ -34,6 +37,10 @@ create table public.shop_nachkalkulation (
   soll_vk_geraete      numeric(12,2),
   soll_erloes_montage  numeric(12,2),   -- Positionen ohne katalogUUID, nur Muster A
   soll_stand           timestamptz,
+
+  -- Ist aus PDS-Bestellungen zur selben Projektakte, eingefroren beim Import.
+  ist_ek_bestellungen  numeric(12,2),
+  ist_bestellungen_stand timestamptz,
 
   status               text not null default 'offen'
     check (status in ('offen', 'erfasst', 'geprueft')),
@@ -86,7 +93,7 @@ create table public.shop_nachkalkulation_positionen (
   ek_gesamt           numeric(12,2),
 
   quelle              text not null default 'monteur'
-    check (quelle in ('monteur', 'beleg', 'schaetzung')),
+    check (quelle in ('monteur', 'beleg', 'bestellung', 'schaetzung')),
   notiz               text,
   created_at          timestamptz not null default now(),
 
@@ -95,9 +102,15 @@ create table public.shop_nachkalkulation_positionen (
 );
 
 comment on column public.shop_nachkalkulation_positionen.quelle is
-  'monteur = vom Bautagebuch abgeschrieben, beleg = aus einem Lieferantenbeleg, '
-  'schaetzung = geschätzt. Ohne diese Trennung liest sich eine Schätzung später '
-  'wie eine belegte Zahl.';
+  'bestellung = aus einer PDS-Bestellung zur selben Projektakte übernommen, das '
+  'ist die belastbarste Quelle. monteur = vom Zettel abgeschrieben, beleg = aus '
+  'einem Lieferantenbeleg, schaetzung = geschätzt. Ohne diese Trennung liest sich '
+  'eine Schätzung später wie eine belegte Zahl.';
+
+comment on column public.shop_nachkalkulation.ist_ek_bestellungen is
+  'Summe der Einkaufspreise aus PDS-Bestellungen zur Projektakte. Deckt das ab, '
+  'was bestellt wurde; Lagerware und Kleinteile ohne eigene Bestellung fehlen '
+  'darin und gehören von Hand ergänzt.';
 
 comment on column public.shop_nachkalkulation_positionen.freitext is
   'Nur wenn der Artikel im Shop fehlt. Diese Zeilen sind die Arbeitsliste für '

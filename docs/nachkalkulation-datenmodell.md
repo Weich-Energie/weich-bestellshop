@@ -51,15 +51,65 @@ Beim Außengerät stehen 832 € Einkauf gegen 2.420 € Verkauf. Dieser Aufschl
 keine Gerätemarge, sondern enthält die Montage — es gibt keine andere Position,
 die sie tragen könnte.
 
-Es gibt also zwei Muster:
+## Drittes Muster: Material in einer Leistungsposition
 
-- **A** wie 2025-10263: Montage als eigene Textposition, `katalogUUID` null, EK 0
-- **B** wie 2025-10313: keine Montageposition, Montage im Geräte-VK eingerechnet
+Der Grund für die Unterschiede ist eine geänderte Kalkulationsstruktur (Auskunft
+des Betriebs, 22.08.2026):
+
+**Früher** lagen Arbeitszeiten im Gerät — das erklärt Muster B: 832 € Einkauf,
+2.420 € Verkauf, ohne dass irgendwo Montage steht.
+
+**Der Workaround** war eine Leistungsposition „Vielen Dank für Ihren Auftrag".
+Dahinter standen die tatsächlich verbrauchten Materialien, mit EK als
+Einstandspreis des Materials und VK als Verkaufspreis. Damit war ablesbar, wie
+der Auftrag gelaufen ist.
+
+**Heute** bekommt der Kunde einen klassischen Aufschlag aufs Produkt und rechnet
+Montagestunden und Material getrennt ab. Das Material läuft weiterhin als
+Leistungsposition, die alles sammelt, was nicht als eigene Angebotszeile steht.
+
+Damit gibt es drei Erfassungsarten:
+
+| | Kennzeichen | Materialeinstand |
+|---|---|---|
+| **A** (2025-10263) | freie Textpositionen ohne `katalogUUID` | fehlt, EK 0 |
+| **B** (2025-10313) | nur Gerätepositionen | im Geräte-VK versteckt |
+| **C** (Workaround) | Position `positionsTyp: LEISTUNG` | **steht im `ekPreis` der Leistung** |
+
+Muster C ist der Glücksfall: dort ist das Ist bereits in PDS erfasst und muss
+nicht nachgetragen werden. `pds-auftrag-soll` weist es als
+`soll.ist_bereits_erfasst` aus und sagt im Hinweis, welcher Art der Auftrag folgt.
+
+Muster C ist noch nicht an einem Auftrag verifiziert — die PDS-Verbindung fiel
+während der Prüfung aus. Die Logik ist auf `positionsTyp` gebaut und deckt alle
+drei Fälle ab, aber die Zahlen dafür fehlen noch.
+
+## Zielbild: der Klimarechner
+
+Der [Klimarechner](../../klimarechner/docs/kalkulationslogik.md) bildet die
+Struktur ab, auf die die Aufträge zulaufen sollen: Arbeitszeit getrennt nach
+Techniker (75 €/h) und Monteur (69 €/h), Anfahrt nach Zone, vier Pauschalen, und
+Material mit **VK = EK × (1 + Aufschlag)** — 30 % auf Hauptkomponenten, 35 % auf
+feste Materialien, 100 % auf Verbrauch und Meterware. Material über 40 € VK wird
+eigene Zeile, darunter läuft es im Sammelposten „Montagematerial".
+
+Zwei Dinge folgen daraus für dieses Werkzeug:
+
+1. Der Sammelposten „Montagematerial" ist die Fortsetzung von Muster C. Die
+   Nachkalkulation muss ihn genauso behandeln.
+2. Der Klimarechner hält seine **Standardzeiten je Arbeitspaket ausdrücklich für
+   Platzhalter, die „aus echter Nachkalkulation" kommen sollen.** Diese
+   Nachkalkulation ist also nicht nur Rückschau, sondern der Datenlieferant für
+   die künftige Angebotskalkulation. Das spricht dafür, neben dem Material auch
+   die tatsächlichen Stunden je Auftrag zu erfassen.
+
+Bis die Aufträge dem Klimarechner folgen, bleibt es beim Workaround — das
+Werkzeug muss deshalb alle drei Muster gleichzeitig aushalten.
 
 ## Daraus folgt die Vergleichsgrösse
 
-Eine Kennzahl, die nur die Positionen ohne `katalogUUID` summiert, ist bei Muster
-B null und damit unbrauchbar. Belastbar über beide Muster ist:
+Eine Kennzahl, die nur die Positionen ohne `katalogUUID` summiert, ist bei den
+Mustern B und C null und damit unbrauchbar. Belastbar über alle drei ist:
 
 | Grösse | Quelle | 2025-10313 |
 |---|---|---|
@@ -69,8 +119,8 @@ B null und damit unbrauchbar. Belastbar über beide Muster ist:
 | Ist-Materialeinsatz | im Shop erfasste Mengen × EK | zu erfassen |
 | **Rest für Lohn und Gewinn** | übrig − Ist | ergibt sich |
 
-„Nach Geräteeinkauf übrig" ist der Betrag, aus dem Montagematerial, Lohn und
-Gewinn bezahlt werden. Ihm steht der tatsächliche Materialeinsatz gegenüber. Was
+„Nach Geräteeinkauf übrig" ist der Betrag, aus dem Material, Lohn und Gewinn
+bezahlt werden. Ihm steht der tatsächliche Materialeinsatz gegenüber. Was
 bleibt, muss die Arbeitsstunden decken — wird die Zahl negativ, hat allein das
 Material den Auftrag aufgezehrt.
 

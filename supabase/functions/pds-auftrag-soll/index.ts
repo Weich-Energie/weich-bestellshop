@@ -8,11 +8,18 @@
 //   { aktion: "suchen",   suchwort }        -> Auftragsliste zur Auswahl
 //   { aktion: "importieren", vorgang_uuid } -> Soll-Werte in shop_nachkalkulation
 //
-// Warum die Aufteilung Geräte gegen Montage: die Gerätepositionen tragen eine
-// katalogUUID und echte Einkaufspreise, die Montagematerial-Positionen sind
-// freie Textpositionen mit EK 0,00. Ein geplanter Materialeinsatz existiert
-// also nicht — verglichen wird der Erlös dieser Positionen gegen das, was
-// tatsächlich verbaut wurde. Hergeleitet in docs/nachkalkulation-datenmodell.md.
+// Die Positionen werden in drei Gruppen geteilt, weil die Klima-Aufträge drei
+// Erfassungsarten folgen (hergeleitet in docs/nachkalkulation-datenmodell.md):
+//
+//   geraete    — positionsTyp ARTIKEL mit katalogUUID, echter Einkaufspreis
+//   leistungen — positionsTyp LEISTUNG oder LOHN. Hier sammelt der Betrieb das
+//                Material, das nicht als eigene Angebotszeile steht. Trägt die
+//                Position einen ekPreis, ist das der Materialeinstand und damit
+//                schon eine Ist-Zahl.
+//   montage    — freie Textpositionen ohne Katalogbezug, EK 0,00 (älterer Stil)
+//
+// Leitgrösse über alle drei: Gesamt-VK minus Geräte-EK. Das ist der Betrag, aus
+// dem Material, Lohn und Gewinn bezahlt werden.
 //
 // PDS-Key aus integration_secrets, Muster wie in pds-katalog-sync.
 
@@ -53,6 +60,41 @@ function sammle(e: Ebene, raus: Position[]) {
 
 function runde(n: number) {
   return Math.round(n * 100) / 100
+}
+
+// Sagt in einem Satz, welcher Erfassungsart dieser Auftrag folgt und was daraus
+// fuer die Nachkalkulation zu tun ist. Die drei Arten stehen in
+// docs/nachkalkulation-datenmodell.md.
+function bauHinweis(z: {
+  anzahlLeistungen: number
+  anzahlMontage: number
+  istBereitsErfasst: number
+  erloesMontage: number
+  deckung: number
+}) {
+  if (z.istBereitsErfasst > 0) {
+    return (
+      `${z.anzahlLeistungen} Leistungspositionen mit ${z.istBereitsErfasst} Euro Einstandspreis. ` +
+      "Der Materialeinstand ist hier schon im Auftrag erfasst — von Hand nachzutragen ist nur, " +
+      "was darin fehlt."
+    )
+  }
+  if (z.anzahlLeistungen > 0) {
+    return (
+      `${z.anzahlLeistungen} Leistungspositionen, aber ohne Einstandspreis. Genau hier gehoert ` +
+      `das verbaute Material hinterlegt. Zu deckende Summe: ${z.deckung} Euro.`
+    )
+  }
+  if (z.anzahlMontage > 0) {
+    return (
+      `${z.anzahlMontage} freie Montagepositionen mit ${z.erloesMontage} Euro Erloes und ohne ` +
+      "Einstandspreis. Das Material ist vollstaendig nachzutragen."
+    )
+  }
+  return (
+    "Nur Geraetepositionen — Montage und Material stecken im Geraete-Verkaufspreis (aelterer " +
+    `Stil). Zu deckende Summe nach Geraeteeinkauf: ${z.deckung} Euro.`
+  )
 }
 
 Deno.serve(async (req: Request) => {
@@ -178,9 +220,17 @@ Deno.serve(async (req: Request) => {
       let erloesMontage = 0
       let ekGeraete = 0
       let vkGeraete = 0
+      let ekLeistungen = 0
+      let vkLeistungen = 0
 
       const montage: Array<Record<string, unknown>> = []
       const geraete: Array<Record<string, unknown>> = []
+      // Leistungspositionen sind der Kern des Workarounds: dort wird das Material
+      // gesammelt, das nicht als eigene Angebotszeile steht — im Klimarechner der
+      // Sammelposten "Montagematerial", in aelteren Auftraegen die Leistung
+      // "Vielen Dank fuer Ihren Auftrag". Ihr ekPreis ist der Materialeinstand
+      // und damit eine Ist-Zahl, die schon in PDS steht.
+      const leistungen: Array<Record<string, unknown>> = []
 
       for (const p of positionen) {
         const vk = p.vkPreis?.gesamtPreis ?? 0
@@ -196,23 +246,34 @@ Deno.serve(async (req: Request) => {
 
         vkGesamt += vk
 
-        // Die Trennlinie ist der Katalogbezug: Positionen ohne katalogUUID sind
-        // die freien Textpositionen fuer Montagematerial.
-        if (p.katalogUUID) {
+        const istLeistung = p.positionsTyp === "LEISTUNG" || p.positionsTyp === "LOHN"
+
+        if (istLeistung) {
+          // Traegt der Eintrag einen EK, ist das der erfasste Materialeinstand
+          // bzw. Lohnkosten — schon eine Ist-Zahl, nicht nur ein Plan.
+          ekLeistungen += ek
+          vkLeistungen += vk
+          leistungen.push({ ...zeile, typ: p.positionsTyp })
+        } else if (p.katalogUUID) {
           ekGeraete += ek
           vkGeraete += vk
           geraete.push({ ...zeile, katalog_uuid: p.katalogUUID })
         } else {
+          // Freie Textposition ohne Katalogbezug — Montagematerial im aelteren
+          // Stil, dort steht EK 0.
           erloesMontage += vk
           montage.push(zeile)
         }
       }
 
-      // Leitgroesse ueber beide Auftragsmuster: was nach dem Geraeteeinkauf
-      // uebrig bleibt, muss Montagematerial, Lohn und Gewinn tragen. Bei
-      // Auftraegen ohne eigene Montageposition ist erloesMontage null, diese
-      // Groesse aber nicht.
+      // Leitgroesse ueber alle Erfassungsarten: was nach dem Geraeteeinkauf
+      // uebrig bleibt, muss Material, Lohn und Gewinn tragen. Bei Auftraegen
+      // ohne eigene Montageposition ist erloesMontage null, diese Groesse nicht.
       const deckungMaterialUndLohn = vkGesamt - ekGeraete
+
+      // Was in den Leistungspositionen als EK steht, ist bereits erfasst und
+      // muss nicht erneut von Hand eingetragen werden.
+      const istBereitsErfasst = ekLeistungen
 
       const { data: gespeichert, error } = await sb
         .from("shop_nachkalkulation")
@@ -221,6 +282,7 @@ Deno.serve(async (req: Request) => {
             pds_vorgang_uuid: vorgangUUID,
             pds_vorgangs_nummer: det.vorgangsNummer ?? "",
             bezeichnung: det.bezeichnung ?? "",
+            pds_projektakte_uuid: det.projektakteUUID ?? null,
             soll_vk_gesamt: runde(vkGesamt),
             soll_ek_geraete: runde(ekGeraete),
             soll_vk_geraete: runde(vkGeraete),
@@ -242,15 +304,19 @@ Deno.serve(async (req: Request) => {
           ek_geraete: runde(ekGeraete),
           vk_geraete: runde(vkGeraete),
           erloes_montage: runde(erloesMontage),
+          ek_leistungen: runde(ekLeistungen),
+          vk_leistungen: runde(vkLeistungen),
           deckung_material_und_lohn: runde(deckungMaterialUndLohn),
+          ist_bereits_erfasst: runde(istBereitsErfasst),
         },
-        positionen: { geraete, montage },
-        hinweis:
-          montage.length > 0
-            ? `${montage.length} eigene Montagepositionen mit ${runde(erloesMontage)} Euro Erloes ` +
-              "und 0 Euro geplantem Materialeinsatz."
-            : "Keine eigene Montageposition — die Montage steckt im Geraete-Verkaufspreis. " +
-              `Zu vergleichen ist der Rest nach Geraeteeinkauf: ${runde(deckungMaterialUndLohn)} Euro.`,
+        positionen: { geraete, leistungen, montage },
+        hinweis: bauHinweis({
+          anzahlLeistungen: leistungen.length,
+          anzahlMontage: montage.length,
+          istBereitsErfasst: runde(istBereitsErfasst),
+          erloesMontage: runde(erloesMontage),
+          deckung: runde(deckungMaterialUndLohn),
+        }),
       })
     }
 
