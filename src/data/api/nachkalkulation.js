@@ -2,7 +2,8 @@ import { supabase } from '../../supabaseClient.js'
 
 const NK_SELECT = `
   id, pds_vorgang_uuid, pds_vorgangs_nummer, bezeichnung,
-  soll_vk_gesamt, soll_ek_geraete, soll_vk_geraete, soll_erloes_montage, soll_stand,
+  soll_vk_gesamt, soll_ek_geraete, soll_vk_geraete, soll_erloes_montage,
+  soll_ek_leistungen, soll_vk_leistungen, soll_stand,
   status, notiz, created_at, updated_at,
   shop_nachkalkulation_positionen (
     id, artikel_id, freitext, menge, einheit, ek_einzel, ek_gesamt, quelle, notiz,
@@ -34,7 +35,14 @@ function normalize(row) {
     shop_artikel: undefined,
   }))
 
-  const istMaterial = positionen.reduce((s, p) => s + Number(p.ek_gesamt || 0), 0)
+  const istErfasst = positionen.reduce((s, p) => s + Number(p.ek_gesamt || 0), 0)
+
+  // Wo der Betrieb das Material in einer Leistungsposition sammelt (Muster C),
+  // steht der Einstandspreis schon im Auftrag. Er zaehlt als Ist mit, sonst
+  // erscheint der Auftrag besser als er ist — und wer ihn von Hand nachtraegt,
+  // zaehlt ihn doppelt.
+  const istAusAuftrag = Number(row.soll_ek_leistungen || 0)
+  const istMaterial = istErfasst + istAusAuftrag
 
   // Leitgroesse: was nach dem Geraeteeinkauf uebrig ist, muss Montagematerial,
   // Lohn und Gewinn tragen. Traegt ueber beide Auftragsmuster — auch dort, wo
@@ -46,6 +54,8 @@ function normalize(row) {
     positionen,
     shop_nachkalkulation_positionen: undefined,
     ist_material: runde(istMaterial),
+    ist_erfasst: runde(istErfasst),
+    ist_aus_auftrag: runde(istAusAuftrag),
     deckung_material_und_lohn: runde(deckung),
     // Was nach dem tatsaechlichen Materialeinsatz fuer Lohn und Gewinn bleibt.
     // Negativ heisst: das Material allein hat den Rest aufgezehrt.

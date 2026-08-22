@@ -36,6 +36,10 @@ create table public.shop_nachkalkulation (
   soll_ek_geraete      numeric(12,2),   -- Positionen mit katalogUUID
   soll_vk_geraete      numeric(12,2),
   soll_erloes_montage  numeric(12,2),   -- Positionen ohne katalogUUID, nur Muster A
+  -- Materialeinstand, der im Auftrag schon erfasst ist: der ekPreis der
+  -- Leistungspositionen (Muster C). Zaehlt als Ist, nicht als Soll.
+  soll_ek_leistungen   numeric(12,2),
+  soll_vk_leistungen   numeric(12,2),
   soll_stand           timestamptz,
 
   -- Ist aus PDS-Bestellungen zur selben Projektakte, eingefroren beim Import.
@@ -106,6 +110,11 @@ comment on column public.shop_nachkalkulation_positionen.quelle is
   'ist die belastbarste Quelle. monteur = vom Zettel abgeschrieben, beleg = aus '
   'einem Lieferantenbeleg, schaetzung = geschätzt. Ohne diese Trennung liest sich '
   'eine Schätzung später wie eine belegte Zahl.';
+
+comment on column public.shop_nachkalkulation.soll_ek_leistungen is
+  'Einkaufspreis der Leistungspositionen. Wo der Betrieb das Material in einer '
+  'Leistung sammelt (Muster C), steht hier der Einstandspreis — das ist bereits '
+  'eine Ist-Zahl und wird nicht erneut von Hand erfasst.';
 
 comment on column public.shop_nachkalkulation.ist_ek_bestellungen is
   'Summe der Einkaufspreise aus PDS-Bestellungen zur Projektakte. Deckt das ab, '

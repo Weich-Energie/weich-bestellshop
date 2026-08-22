@@ -287,6 +287,8 @@ Deno.serve(async (req: Request) => {
             soll_ek_geraete: runde(ekGeraete),
             soll_vk_geraete: runde(vkGeraete),
             soll_erloes_montage: runde(erloesMontage),
+            soll_ek_leistungen: runde(ekLeistungen),
+            soll_vk_leistungen: runde(vkLeistungen),
             soll_stand: new Date().toISOString(),
           },
           { onConflict: "pds_vorgang_uuid" },

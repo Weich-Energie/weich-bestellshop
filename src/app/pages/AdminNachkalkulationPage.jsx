@@ -300,6 +300,12 @@ function Detail({ id, onZurueck }) {
             <Plus size={14} /> Hinzufügen
           </Button>
         </HStack>
+        {nk.ist_aus_auftrag > 0 && (
+          <Text fontSize="xs" color="fg.muted" mt={2}>
+            {euro(nk.ist_aus_auftrag)} sind bereits im Auftrag als Einstandspreis einer
+            Leistungsposition erfasst und zählen oben mit. Hier gehört nur nach, was darin fehlt.
+          </Text>
+        )}
         {gewaehlt && gewaehlt.preis_netto == null && (
           <Text fontSize="xs" color="orange.600" mt={2}>
             Für diesen Artikel ist kein Einkaufspreis hinterlegt — die Position zählt dann mit 0 €.
