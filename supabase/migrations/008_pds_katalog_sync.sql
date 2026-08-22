@@ -70,6 +70,32 @@ update public.shop_lieferanten
  where slug = 'frigotechnik'
    and pds_person_uuid is null;
 
+-- ─── Artikel: Lieferant als Bezug statt Freitext ───────────────────────────
+-- shop_artikel.lieferant ist Freitext. Für PDS wird aber eine lieferantUUID
+-- gebraucht, und die hängt an shop_lieferanten. Ohne diesen Bezug müsste der
+-- Sync zur Laufzeit über Namensgleichheit raten.
+--
+-- Die Freitextspalte bleibt zunächst erhalten: sie enthält Werte, für die es
+-- noch keinen Lieferantendatensatz gibt (Conrad, Reichelt). Sie zu löschen wäre
+-- Datenverlust, solange diese Lieferanten nicht angelegt sind.
+alter table public.shop_artikel
+  add column if not exists lieferant_id uuid
+    references public.shop_lieferanten(id) on delete set null;
+
+comment on column public.shop_artikel.lieferant_id is
+  'Lieferant als Bezug auf shop_lieferanten — Voraussetzung für den PDS-Sync. '
+  'Die alte Freitextspalte lieferant bleibt vorerst bestehen, weil dort noch '
+  'Lieferanten ohne eigenen Datensatz stehen.';
+
+-- Backfill über Namensgleichheit. Trifft heute Frigotechnik; alles andere
+-- bleibt null und wird beim Sync als fehlendes Mapping sichtbar.
+update public.shop_artikel a
+   set lieferant_id = l.id
+  from public.shop_lieferanten l
+ where a.lieferant_id is null
+   and a.lieferant is not null
+   and lower(btrim(a.lieferant)) = lower(btrim(l.name));
+
 -- ─── Kategorien: Ziel in PDS ───────────────────────────────────────────────
 -- Eine Shop-Kategorie bestimmt beides in PDS: die Katalogkategorie und die
 -- Warengruppe. So bleiben die zwei Dimensionen konsistent, statt je Artikel
