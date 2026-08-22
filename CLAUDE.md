@@ -83,6 +83,7 @@ Neue Edge Function `shop-ai` mit taskbasiertem Routing:
 - [CONTEXT.md](CONTEXT.md) — Domain-Glossar
 - [ROADMAP.md](ROADMAP.md) — Phasen 0-9
 - [docs/adr/](docs/adr/) — Architektur-Entscheidungen
+- [docs/pds-inbetriebnahme.md](docs/pds-inbetriebnahme.md) — Reihenfolge der Inbetriebnahme
 - [docs/pds-katalog-mapping.md](docs/pds-katalog-mapping.md) — Feld- und ID-Mapping Shop → PDS
 - [docs/pds-klima-warengruppen.md](docs/pds-klima-warengruppen.md) — Klima-Warengruppen und Umzugsliste
 - [docs/nachkalkulation-datenmodell.md](docs/nachkalkulation-datenmodell.md) — Soll/Ist-Modell
