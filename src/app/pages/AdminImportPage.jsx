@@ -81,7 +81,7 @@ function BelegKarte({ beleg, onOpen, onDelete }) {
   )
 }
 
-function PositionsAnsicht({ belegId, kategorien, onClose }) {
+function PositionsAnsicht({ belegId, belegLieferant, kategorien, onClose }) {
   const qc = useQueryClient()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [prefillFromPos, setPrefillFromPos] = useState(null)
@@ -119,6 +119,9 @@ function PositionsAnsicht({ belegId, kategorien, onClose }) {
       preis_netto: pos.raw_einzelpreis,
       artikelnr: pos.raw_artikelnr || '',
       einheit: pos.ki_einheit || '',
+      // Lieferant vom Rechnungskopf: ohne ihn hat der Artikel spaeter keinen
+      // Bezug auf shop_lieferanten und ist in PDS nicht nachbestellbar.
+      lieferant: belegLieferant || '',
       tags: Array.isArray(pos.ki_tags) ? pos.ki_tags.join(', ') : '',
       kategorie_id: findKategorieId(pos.ki_kategorie, kategorien),
     })
@@ -296,6 +299,7 @@ export default function AdminImportPage() {
     return (
       <PositionsAnsicht
         belegId={offenerBeleg.id}
+        belegLieferant={offenerBeleg.lieferant}
         kategorien={kategorien}
         onClose={() => setOffenerBeleg(null)}
       />

@@ -86,6 +86,41 @@ Zeile ist vor dem Umhängen zu bestätigen.
 | `c0dfe505-8abb-4dc3-afed-5e6723389edc` | Bosch CL7000iU W 35 E | Bosch |
 | `453d6e4d-f43e-4c4e-88b6-66fcaf08d3ba` | REMKO Deckenkassette MXD 204 | 2-Wärmepumpen Zubehör |
 
+Aus der Suche nach `Wandgerät` (30 Treffer) kommen weitere 24 Innengeräte hinzu,
+alle in `(SHK)Wärmepumpe`, Kategorie `Daikin` bzw. `Panasonic`:
+
+Daikin Stylish — `5b2d78e9-ff8e-46f9-ae15-4677b5b7c2ad` FTXA25CW,
+`d90c5980-920f-4f4f-9f2e-434acb3bd5be` FTXA20CW,
+`47251e7c-0e39-4fc9-b036-f396eadfecc0` FTXA35CW,
+`f639ac0c-6eba-4086-ab5a-ee997c0535de` FTXA42CW,
+`65bde86a-75bb-4f1c-af6f-298ba161f1fa` FTXA50CW,
+`29e84e57-ed01-493b-8640-a96fe29fdd18` FTXA25CB,
+`5f40d5dd-9dde-4b0e-b0c8-ce9a3700a289` FTXA35CB,
+`f7cc2135-d62e-434f-a45d-da2cc062bca3` FTXA50CB,
+`8c006251-e977-42e6-a49b-ccad27db6ec9` FTXA25CS,
+`543af989-46c3-43a4-bd0c-ef8c5aa50ba3` CTXA15CW,
+`368c2da8-dd77-4fc8-8e4c-ad5956584d4b` CTXA15CB
+
+Daikin Perfera — `ea29930b-5303-4fad-ba30-90fff6e69d32` FTXM20A,
+`38faaa24-d11d-46ff-bc26-f2d75f206c42` FTXM25A,
+`e9e2c7dc-b2a4-45d7-837b-a9a8bfbd27cc` FTXM35A,
+`6c0f966a-f9be-4ea3-9b0b-eb5bfd7e56d2` FTXM42A,
+`4cca5a1d-78e3-4875-a6dc-2eb80adc0e10` FTXM50A,
+`24bcb21c-947c-4b71-a99f-f751410ed8d6` FTXM60A,
+`870f49eb-3ab8-4569-93dc-e2fb47167637` CTXM15A
+
+Panasonic Etherea — `36732089-6e8a-4b3e-bbcd-0454d99fc5a3` CS-Z20CKEW,
+`08888c37-0c99-4c95-a719-a1306a544de8` CS-Z25CKEW,
+`b7f2fe27-ae70-451c-af3a-3a8a426a1a38` CS-Z35CKEW,
+`9be059e8-2e15-4997-b4cb-c1349afae58b` CS-Z50CKEW,
+`a47f7b23-7349-401e-b8c4-91c0c8d1c09b` CS-XZ35CKEW-H
+
+Zwei Treffer derselben Suche sind **keine** Klimageräte, sondern Wärmepumpen-
+Innengeräte und bleiben, wo sie sind: `b9d26329-5a44-4a10-85ab-d1197dc2de36`
+ELBX12E9W und `fb7e3e54-f0a8-4bc1-a508-9eba3e0334ad` ETBH12E9W (beide Altherma).
+
+Damit umfasst die Umzugsliste rund 60 Artikel.
+
 ### → `(KLIMA)Installationsmaterial`
 
 | UUID | Artikel | Einheit |

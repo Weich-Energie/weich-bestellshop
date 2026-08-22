@@ -118,7 +118,7 @@ comment on column public.shop_kategorien.pds_warengruppe_uuid is
 -- PDS erwartet in massEinheit eine Zeichenkette, die exakt einer vorhandenen
 -- Maßeinheit entspricht. Der Mandant führt vier Stück- und vier Meter-Varianten
 -- parallel (Stck, Stück, Stk, PCE / m, lfdm, lfm, MTR). Diese Tabelle legt fest,
--- welche davon der Shop benutzt, statt den Wildwuchs zu vergrössern.
+-- welche davon beim Übertragen benutzt wird, statt den Wildwuchs zu vergrössern.
 --
 -- Bewusst als Mapping-Tabelle und nicht als CHECK auf shop_artikel.einheit:
 -- ein Constraint würde Bestandsdaten brechen. So bleiben ungemappte Einheiten
@@ -134,12 +134,26 @@ comment on table public.shop_pds_einheiten is
   'Übersetzt shop_artikel.einheit in den String, den PDS in massEinheit erwartet. '
   'Fehlt ein Eintrag, wird der Artikel nicht übertragen statt mit falscher Einheit.';
 
+-- Die Schlüssel sind die Schreibweisen, die der Shop bereits benutzt. Der
+-- Artikel-Dialog normalisiert Eingaben über EINHEIT_ALIASE auf die
+-- ausgeschriebene deutsche Form ("Im Katalog soll durchgehend die korrekte
+-- deutsche Schreibweise stehen", src/app/components/ArtikelDialog.jsx). Diese
+-- Tabelle übersetzt sie nach PDS und ändert die Shop-Konvention nicht.
 insert into public.shop_pds_einheiten (shop_einheit, pds_bezeichnung, pds_uuid, notiz) values
-  ('Stk', 'Stck', 'a41d7bb2-4f47-4e54-9fb6-e9e798d8d831', 'Stückgut; PDS führt zusätzlich Stück, Stk und PCE'),
-  ('m',   'm',    'de9e3758-c933-47cd-8e74-64f37d8b9077', 'Meterware wie Kabelkanal'),
-  ('lfm', 'lfm',  '597869b4-936d-45fb-8c82-665269cefeaa', 'laufender Meter, Praxis bei Rohrpaketen'),
-  ('Pkg', 'Geb',  '84fd815c-3de6-40bf-97f5-fe7c42da4f26', 'Gebinde bzw. Verpackungseinheit')
+  ('Stück',     'Stck',  'a41d7bb2-4f47-4e54-9fb6-e9e798d8d831', 'PDS führt daneben Stück, Stk und PCE — wir schreiben Stck'),
+  ('Meter',     'm',     'de9e3758-c933-47cd-8e74-64f37d8b9077', 'Meterware wie Kabelkanal'),
+  ('Laufmeter', 'lfm',   '597869b4-936d-45fb-8c82-665269cefeaa', 'Praxis bei Rohrpaketen'),
+  ('Packung',   'Geb',   '84fd815c-3de6-40bf-97f5-fe7c42da4f26', 'Gebinde bzw. Verpackungseinheit'),
+  ('Karton',    'Geb',   '84fd815c-3de6-40bf-97f5-fe7c42da4f26', 'wie Packung'),
+  ('Beutel',    'Geb',   '84fd815c-3de6-40bf-97f5-fe7c42da4f26', 'wie Packung'),
+  ('Rolle',     'Rolle', '4194ce3e-e095-4fbe-824c-02b659ad4671', 'Kabel und Kabelkanal kommen oft als Rolle'),
+  ('Kilogramm', 'kg',    '4b81f74b-7cb3-404a-870a-1800c12fba51', null),
+  ('Satz',      'SET',   '3ebaeb49-2040-4029-a207-f13faaf9ba15', null)
 on conflict (shop_einheit) do nothing;
+
+-- Liter, Dose, Kanister und Paar kennt der Shop ebenfalls, PDS hat dafür keine
+-- Maßeinheit. Sie bleiben absichtlich ohne Zuordnung: der Sync meldet dann eine
+-- Lücke, statt auf Stck auszuweichen und die Menge zu verfälschen.
 
 alter table public.shop_pds_einheiten enable row level security;
 

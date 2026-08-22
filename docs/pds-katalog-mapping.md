@@ -56,9 +56,29 @@ Der Mandant führt vier Stück- und vier Meter-Varianten parallel:
 | `Rolle` | `4194ce3e-e095-4fbe-824c-02b659ad4671` | 2950402 |
 | `Geb` | `84fd815c-3de6-40bf-97f5-fe7c42da4f26` | 68811 |
 
-**Festlegung für den Sync** (an der vorhandenen Praxis orientiert): Stück → `Stck`,
-Meterware → `m`, laufender Meter bei Rohrpaketen → `lfm`, Gebinde → `Geb`.
-Der Shop darf nur diese vier Werte in `shop_artikel.einheit` zulassen.
+**Festlegung für den Sync.** Der Shop behält seine Konvention — der
+Artikel-Dialog normalisiert Eingaben auf die ausgeschriebene deutsche Form
+(„Im Katalog soll durchgehend die korrekte deutsche Schreibweise stehen",
+`src/app/components/ArtikelDialog.jsx`). Übersetzt wird erst beim Übertragen,
+über `shop_pds_einheiten`:
+
+| Shop | PDS |
+|---|---|
+| Stück | `Stck` |
+| Meter | `m` |
+| Laufmeter | `lfm` |
+| Packung, Karton, Beutel | `Geb` |
+| Rolle | `Rolle` |
+| Kilogramm | `kg` |
+| Satz | `SET` |
+
+Liter, Dose, Kanister und Paar kennt der Shop ebenfalls, PDS hat dafür keine
+Maßeinheit. Sie bleiben ohne Zuordnung, damit der Sync eine Lücke meldet statt
+auf `Stck` auszuweichen und die Menge zu verfälschen.
+
+Migration 010 hält dieselbe Zuordnung als Trigger auf `shop_artikel` vor, mit
+den Schreibweisen aus Lieferantenrechnungen (`ST`, `STK`, `MTR`, `lfdm`) als
+Aliasse — für alle Anlagewege, die den Dialog nicht durchlaufen.
 
 ## 4. Kategorien — es gibt keine Klima-Kategorie
 
