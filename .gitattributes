@@ -1,0 +1,27 @@
+# Zeilenenden im Repository immer LF, unabhaengig vom Betriebssystem des
+# Entwicklers. Verhindert Schein-Konflikte, bei denen sich Dateien nur in den
+# Zeilenenden unterscheiden.
+* text=auto eol=lf
+
+# Windows-Skripte brauchen CRLF, sonst laufen sie nicht.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binaerdateien nicht anfassen.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.svg  text
+*.pdf  binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+*.eot  binary
+*.xlsx binary
+*.docx binary
+*.zip  binary
+*.mp4  binary
