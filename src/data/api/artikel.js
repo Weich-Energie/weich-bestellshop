@@ -84,25 +84,21 @@ export async function deleteArtikel(id) {
 
 // Aktive Bestellwuensche (pending/approved/ordered) — hilft Doppelbestellungen zu erkennen.
 // Rueckgabe: Liste { artikel_id, variante_id, menge_summe, anzahl, letztes_datum }
+//
+// Laeuft ueber eine security-definer-Funktion statt direkt auf der Tabelle: RLS
+// zeigt einem Monteur dort nur seine EIGENEN Zeilen, der Hinweis warnte ihn also
+// nie vor der Bestellung eines Kollegen — obwohl er genau dafuer gedacht ist.
+// Die Funktion liefert ausschliesslich Zaehler, nie wer bestellt hat.
 export async function listAktiveOrderCounts() {
-  const { data, error } = await supabase
-    .from('shop_order_requests')
-    .select('artikel_id, variante_id, menge, created_at, status')
-    .in('status', ['pending', 'approved', 'ordered'])
+  const { data, error } = await supabase.rpc('shop_aktive_bestell_zaehler')
   if (error) throw error
-  const map = new Map()
-  for (const r of data || []) {
-    const key = `${r.artikel_id}::${r.variante_id || ''}`
-    const cur = map.get(key) || {
-      artikel_id: r.artikel_id, variante_id: r.variante_id,
-      anzahl: 0, menge_summe: 0, letztes_datum: null,
-    }
-    cur.anzahl += 1
-    cur.menge_summe += r.menge
-    if (!cur.letztes_datum || r.created_at > cur.letztes_datum) cur.letztes_datum = r.created_at
-    map.set(key, cur)
-  }
-  return [...map.values()]
+  return (data || []).map((r) => ({
+    artikel_id: r.artikel_id,
+    variante_id: r.variante_id,
+    anzahl: Number(r.anzahl) || 0,
+    menge_summe: Number(r.menge_summe) || 0,
+    letztes_datum: r.letztes_datum,
+  }))
 }
 
 // Varianten und Gebinde werden per Namen abgeglichen statt geloescht und neu
