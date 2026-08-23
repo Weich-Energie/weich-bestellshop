@@ -45,8 +45,9 @@ Verknuepfung `(user_id, katalog_artikel_id)`. Simple Merkliste, keine Gruppen v1
 
 - **admin**: verwaltet Katalog, gibt Bestellwuensche frei, sieht alle Bestellungen,
   verwaltet Beleg-Import, konfiguriert KI-Regeln, benennt weitere Admins.
-- **user**: bestellt, meldet Bedarf, sieht eigene Bestellungen + Favoriten. Sieht
-  keine Preise.
+- **user**: bestellt, meldet Bedarf, sieht eigene Bestellungen + Favoriten. Die
+  Oberflaeche zeigt ihm keine Preise — das ist eine UI-Entscheidung, keine
+  Vertraulichkeit (siehe CLAUDE.md).
 
 Rollen werden ueber das **App-Zugriffs-System** (`app_access(user_id, app, role)`)
 gefuehrt — geteilt mit den anderen drei Apps.

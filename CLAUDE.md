@@ -47,7 +47,11 @@ Ressourcenplanung, Service-Ticket und Betriebsradar.
 - Immer auf Deutsch (UI, Kommentare, KI-Output)
 - Chakra v3 Syntax: `Dialog.Root`, `Tabs.Root`, `Select` mit `createListCollection`
 - Fail-closed Auth-Check: KEIN `?? true` — nicht gesetzt = kein Zugriff
-- User sieht KEINE Preise im Katalog (nur Admin sieht Preise) — bewusste Entscheidung
+- Der Katalog zeigt dem User keine Preise — bewusste UI-Entscheidung, damit nach
+  Bedarf und nicht nach Preis bestellt wird. **Keine Vertraulichkeit:** Monteure
+  duerfen die Preise kennen, und die Datenbank schuetzt sie nicht (jeder Shop-User
+  kann `shop_artikel.preis_netto` lesen). Wer Preise im UI ergaenzen will, kann
+  das also tun, ohne an RLS zu ruehren. Entscheidung vom 23.08.2026.
 - Verbrauchsmaterial (C-Teile) — hochwertige B-Teile bleiben im ERP
 
 ## Architektur
