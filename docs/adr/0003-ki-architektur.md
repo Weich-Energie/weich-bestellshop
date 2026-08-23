@@ -45,6 +45,30 @@ Extraktion overkill.
 
 Die Function bekommt einen `task`-Discriminator im Payload und routet intern.
 
+## Nachtrag 2026-08-23 — Zugriff: nur Shop-Admins
+
+`shop-ai` hat bis hierhin nur geprueft, dass das JWT gueltig ist. Die Supabase-
+Instanz ist aber mit Ressourcenplanung, Service-Ticket und Betriebsradar geteilt:
+ein gueltiges Token sagt damit nur, dass jemand *irgendeine* der vier Apps
+benutzt. Jeder Mitarbeiter mit Zugang zu einer beliebigen App konnte die Funktion
+also aufrufen — und ueber `extract_shop_link` bzw. `analyze_bedarf_bild` eine
+beliebige URL serverseitig abrufen lassen.
+
+**Entscheidung:** Alle fuenf Tasks pruefen jetzt fail-closed auf Shop-Admin
+(`app_access.bestellshop_admin === true` oder `rolle === 'admin'`), nach dem
+Muster von `lieferant-zugang`. Das passt zur Nutzung: alle Tasks haengen an
+Admin-Seiten (Katalog-Dialog, Beleg-Import, Bedarfsmeldungen). Sollte eine
+KI-Funktion spaeter fuer normale Nutzer gebraucht werden — etwa Foto-Analyse
+direkt in der Bedarfsmeldung — bekommt dieser Task einen eigenen, schwaecheren
+Check auf `app_access.bestellshop` statt einer Aufweichung fuer alle.
+
+Zusaetzlich pruefen die drei Tasks, die eine uebergebene URL laden, das Ziel
+gegen Loopback-, private und Link-Local-Adressen (inklusive 169.254.169.254).
+Das ist eine Huerde, keine Grenze: Umleitungen werden weiter gefolgt und nicht
+erneut geprueft, und Namen, die erst per DNS intern zeigen, kann eine Edge
+Function ohne eigenen Resolver nicht erkennen. Die eigentliche Tuer ist der
+Admin-Check.
+
 ## Konsequenzen
 
 **Positiv:**

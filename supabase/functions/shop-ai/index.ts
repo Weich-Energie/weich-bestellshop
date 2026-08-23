@@ -37,6 +37,57 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary)
 }
 
+// Serverseitige Fetches gehen nur nach draussen. Die offensichtlichen Ziele im
+// internen Netz (Loopback, private Bereiche, Link-Local samt Cloud-Metadaten)
+// werden hier abgewiesen — sonst waere die Funktion ein Fetch-Proxy auf unseren
+// Namen. Namen, die erst per DNS auf eine interne Adresse zeigen, kann eine
+// Edge Function ohne eigenen Resolver nicht abfangen; die klaren Faelle schon.
+const PRIVATE_HOSTS = /^(localhost|.*\.localhost|.*\.internal|.*\.local)$/i
+
+function pruefeZielUrl(roh: unknown): URL {
+  if (!roh || typeof roh !== "string") throw new Error("URL fehlt")
+  let url: URL
+  try { url = new URL(roh) } catch { throw new Error("URL ungueltig") }
+  if (!["http:", "https:"].includes(url.protocol)) throw new Error("Nur http/https")
+
+  const host = url.hostname.replace(/^\[|\]$/g, "").toLowerCase()
+  if (PRIVATE_HOSTS.test(host)) throw new Error("Interne Adressen sind nicht erlaubt")
+  // IPv6-Loopback, ULA (fc00::/7) und Link-Local (fe80::/10). Nur fuer echte
+  // IPv6-Literale pruefen: ein Hostname wie "februar-shop.de" faellt sonst
+  // ueber die Praefix-Regel.
+  if (host.includes(":") && (host === "::1" || /^(fc|fd|fe[89ab])/.test(host))) {
+    throw new Error("Interne Adressen sind nicht erlaubt")
+  }
+  const v4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])]
+    const intern =
+      a === 0 || a === 127 || a === 10 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 169 && b === 254) ||   // Link-Local + Cloud-Metadaten (169.254.169.254)
+      (a === 100 && b >= 64 && b <= 127)
+    if (intern) throw new Error("Interne Adressen sind nicht erlaubt")
+  }
+  return url
+}
+
+// Fail-closed Admin-Check. Die Supabase-Instanz ist mit den drei anderen
+// WEICHENERGIE-Apps geteilt: ein gueltiges JWT allein sagt nur, dass jemand
+// irgendeine dieser Apps benutzt. Alle Tasks hier haengen an Admin-Seiten
+// (Katalog, Beleg-Import, Bedarfsmeldungen), also gilt dasselbe Recht wie in
+// lieferant-zugang.
+async function istShopAdmin(sb: any, email: string | undefined): Promise<boolean> {
+  if (!email) return false
+  const { data: profil } = await sb
+    .from("employees")
+    .select("berechtigungen")
+    .eq("email", email)
+    .single()
+  const rechte = (profil?.berechtigungen ?? {}) as Record<string, any>
+  return rechte?.app_access?.bestellshop_admin === true || rechte?.rolle === "admin"
+}
+
 // Extrahiert JSON-Objekt aus einem Textbausch (Modell kann manchmal Prosa vorne/hinten haben).
 function extractJson(text: string): any | null {
   const firstBrace = text.indexOf("{")
@@ -101,10 +152,13 @@ async function enrichArtikel(body: any) {
 
 // ─── Task: analyze_bedarf_bild ────────────────────────────────────────
 async function analyzeBedarfBild(body: any) {
-  const { bild_url, beschreibung, kategorien } = body
-  if (!bild_url) return json({ error: "bild_url fehlt" }, 400)
+  const { beschreibung, kategorien } = body
+  let bildUrl: URL
+  try { bildUrl = pruefeZielUrl(body?.bild_url) } catch (e) {
+    return json({ error: `bild_url: ${(e as any)?.message || e}` }, 400)
+  }
 
-  const imgRes = await fetch(bild_url)
+  const imgRes = await fetch(bildUrl)
   if (!imgRes.ok) return json({ error: `Bild-Download fehlgeschlagen: ${imgRes.status}` }, 502)
   const buf = await imgRes.arrayBuffer()
   const base64 = bytesToBase64(new Uint8Array(buf))
@@ -140,10 +194,13 @@ async function analyzeBedarfBild(body: any) {
 // Laedt PDF von signed URL, sendet als "document"-Content an Sonnet Vision,
 // erwartet strukturiertes JSON mit Meta (Lieferant, Datum, Nr, Summe) + Positionen.
 async function extractBeleg(body: any) {
-  const { pdf_url, kategorien } = body
-  if (!pdf_url) return json({ error: "pdf_url fehlt" }, 400)
+  const { kategorien } = body
+  let pdfUrl: URL
+  try { pdfUrl = pruefeZielUrl(body?.pdf_url) } catch (e) {
+    return json({ error: `pdf_url: ${(e as any)?.message || e}` }, 400)
+  }
 
-  const pdfRes = await fetch(pdf_url)
+  const pdfRes = await fetch(pdfUrl)
   if (!pdfRes.ok) return json({ error: `PDF-Download fehlgeschlagen: ${pdfRes.status}` }, 502)
   const buf = await pdfRes.arrayBuffer()
   if (buf.byteLength > 32 * 1024 * 1024) return json({ error: "PDF > 32 MB — Anthropic-Limit" }, 413)
@@ -196,14 +253,18 @@ async function extractBeleg(body: any) {
 // Inhalt, laesst Sonnet Produkt-Daten extrahieren.
 async function extractShopLink(body: any) {
   const { url, kategorien } = body
-  if (!url || typeof url !== "string") return json({ error: "url fehlt" }, 400)
   let parsedUrl: URL
-  try { parsedUrl = new URL(url) } catch { return json({ error: "URL ungueltig" }, 400) }
-  if (!["http:", "https:"].includes(parsedUrl.protocol)) return json({ error: "Nur http/https" }, 400)
+  try { parsedUrl = pruefeZielUrl(url) } catch (e) {
+    return json({ error: (e as any)?.message || String(e) }, 400)
+  }
 
   let html: string
   try {
-    const resp = await fetch(url, {
+    // redirect: "follow" bleibt, weil Shops staendig umleiten (http→https, Sprach-
+    // Pfade, Tracking). Ziele hinter einer Umleitung laufen damit aber nicht mehr
+    // durch pruefeZielUrl — die eigentliche Tuer ist deshalb der Admin-Check oben,
+    // die Adress-Pruefung nur die erste Huerde.
+    const resp = await fetch(parsedUrl, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -347,6 +408,10 @@ Deno.serve(async (req: Request) => {
     )
     const { data: userData, error: authErr } = await sb.auth.getUser(token)
     if (authErr || !userData?.user) return json({ error: "Ungueltige Session" }, 401)
+
+    if (!(await istShopAdmin(sb, userData.user.email))) {
+      return json({ error: "Nur Shop-Admins duerfen die KI-Funktionen nutzen" }, 403)
+    }
 
     const body = await req.json()
     const task = body?.task

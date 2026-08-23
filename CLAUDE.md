@@ -60,10 +60,16 @@ Ressourcenplanung, Service-Ticket und Betriebsradar.
 - `supabase/migrations/` — SQL-Migrationen (kommt ab Phase 2)
 
 ## KI (spaeter)
-Neue Edge Function `shop-ai` mit taskbasiertem Routing:
+Edge Function `shop-ai` mit taskbasiertem Routing:
 - Vision (Foto→Artikel, Beleg→Positionen): Sonnet 4.6
-- Text (Kategorie/Tag/Beschreibung): Haiku 4.5
+- Text (Kategorie/Tag/Beschreibung): laeuft aktuell ebenfalls auf Sonnet 4.6
+  (revidierte Modell-Politik, ADR 0003 v2); Haiku 4.5 bleibt fuer spaetere
+  Live-Suggestions und den Bot reserviert
 - Browser-Agent (Phase 7/8): Sonnet 4.6 mit Tool-Use
+
+**Zugriff: nur Shop-Admins** — fail-closed, geprueft in der Function selbst.
+Die Supabase-Instanz ist mit den anderen drei Apps geteilt, ein gueltiges JWT
+allein ist also kein Shop-Recht. Siehe ADR 0003, Nachtrag vom 23.08.2026.
 
 ## Domain-Doku
 - [CONTEXT.md](CONTEXT.md) — Domain-Glossar
