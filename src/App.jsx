@@ -4,6 +4,7 @@ import { Flex, Spinner } from '@chakra-ui/react'
 import { useAuth } from './app/contexts/AuthContext.jsx'
 import Layout from './app/components/Layout.jsx'
 import LoginPage from './app/pages/LoginPage.jsx'
+import UpdatePasswordPage from './app/pages/UpdatePasswordPage.jsx'
 import KatalogPage from './app/pages/KatalogPage.jsx'
 
 // Alles ausser Login und Katalog wird nachgeladen. Vorher steckten alle 12 Seiten
@@ -42,6 +43,11 @@ export default function App() {
     <Suspense fallback={<Ladeanzeige />}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        {/* Ziel des Reset-Links aus der Email. Nicht im geschuetzten Bereich:
+            sonst laeuft der Nutzer erst in den Zugriffs-Check, und die Route lief
+            ueber das "*"-Fallback auf den Katalog — der Recovery-Token war damit
+            verbraucht, ohne dass je ein Passwort gesetzt werden konnte. */}
+        <Route path="/update-password" element={<UpdatePasswordPage />} />
         <Route
           path="/"
           element={<ProtectedRoute><Layout /></ProtectedRoute>}

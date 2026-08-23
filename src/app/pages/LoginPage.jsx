@@ -5,10 +5,13 @@ import { ShoppingCart } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.jsx'
 
 export default function LoginPage() {
-  const { loginWithEmail, isAuthenticated, accessDeniedMessage, error } = useAuth()
+  const { loginWithEmail, isAuthenticated, accessDeniedMessage, error, resetPassword } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [resetHinweis, setResetHinweis] = useState(null)
+  const [resetFehler, setResetFehler] = useState(null)
+  const [resetBusy, setResetBusy] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -21,6 +24,25 @@ export default function LoginPage() {
     try { await loginWithEmail(email, password) }
     catch { /* Fehler steht im Context */ }
     finally { setSubmitting(false) }
+  }
+
+  // Die Reset-Email geht an die Adresse, die oben schon im Formular steht — ein
+  // zweites Eingabefeld waere hier nur Ballast.
+  async function onPasswortVergessen() {
+    setResetHinweis(null); setResetFehler(null)
+    if (!email.trim()) {
+      setResetFehler('Bitte zuerst deine Email eintragen.')
+      return
+    }
+    setResetBusy(true)
+    try {
+      await resetPassword(email.trim())
+      setResetHinweis('Email ist unterwegs. Der Link darin führt dich zum neuen Passwort.')
+    } catch (e) {
+      setResetFehler(e.message || 'Die Email konnte nicht gesendet werden.')
+    } finally {
+      setResetBusy(false)
+    }
   }
 
   return (
@@ -46,6 +68,12 @@ export default function LoginPage() {
               {error && <Text color="red.500" fontSize="sm">{error}</Text>}
               {accessDeniedMessage && <Text color="orange.600" fontSize="sm">{accessDeniedMessage}</Text>}
               <Button type="submit" colorPalette="blue" loading={submitting}>Anmelden</Button>
+              <Button type="button" variant="plain" size="sm" alignSelf="center"
+                onClick={onPasswortVergessen} loading={resetBusy}>
+                Passwort vergessen?
+              </Button>
+              {resetHinweis && <Text color="green.600" fontSize="sm">{resetHinweis}</Text>}
+              {resetFehler && <Text color="red.500" fontSize="sm">{resetFehler}</Text>}
             </VStack>
           </form>
         </VStack>

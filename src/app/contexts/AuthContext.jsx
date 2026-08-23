@@ -135,6 +135,13 @@ export function AuthProvider({ children }) {
     setError(null)
   }, [])
 
+  // Setzt das Passwort der aktuellen Session — nach dem Klick auf den
+  // Reset-Link ist genau die die Recovery-Session aus der Email.
+  const updatePassword = useCallback(async (neuesPasswort) => {
+    const { error: updateError } = await supabase.auth.updateUser({ password: neuesPasswort })
+    if (updateError) throw updateError
+  }, [])
+
   const resetPassword = useCallback(async (email) => {
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
       // BASE_URL ('/bestellshop/') muss mit rein: unter der Dach-App liegt die Route
@@ -159,8 +166,9 @@ export function AuthProvider({ children }) {
       loginWithEmail,
       logout,
       resetPassword,
+      updatePassword,
     }),
-    [currentUser, session, loading, error, accessDeniedMessage, isAdmin, hasAdminRights, viewAsUser, loginWithEmail, logout, resetPassword],
+    [currentUser, session, loading, error, accessDeniedMessage, isAdmin, hasAdminRights, viewAsUser, loginWithEmail, logout, resetPassword, updatePassword],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
