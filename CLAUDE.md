@@ -30,6 +30,11 @@ Ressourcenplanung, Service-Ticket und Betriebsradar.
 - Ablauf: `npx vite build` (Check), commit, `git push` — ab da ist es live.
 - **Unfertiges gehoert auf einen Branch**, nicht auf `master`. Branch-Pushes
   erzeugen Vorschau-Deployments und lassen die Produktion unberuehrt.
+- Vorschau-Deployments bauen mit `base: '/'` statt `/bestellshop/`
+  (`vite.config.js` prueft `VERCEL_ENV`): dort laeuft die App auf ihrer eigenen
+  Adresse und nicht unter der Dach-App. Damit die Vorschau nicht bloss eine weisse
+  Seite zeigt, muessen die beiden `VITE_SUPABASE_*`-Variablen bei Vercel auch fuer
+  die **Preview**-Umgebung freigegeben sein, nicht nur fuer Production.
 - `npx vercel --prod` geht weiterhin, deployt aber den **lokalen Ordner** statt
   des Repos — im August hat das bei der Service-Ticket-App vier Monate Arbeit
   aus der Produktion entfernt. Im Zweifel nicht verwenden.
