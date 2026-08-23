@@ -105,18 +105,72 @@ export async function listAktiveOrderCounts() {
   return [...map.values()]
 }
 
+// Varianten und Gebinde werden per Namen abgeglichen statt geloescht und neu
+// angelegt. Grund: shop_order_requests.variante_id/gebinde_id zeigen mit
+// "on delete set null" hierhin. Loeschen-und-neu hat deshalb bei JEDEM Speichern
+// eines Artikels — auch bei einer reinen Preiskorrektur — die Variante aus allen
+// bestehenden Bestellungen entfernt; aus "Handschuhe Gr. 10" wurde in Verlauf und
+// Historie "Handschuhe". Gleicher Name heisst jetzt: gleiche ID bleibt.
+// Wirklich entfernte Eintraege werden weiter geloescht (und verlieren ihren Bezug
+// in alten Bestellungen) — das ist gewollt und die einzige verbleibende Luecke.
+function gleicheZeile(vorhandene, name) {
+  return vorhandene.find((v) => v.name.trim().toLowerCase() === name.toLowerCase()) || null
+}
+
+// Doppelte Namen wuerden beide auf dieselbe vorhandene Zeile zeigen — der erste gewinnt.
+function ohneDoppelte(eintraege) {
+  const gesehen = new Set()
+  return eintraege.filter((e) => {
+    const key = e.name.toLowerCase()
+    if (gesehen.has(key)) return false
+    gesehen.add(key)
+    return true
+  })
+}
+
+async function loescheUeberzaehlige(tabelle, vorhandene, behalten) {
+  const weg = vorhandene.filter((v) => !behalten.has(v.id)).map((v) => v.id)
+  if (!weg.length) return
+  const { error } = await supabase.from(tabelle).delete().in('id', weg)
+  if (error) throw error
+}
+
 // ─── Varianten ──────────────────────────────────────────────────────────
 export async function replaceVarianten(artikelId, varianten) {
   // varianten: [{ id?, name, sort_order? }]
-  await supabase.from('shop_artikel_varianten').delete().eq('artikel_id', artikelId)
-  const clean = varianten.filter((v) => v.name?.trim())
-  if (clean.length) {
-    const rows = clean.map((v, i) => ({
-      artikel_id: artikelId,
-      name: v.name.trim(),
-      sort_order: v.sort_order ?? i,
-    }))
-    const { error } = await supabase.from('shop_artikel_varianten').insert(rows)
+  const { data: vorhandene, error: leseErr } = await supabase
+    .from('shop_artikel_varianten')
+    .select('id, name, sort_order')
+    .eq('artikel_id', artikelId)
+  if (leseErr) throw leseErr
+
+  const soll = ohneDoppelte(
+    varianten
+      .filter((v) => v.name?.trim())
+      .map((v, i) => ({ name: v.name.trim(), sort_order: v.sort_order ?? i })),
+  )
+
+  const behalten = new Set()
+  const neu = []
+  for (const v of soll) {
+    const alt = gleicheZeile(vorhandene || [], v.name)
+    if (!alt) {
+      neu.push({ artikel_id: artikelId, name: v.name, sort_order: v.sort_order })
+      continue
+    }
+    behalten.add(alt.id)
+    if (alt.name !== v.name || alt.sort_order !== v.sort_order) {
+      const { error } = await supabase
+        .from('shop_artikel_varianten')
+        .update({ name: v.name, sort_order: v.sort_order })
+        .eq('id', alt.id)
+      if (error) throw error
+    }
+  }
+
+  await loescheUeberzaehlige('shop_artikel_varianten', vorhandene || [], behalten)
+  if (neu.length) {
+    const { error } = await supabase.from('shop_artikel_varianten').insert(neu)
     if (error) throw error
   }
 }
@@ -124,23 +178,55 @@ export async function replaceVarianten(artikelId, varianten) {
 // ─── Gebinde ────────────────────────────────────────────────────────────
 export async function replaceGebinde(artikelId, gebinde) {
   // gebinde: [{ id?, name, stueckzahl, ist_default?, sort_order? }]
-  await supabase.from('shop_artikel_gebinde').delete().eq('artikel_id', artikelId)
-  const clean = gebinde.filter((g) => g.name?.trim() && Number(g.stueckzahl) >= 1)
-  if (clean.length) {
-    // Nur ein Default erlaubt — nimm den ersten mit ist_default, sonst gar keiner
-    let defaultTaken = false
-    const rows = clean.map((g, i) => {
-      const isDef = !!g.ist_default && !defaultTaken
-      if (isDef) defaultTaken = true
-      return {
-        artikel_id: artikelId,
-        name: g.name.trim(),
-        stueckzahl: Math.max(1, Number(g.stueckzahl) || 1),
-        ist_default: isDef,
-        sort_order: g.sort_order ?? i,
-      }
-    })
-    const { error } = await supabase.from('shop_artikel_gebinde').insert(rows)
+  const { data: vorhandene, error: leseErr } = await supabase
+    .from('shop_artikel_gebinde')
+    .select('id, name, stueckzahl, ist_default, sort_order')
+    .eq('artikel_id', artikelId)
+  if (leseErr) throw leseErr
+
+  // Nur ein Default erlaubt — der erste mit ist_default, sonst gar keiner.
+  let defaultVergeben = false
+  const soll = ohneDoppelte(
+    gebinde
+      .filter((g) => g.name?.trim() && Number(g.stueckzahl) >= 1)
+      .map((g, i) => {
+        const istDefault = !!g.ist_default && !defaultVergeben
+        if (istDefault) defaultVergeben = true
+        return {
+          name: g.name.trim(),
+          stueckzahl: Math.max(1, Number(g.stueckzahl) || 1),
+          ist_default: istDefault,
+          sort_order: g.sort_order ?? i,
+        }
+      }),
+  )
+
+  const behalten = new Set()
+  const neu = []
+  for (const g of soll) {
+    const alt = gleicheZeile(vorhandene || [], g.name)
+    if (!alt) {
+      neu.push({ artikel_id: artikelId, ...g })
+      continue
+    }
+    behalten.add(alt.id)
+    const geaendert =
+      alt.name !== g.name ||
+      alt.stueckzahl !== g.stueckzahl ||
+      alt.ist_default !== g.ist_default ||
+      alt.sort_order !== g.sort_order
+    if (geaendert) {
+      const { error } = await supabase
+        .from('shop_artikel_gebinde')
+        .update(g)
+        .eq('id', alt.id)
+      if (error) throw error
+    }
+  }
+
+  await loescheUeberzaehlige('shop_artikel_gebinde', vorhandene || [], behalten)
+  if (neu.length) {
+    const { error } = await supabase.from('shop_artikel_gebinde').insert(neu)
     if (error) throw error
   }
 }
