@@ -45,9 +45,18 @@ export default function BestellungenPage() {
 
   if (isLoading) return <Flex justify="center" p={12}><Spinner size="xl" /></Flex>
 
+  // Ohne diese Anzeige lief ein per RLS abgelehnter Klick vollkommen stumm ins
+  // Leere — der Knopf sah aus, als tue er nichts.
+  const aktionsFehler = withdrawMutation.error || abgeholtMutation.error
+
   return (
     <Box>
       <Heading size="lg" mb={4}>Meine Bestellungen</Heading>
+      {aktionsFehler && (
+        <Text color="red.500" fontSize="sm" mb={3}>
+          {aktionsFehler.message || 'Aktion fehlgeschlagen'}
+        </Text>
+      )}
       {liste.length === 0 ? (
         <Text color="fg.muted" textAlign="center" py={12}>Du hast noch keine Bestellungen abgeschickt.</Text>
       ) : (
@@ -69,12 +78,16 @@ export default function BestellungenPage() {
                     {b.reject_grund && <Text fontSize="sm" color="red.600">Abgelehnt: {b.reject_grund}</Text>}
                   </VStack>
                   {canWithdraw && (
-                    <Button size="xs" variant="ghost" colorPalette="red" onClick={() => withdrawMutation.mutate(b.id)}>
+                    <Button size="xs" variant="ghost" colorPalette="red"
+                      loading={withdrawMutation.isPending && withdrawMutation.variables === b.id}
+                      onClick={() => withdrawMutation.mutate(b.id)}>
                       <XCircle size={14} /> Zurückziehen
                     </Button>
                   )}
                   {b.status === 'received' && (
-                    <Button size="xs" colorPalette="green" onClick={() => abgeholtMutation.mutate(b.id)}>
+                    <Button size="xs" colorPalette="green"
+                      loading={abgeholtMutation.isPending && abgeholtMutation.variables === b.id}
+                      onClick={() => abgeholtMutation.mutate(b.id)}>
                       <Check size={14} /> Abgeholt
                     </Button>
                   )}
