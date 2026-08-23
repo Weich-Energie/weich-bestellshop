@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -12,6 +12,30 @@ import {
 import ArtikelBild from '../components/ArtikelBild.jsx'
 import PositionText from '../components/PositionText.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
+
+// Eigenes Feld mit lokalem Zustand: vorher hing der Wert direkt am Server und
+// jeder Tastendruck loeste ein UPDATE aus — aus "12" wurden zwei Schreibvorgaenge,
+// und zwischendurch sprang die Anzeige auf den noch nicht aktualisierten Wert
+// zurueck. Geschrieben wird jetzt beim Verlassen des Feldes oder mit Enter.
+function MengeFeld({ wert, onCommit }) {
+  const [text, setText] = useState(String(wert))
+  useEffect(() => { setText(String(wert)) }, [wert])
+
+  function uebernehmen() {
+    const zahl = Math.max(1, Math.floor(Number(String(text).replace(',', '.')) || 1))
+    setText(String(zahl))
+    if (zahl !== wert) onCommit(zahl)
+  }
+
+  return (
+    <Input
+      type="number" min={1} size="sm" w="70px" value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={uebernehmen}
+      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
+      aria-label="Menge" />
+  )
+}
 
 export default function WarenkorbPage() {
   const { currentUser } = useAuth()
@@ -77,11 +101,9 @@ export default function WarenkorbPage() {
                   <VStack gap={2} align="flex-end">
                     <HStack>
                       <Text fontSize="xs" color="fg.muted">Menge</Text>
-                      <Input type="number" min={1} value={p.menge} size="sm" w="70px"
-                        onChange={(e) => {
-                          const n = Math.max(1, Number(e.target.value) || 1)
-                          updateMutation.mutate({ id: p.id, patch: { menge: n } })
-                        }} />
+                      <MengeFeld
+                        wert={p.menge}
+                        onCommit={(menge) => updateMutation.mutate({ id: p.id, patch: { menge } })} />
                     </HStack>
                     <IconButton size="xs" variant="ghost" colorPalette="red"
                       onClick={() => removeMutation.mutate(p.id)} aria-label="Entfernen">

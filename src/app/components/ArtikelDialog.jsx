@@ -228,9 +228,19 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
         einheit: einheit || null,
         aktiv,
       }
-      if (bildExternUrl && !bildDatei) {
-        fields.bild_url = bildExternUrl.trim()
-        fields.bild_ist_extern = true
+      if (!bildDatei) {
+        const externUrl = bildExternUrl.trim()
+        if (externUrl) {
+          fields.bild_url = externUrl
+          fields.bild_ist_extern = true
+        } else if (artikel?.bild_ist_extern) {
+          // Feld geleert: das externe Bild soll weg. Vorher blieb der alte Wert
+          // stehen, weil nur der gefuellte Fall geschrieben wurde. Nur bei
+          // externen Bildern, damit ein hochgeladenes Bild nicht mitgeloescht wird
+          // (dessen URL steht gar nicht in diesem Feld).
+          fields.bild_url = null
+          fields.bild_ist_extern = false
+        }
       }
 
       const tags = tagsRaw.split(',').map((s) => s.trim()).filter(Boolean)
