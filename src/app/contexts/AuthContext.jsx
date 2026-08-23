@@ -8,6 +8,13 @@ const AuthContext = createContext(null)
 // Pattern uebernommen aus Ressourcenplanung (Phase 11 / AAC-04).
 const APP_KEY = 'bestellshop'
 const NO_ACCESS_MESSAGE = 'Du hast keinen Zugang zum Bestellshop. Wende dich an Patrick.'
+// Anmeldung hat geklappt, aber zur Email gibt es keine Zeile in employees. Ohne
+// eigene Meldung landete der Nutzer stumm wieder auf dem leeren Anmelde-Formular
+// und versuchte es endlos erneut.
+const NO_PROFILE_MESSAGE =
+  'Zu dieser Email gibt es keinen Mitarbeiter-Datensatz. Wende dich an Patrick.'
+const PROFILE_ERROR_MESSAGE =
+  'Dein Profil konnte nicht geladen werden. Bitte spaeter noch einmal versuchen.'
 
 export function AuthProvider({ children }) {
   const queryClient = useQueryClient()
@@ -19,6 +26,8 @@ export function AuthProvider({ children }) {
   const [viewAsUser, setViewAsUser] = useState(false) // Admin-Selbst-Testmodus
 
   // Mitarbeiter-Profil per Email-Lookup laden (explizite Spaltenliste — CLAUDE.md Regel).
+  // Rueckgabe: { profile, meldung } — die Meldung unterscheidet den fehlenden
+  // Datensatz von einem Netz-/Serverproblem, damit der Nutzer weiss, woran er ist.
   const loadUserProfile = useCallback(async (authUser) => {
     const { data, error: fetchError } = await supabase
       .from('employees')
@@ -27,9 +36,14 @@ export function AuthProvider({ children }) {
       .single()
     if (fetchError) {
       console.error('Profil laden fehlgeschlagen:', fetchError)
-      return null
+      // PGRST116 = kein (oder mehr als ein) Treffer, alles andere ist ein Fehler
+      // auf dem Weg dorthin.
+      return {
+        profile: null,
+        meldung: fetchError.code === 'PGRST116' ? NO_PROFILE_MESSAGE : PROFILE_ERROR_MESSAGE,
+      }
     }
-    return data
+    return { profile: data, meldung: null }
   }, [])
 
   // Fail-closed App-Access-Check.
@@ -63,9 +77,10 @@ export function AuthProvider({ children }) {
         setLoading(false)
         return
       }
-      const profile = await loadUserProfile(existingSession.user)
+      const { profile, meldung } = await loadUserProfile(existingSession.user)
       if (cancelled) return
       if (!profile) {
+        setAccessDeniedMessage(meldung)
         setLoading(false)
         return
       }
@@ -84,8 +99,11 @@ export function AuthProvider({ children }) {
       setSession(newSession)
       if (newSession?.user) {
         queryClient.invalidateQueries()
-        const profile = await loadUserProfile(newSession.user)
-        if (!profile) return
+        const { profile, meldung } = await loadUserProfile(newSession.user)
+        if (!profile) {
+          setAccessDeniedMessage(meldung)
+          return
+        }
         if (!hasShopAccess(profile)) {
           // Kein signOut: Die Session gehoert der ganzen Dach-App.
           setAccessDeniedMessage(NO_ACCESS_MESSAGE)
@@ -114,16 +132,21 @@ export function AuthProvider({ children }) {
       throw authError
     }
     if (data.user) {
-      const profile = await loadUserProfile(data.user)
-      if (profile && !hasShopAccess(profile)) {
+      const { profile, meldung } = await loadUserProfile(data.user)
+      if (!profile) {
+        // Session bleibt: das ist ein Datenproblem, keine verweigerte
+        // Berechtigung — und unter der gemeinsamen Origin der Dach-App wuerde ein
+        // signOut den Nutzer aus den anderen Apps mitwerfen.
+        setAccessDeniedMessage(meldung)
+        return data
+      }
+      if (!hasShopAccess(profile)) {
         await supabase.auth.signOut()
         setAccessDeniedMessage(NO_ACCESS_MESSAGE)
         return data
       }
-      if (profile) {
-        setCurrentUser({ ...profile, authId: data.user.id })
-        queryClient.invalidateQueries()
-      }
+      setCurrentUser({ ...profile, authId: data.user.id })
+      queryClient.invalidateQueries()
     }
     return data
   }, [loadUserProfile, hasShopAccess, queryClient])
