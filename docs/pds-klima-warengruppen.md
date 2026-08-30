@@ -17,27 +17,51 @@ Rohrpakete in `zn.L Sonstiges` bzw. `zn.L Installationsmaterial`.
 Solange das so bleibt, ist keine Auswertung und keine Nachkalkulation des
 Geschäftsbereichs Klima möglich — jede Abfrage vermischt ihn mit SHK.
 
-## Anzulegen in PDS (von Hand, API kann es nicht)
+## In PDS angelegt (30.08.2026)
 
-Der Bestand zeigt, dass es **fünf** Warengruppen braucht, nicht vier: die
-Klima-Dienstleistungen sind als Typ `ARTIKEL` angelegt und würden sonst im
-Materialanteil der Nachkalkulation landen.
+Fünf Warengruppen, nicht vier: die Klima-Dienstleistungen sind als Typ `ARTIKEL`
+angelegt und würden sonst im Materialanteil der Nachkalkulation landen.
 
-| Neue Warengruppe | Inhalt |
-|---|---|
-| `(KLIMA)Außengerät` | Single- und Multisplit-Außeneinheiten |
-| `(KLIMA)Innengerät` | Wandgeräte, Truhen, Kanalgeräte, Deckenkassetten |
-| `(KLIMA)Installationsmaterial` | Rohrpakete, Kabelkanal, Kabel, Kondensat, C-Teile aus dem Shop |
-| `(KLIMA)Zubehör` | Blenden, Fernbedienungen, WLAN-Module |
-| `(KLIMA)Dienstleistungen` | Montagestunden, Gerüst, Elektroinstallation, Aufmaß |
+| Warengruppe | UUID | Inhalt |
+|---|---|---|
+| `(KLIMA)Außengerät` | `481913dd-4d65-4948-ad77-46c5e3d0092b` | Single- und Multisplit-Außeneinheiten |
+| `(KLIMA)Innengerät` | `7c3c5a86-b1e9-40fa-bf31-2a3482d2e417` | Wandgeräte, Truhen, Kanalgeräte, Deckenkassetten |
+| `(KLIMA)Installationsmaterial` | `2b2e46ea-de62-4d8f-b694-04355bf4d3dc` | Rohrpakete, Kabelkanal, Kabel, C-Teile aus dem Shop |
+| `(KLIMA)Zubehör` | `d82c6990-55eb-46ae-9ca3-4c3bb8b60f67` | Blenden, Fernbedienungen, WLAN-Module |
+| `(KLIMA)Dienstleistungen` | `36d66850-2d4a-4402-8754-f0c770108fc6` | Montagestunden, Gerüst, Elektroinstallation, Aufmaß |
 
-Die ersten drei entsprechen genau den Soll-Positionen eines Klima-Auftrags
+Die ersten drei entsprechen den Soll-Positionen eines Klima-Auftrags
 (Außeneinheit + Inneneinheiten + Montagematerial), sodass die Nachkalkulation
 eine Gruppierung über die Warengruppe bleibt.
 
-Dazu der Kategoriezweig `Klima > Handelsware > 1-Außengerät / 2-Innengerät /
-3-Installationsmaterial / 4-Zubehör` mit Hersteller-Unterebene, analog zur
-bestehenden Struktur unter SHK.
+Der Kategoriezweig dazu, mit Hersteller-Unterebene analog zu SHK:
+
+```
+Klima                        a9809a4d-bf51-439d-936e-1f4e76be6606
+└── Handelsware              1b8ee957-5fb0-4ed6-8f48-d91868f1945c
+    ├── 1-Außengerät         5f0f5b0f-1bb6-4ec4-a7a5-a5cb11056cf4
+    │   ├── Daikin           58d0dae9-44e5-45f9-8a43-d2d2487441bd
+    │   ├── Panasonic        e3fac48f-44a9-408c-af1e-b229f07c1ef2
+    │   └── Bosch            58bdbe82-4855-47c1-8de2-d97e18817c4d
+    ├── 2-Innengerät         9b7fa267-ceb1-4d4c-b190-0bb0635d4e59
+    │   ├── Daikin           d87fab7e-9bcf-4a7e-99f4-5cb1a6a88161
+    │   ├── Panasonic        10df8b73-a520-40fc-91fa-073f348f9160
+    │   ├── Bosch            2dbb98de-d55c-4594-a818-24c3f377c028
+    │   └── Remko            de09c6d7-596d-4fc9-a64f-ac365b1e9400
+    ├── 3-Installationsmaterial  899522b5-fc11-41df-94a3-1a587eb93544
+    ├── 4-Zubehör            902aab52-df81-4842-9de0-f9c4037f0ab6
+    │   ├── Daikin           d9329d62-6ce5-4c24-ba7e-fdee1e7eae4e
+    │   ├── Panasonic        f70f1bdd-7aba-4898-bb02-6b0ac567ffe2
+    │   └── Bosch            787ff467-553e-4af0-a40e-fa369c6617ca
+    └── 5-Dienstleistungen   215db8a6-703d-4466-a2ed-69ea0d3e9a9d
+```
+
+Unter `Klima` liegen zusätzlich `Dienstleistungen & Fahrtkosten`,
+`Produktionsmaterial` und `Sonstiges` — aus der Anlagevorlage übernommen, für den
+Umzug ohne Bedeutung.
+
+**Die maschinenlesbare Zuordnung aller 62 Artikel auf diese Ziele steht in
+[pds-klima-umzug.json](pds-klima-umzug.json).**
 
 ## Umzugsliste — Kandidaten
 
@@ -191,12 +215,13 @@ zusammen mit einer Liste aller Artikel in `(SHK)Wärmepumpe` zur Durchsicht.
 
 ## Ablauf
 
-1. Fünf Warengruppen und den Kategoriezweig in PDS von Hand anlegen. Die API
-   kann das nicht: im Katalog-Bereich gibt es für Warengruppen nur
-   `listwarengruppen`, für Kategorien nur `listkategorien` und
+1. ~~Fünf Warengruppen und den Kategoriezweig in PDS anlegen.~~ **Erledigt am
+   30.08.2026.** Die API kann das nicht: im Katalog-Bereich gibt es für
+   Warengruppen nur `listwarengruppen`, für Kategorien nur `listkategorien` und
    `kategoriedetails` — kein `create`, auch nicht in der Administration.
-2. UUIDs in [pds-katalog-mapping.md](pds-katalog-mapping.md) Abschnitt 4 und 5
-   nachtragen und in `shop_kategorien.pds_warengruppe_uuid` hinterlegen.
+2. ~~UUIDs nachtragen.~~ **Erledigt**, siehe oben und
+   [pds-klima-umzug.json](pds-klima-umzug.json). Offen bleibt das Hinterlegen in
+   `shop_kategorien.pds_warengruppe_uuid` — das braucht Migration 008.
 3. Vollabzug des Katalogs, Liste aller Artikel in `(SHK)Wärmepumpe` erzeugen.
 4. Liste bestätigen — Klima gegen Wärmepumpe, siehe Abgrenzung oben.
 5. Umhängen per `pds_updateKatalogEintrag`, im Dry-Run zuerst, protokolliert in

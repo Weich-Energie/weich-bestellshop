@@ -114,29 +114,22 @@ Die Daikin-Klimageräte hängen heute in dieser Kategorie `Daikin` unter
 eingeordnet.
 
 **Die Katalog-API kann keine Kategorien anlegen** — es gibt nur
-`listkategorien` und `kategoriedetails`. Die Klima-Struktur muss einmalig von
-Hand in PDS erstellt werden, danach die UUIDs hier eintragen.
-
-### Vorschlag: eigener Bereich Klima
-
-Klima ist ein eigener Geschäftsbereich, kein SHK-Unterpunkt. Deshalb ein
-eigener Zweig auf Ebene 1, parallel zu PV und SHK, mit der gewohnten Tiefe:
+`listkategorien` und `kategoriedetails`. Die Klima-Struktur wurde deshalb am
+30.08.2026 von Hand in PDS erstellt:
 
 ```
-Klima
-└── Handelsware
-    ├── 1-Außengerät        → Hersteller (Daikin, …)
-    ├── 2-Innengerät        → Hersteller
-    ├── 3-Installationsmaterial
-    └── 4-Zubehör
+Klima                        a9809a4d-bf51-439d-936e-1f4e76be6606
+└── Handelsware              1b8ee957-5fb0-4ed6-8f48-d91868f1945c
+    ├── 1-Außengerät         5f0f5b0f-…   → Daikin / Panasonic / Bosch
+    ├── 2-Innengerät         9b7fa267-…   → Daikin / Panasonic / Bosch / Remko
+    ├── 3-Installationsmaterial  899522b5-…
+    ├── 4-Zubehör            902aab52-…   → Daikin / Panasonic / Bosch
+    └── 5-Dienstleistungen   215db8a6-…
 ```
 
-Die Produktgruppen decken sich mit den vier Warengruppen aus Abschnitt 5, sodass
-Kategorie und Warengruppe dieselbe Aussage tragen und nicht auseinanderlaufen.
-
-Pragmatische Alternative, falls kein neuer Ebene-1-Zweig gewünscht ist: den
-freien Slot `3-` unter SHK > Handelsware zu `3-Klima` machen. Das ist schneller,
-lässt Klima aber dauerhaft unter SHK hängen.
+Vollständig mit allen Hersteller-UUIDs in
+[pds-klima-warengruppen.md](pds-klima-warengruppen.md), maschinenlesbar in
+[pds-klima-umzug.json](pds-klima-umzug.json).
 
 ## 5. Warengruppen — eigener Klima-Bereich nötig
 
@@ -179,8 +172,18 @@ ist die Nachkalkulation eine Gruppierung über die Warengruppe, ohne Sonderlogik
 Die drei ersten Gruppen entsprechen genau den drei Soll-Positionen. Die vierte
 trennt Zubehör ab, das sonst die Materialquote verfälscht.
 
-Warengruppen sind per API **nur lesbar** — diese vier müssen einmalig von Hand
-in PDS angelegt werden. Danach ihre UUIDs hier eintragen.
+Warengruppen sind per API **nur lesbar**. Die fünf wurden am 30.08.2026 von Hand
+angelegt:
+
+| Warengruppe | UUID |
+|---|---|
+| `(KLIMA)Außengerät` | `481913dd-4d65-4948-ad77-46c5e3d0092b` |
+| `(KLIMA)Innengerät` | `7c3c5a86-b1e9-40fa-bf31-2a3482d2e417` |
+| `(KLIMA)Installationsmaterial` | `2b2e46ea-de62-4d8f-b694-04355bf4d3dc` |
+| `(KLIMA)Zubehör` | `d82c6990-55eb-46ae-9ca3-4c3bb8b60f67` |
+| `(KLIMA)Dienstleistungen` | `36d66850-2d4a-4402-8754-f0c770108fc6` |
+
+Für neue C-Teile aus dem Shop ist `(KLIMA)Installationsmaterial` die Zielgruppe.
 
 ### Bestand umhängen: geht per API
 

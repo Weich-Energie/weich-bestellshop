@@ -37,10 +37,23 @@ select slug, pds_person_uuid, pds_lieferanten_nummer from public.shop_lieferante
 select public.normalisiere_einheit('STK');
 ```
 
-## 2. In PDS von Hand anlegen
+## 2. In PDS von Hand anlegen — ERLEDIGT am 30.08.2026
 
 Die API kann Kategorien und Warengruppen nur lesen. Ohne diesen Schritt bricht
-jede Übertragung mit einer Meldung ab, welche Angabe fehlt.
+jede Übertragung mit einer Meldung ab, welche Angabe fehlt. Struktur und alle
+UUIDs stehen in [pds-klima-warengruppen.md](pds-klima-warengruppen.md).
+
+Offen bleibt nur das Hinterlegen im Shop — dafür braucht es Schritt 1. Für die
+Kategorie, unter der die Klima-C-Teile im Shop laufen:
+
+```sql
+update public.shop_kategorien
+   set pds_kategorie_uuid   = '899522b5-fc11-41df-94a3-1a587eb93544',  -- 3-Installationsmaterial
+       pds_warengruppe_uuid = '2b2e46ea-de62-4d8f-b694-04355bf4d3dc'   -- (KLIMA)Installationsmaterial
+ where name = '<Name der Shop-Kategorie>';
+```
+
+Die folgende Auflistung ist damit erledigt und bleibt nur als Beleg stehen.
 
 **Fünf Warengruppen** (Begründung des Schnitts in
 [pds-klima-warengruppen.md](pds-klima-warengruppen.md)):
