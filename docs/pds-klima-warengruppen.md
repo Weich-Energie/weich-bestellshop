@@ -42,8 +42,9 @@ bestehenden Struktur unter SHK.
 ## Umzugsliste — Kandidaten
 
 Erhoben über Stichwortsuchen (`Klima`, `Split`, `Multisplit`, `Daikin`,
-`Rohrpaket`). **Keine vollständige Liste** — siehe Vollständigkeit unten. Jede
-Zeile ist vor dem Umhängen zu bestätigen.
+`Rohrpaket`, `Wandgerät`). **Vom Betrieb bestätigt am 30.08.2026** —
+einschliesslich der beiden Zubehörzeilen, die vorher offen waren. Die Liste ist
+damit freigegeben; sie ist aber weiterhin kein Vollabzug, siehe unten.
 
 ### → `(KLIMA)Außengerät`
 
@@ -133,12 +134,14 @@ stehen zwei Lieferanteneinträge mit 8,84 € und 80,00 € EK, einer davon mit 
 vollständigen Artikelnamen im Feld `bestellnummer`. Hier lohnt das Aufräumen im
 selben Durchgang.
 
-### → `(KLIMA)Zubehör` (zu prüfen)
+### → `(KLIMA)Zubehör`
 
-| UUID | Artikel | Anmerkung |
-|---|---|---|
-| `b6f83a11-f805-4769-86ac-6c0ed9699081` | BYCQ140EB Daikin Geräteblende schwarz | Blende für Deckenkassette, dürfte Klima sein |
-| `93957b90-a7ee-4cf1-a20e-8e8852d83ca0` | BRC1H52K Fernbedienung Madoka | wird auch bei Wärmepumpen verbaut — Zuordnung offen |
+Am 30.08.2026 bestätigt — beide gehören zu Klima.
+
+| UUID | Artikel |
+|---|---|
+| `b6f83a11-f805-4769-86ac-6c0ed9699081` | BYCQ140EB Daikin Geräteblende schwarz |
+| `93957b90-a7ee-4cf1-a20e-8e8852d83ca0` | BRC1H52K Fernbedienung Madoka |
 
 ### → `(KLIMA)Dienstleistungen`
 
@@ -185,7 +188,10 @@ zusammen mit einer Liste aller Artikel in `(SHK)Wärmepumpe` zur Durchsicht.
 
 ## Ablauf
 
-1. Fünf Warengruppen und den Kategoriezweig in PDS von Hand anlegen.
+1. Fünf Warengruppen und den Kategoriezweig in PDS von Hand anlegen. Die API
+   kann das nicht: im Katalog-Bereich gibt es für Warengruppen nur
+   `listwarengruppen`, für Kategorien nur `listkategorien` und
+   `kategoriedetails` — kein `create`, auch nicht in der Administration.
 2. UUIDs in [pds-katalog-mapping.md](pds-katalog-mapping.md) Abschnitt 4 und 5
    nachtragen und in `shop_kategorien.pds_warengruppe_uuid` hinterlegen.
 3. Vollabzug des Katalogs, Liste aller Artikel in `(SHK)Wärmepumpe` erzeugen.
