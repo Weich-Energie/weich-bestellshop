@@ -109,9 +109,17 @@ zweimal: das Rohrpaket steht im Auftrag mit 80 €/lfm als Einkauf, während der
 Katalog beim echten Fremdlieferanten **8,84 €/lfm** führt. Bei 4 lfm sind das
 35,36 € tatsächliche Kosten gegenüber 320 € ausgewiesenen.
 
+Diese Preisführung ist Vergangenheit (Auskunft des Betriebs, 30.08.2026) — die
+alten Angebote wurden so erstellt, und sie bleibt stehen. Für die Nachkalkulation
+der Altaufträge folgt daraus die eigentliche Einschränkung: **bei diesen
+Positionen ist der Materialeinsatz aus PDS grundsätzlich nicht ableitbar.** Er
+muss von den Aufzeichnungen der Monteure oder aus den Lieferantenrechnungen
+kommen.
+
 Für die Kennzahl heisst das: Eigenleistungs-Positionen dürfen nicht als
 Materialkosten abgezogen werden. Täte man es, würde die Deckung um genau ihren
-eigenen Erlös gekürzt und der Auftrag zu schlecht dargestellt.
+eigenen Erlös gekürzt und der Auftrag zu schlecht dargestellt. Sie sind als
+„Kosten unbekannt" zu führen, nicht als „Kosten gleich Erlös".
 
 Erkannt werden sie an zwei Merkmalen — eigene Firma als `lieferantUUID`, oder
 `ekPreis` gleich `vkPreis` bei EK über null. Die Funktion weist sie getrennt als

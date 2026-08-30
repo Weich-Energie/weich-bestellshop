@@ -129,10 +129,13 @@ Damit umfasst die Umzugsliste rund 60 Artikel.
 | `a8b265d6-2d02-4d05-8931-bb09bc89a8e9` | Rohrpaket im Kabelkanal je Innengerät | lfm |
 | `fd0961fe-9a35-447c-8dd8-b4f9af15b140` | Rohrpaket ohne Kabelkanal je Innengerät | lfm |
 
-Beide haben zusätzlich Datenmängel: `kategorie` ist null, und bei `a8b265d6`
-stehen zwei Lieferanteneinträge mit 8,84 € und 80,00 € EK, einer davon mit dem
-vollständigen Artikelnamen im Feld `bestellnummer`. Hier lohnt das Aufräumen im
-selben Durchgang.
+Bei beiden ist `kategorie` null, und `a8b265d6` trägt zwei Lieferanteneinträge
+mit 8,84 € und 80,00 € EK. **Das ist Vergangenheit und bleibt so** (Auskunft des
+Betriebs, 30.08.2026): die alten Angebote wurden auf dieser Grundlage erstellt.
+Die Preise nachträglich zu ändern würde die Historie verwischen, ohne einem
+Altauftrag zu helfen — die Preise sind beim Anlegen ohnehin in die Position
+kopiert worden. Beim Umhängen also nur Warengruppe und Kategorie setzen, die
+Lieferanteneinträge unberührt lassen.
 
 ### → `(KLIMA)Zubehör`
 
