@@ -214,6 +214,58 @@ Auftragstitel eine Heuristik und gehört einmal bestätigt.
 Reonic als zweite Soll-Quelle ist noch nicht geprüft. Der PDS-Auftrag trägt die
 Soll-Werte bereits vollständig, insofern ist Reonic nicht Voraussetzung.
 
+## Nachweis: Soll gegen Ist an einem abgerechneten Auftrag
+
+Am 31.08.2026 rein lesend an Auftrag **2025-10313** durchgerechnet — dem einzigen
+abgerechneten der 51 Klima-Aufträge, Rechnung bezahlt. Ohne Schreibrechte, ohne
+Handerfassung, allein aus PDS.
+
+Die Belegkette zur Projektakte:
+
+| Vorgang | Nummer | Datum | Inhalt |
+|---|---|---|---|
+| Auftrag | 2025-10313 | 04.11.2025 | 2 Geräte, EK 1.536,34 / VK 3.740,00 |
+| Bestellung | 2025-50445 | 13.11.2025 | 1 × Comfora Außengerät, **EK 1.650,00** |
+| Wareneingang | 2025-60525 | 13.11.2025 | dasselbe Gerät, EK 1.650,00, erledigt |
+| Rechnung | 202530582 | 27.12.2025 | VK 3.740,00, bezahlt — **EK weiterhin 832,07** |
+
+### Das Ergebnis
+
+| | kalkuliert | belegt | Abweichung |
+|---|---|---|---|
+| Comfora Außengerät RXP50N8 | 832,07 € | **1.650,00 €** | **+817,93 €** |
+| Perfera Wandgerät FTXM50A | 704,27 € | kein Beleg | offen |
+| Erlös (fakturiert und bezahlt) | 3.740,00 € | 3.740,00 € | 0 |
+| **Deckung für Montage, Lohn, Gewinn** | **2.203,66 €** | **1.385,73 €** | **−817,93 €** |
+
+Das Außengerät hat fast das Doppelte des kalkulierten Einkaufs gekostet. 37 % der
+geplanten Deckung sind damit weg — und in PDS ist das nirgends sichtbar, weil der
+`ekPreis` an der Position beim Anlegen kopiert und nie nachgezogen wird. Die
+bezahlte Rechnung führt bis heute 832,07 €.
+
+### Wie die Zuordnung funktioniert
+
+`kopplungsID.superKID` ist über die gesamte Kette identisch. Für die
+Außengerät-Position lautet er in allen vier Vorgängen
+`39468c90-fb76-4f1b-b397-c905d283c6f8`; `kopplungsID` selbst und `kidUrsprung`
+wandern mit jedem Beleg weiter, `superKID` bleibt. Damit lässt sich positionsgenau
+vergleichen, nicht nur summarisch.
+
+`pds-auftrag-soll` holt deshalb beim Import zusätzlich alle Bestellungen und
+Wareneingänge zur `projektakteUUID` und ordnet sie über `superKID` zu. Der
+Wareneingang überschreibt die Bestellung, weil er sagt, was tatsächlich geliefert
+wurde. Ausgegeben wird je Position `ek_belegt`, `ek_quelle`, `ek_beleg` und
+`abweichung`, dazu die Summen als `ist.deckung_ist` und
+`ist.abweichung_material`.
+
+### Was das Verfahren nicht sieht
+
+Das Wandgerät hat keine Bestellung zur Projektakte — entweder Lagerware oder
+separat ohne Projektaktenbezug beschafft. Solche Positionen behalten den
+kalkulierten Wert und werden als `nicht belegt` markiert. Der wahre
+Materialeinsatz kann also nur höher liegen, nie niedriger. Diese Positionen sind
+die Arbeitsliste für die Handerfassung.
+
 ## Ist-Werte erfassen
 
 Eigene Tabellen im Shop, nicht in PDS. Der Kundenauftrag darf nicht verändert

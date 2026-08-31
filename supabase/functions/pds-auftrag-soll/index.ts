@@ -33,7 +33,11 @@ const CORS = {
 
 // Diese Funktion darf nur lesen. Beide Pfade sind GET-artige Abfragen, die PDS
 // als POST erwartet — ein schreibender Pfad hat hier nichts zu suchen.
-const ERLAUBTE_PFADE = new Set(["/vorgang/listauftraege", "/vorgang/details"])
+const ERLAUBTE_PFADE = new Set([
+  "/vorgang/listauftraege",
+  "/vorgang/details",
+  "/vorgang/listvorgaengebyprojektakte",
+])
 
 // Die Weich GmbH ist in PDS selbst als Lieferant angelegt (Lieferantennummer
 // 70022). Positionen mit diesem Lieferanten sind Eigenleistungen — Rohrpaket,
@@ -54,6 +58,7 @@ type Position = {
   katalogUUID?: string | null
   positionsTyp?: string
   lieferantUUID?: string | null
+  kopplungsID?: { superKID?: string | null } | null
   masseinheit?: { bezeichnung?: string } | null
   ekPreis?: { gesamtPreis?: number } | null
   vkPreis?: { gesamtPreis?: number } | null
@@ -259,13 +264,14 @@ Deno.serve(async (req: Request) => {
       for (const p of positionen) {
         const vk = p.vkPreis?.gesamtPreis ?? 0
         const ek = p.ekPreis?.gesamtPreis ?? 0
-        const zeile = {
+        const zeile: Record<string, unknown> = {
           nummer: p.nummer ?? null,
           kurztext: p.kurztext ?? null,
           menge: p.menge ?? null,
           einheit: p.masseinheit?.bezeichnung ?? null,
           ek_gesamt: runde(ek),
           vk_gesamt: runde(vk),
+          super_kid: p.kopplungsID?.superKID ?? null,
         }
 
         vkGesamt += vk
@@ -302,11 +308,80 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      // ─── Ist-Materialeinkauf aus Bestellung und Wareneingang ──────────────
+      // Beide tragen dieselbe projektakteUUID wie der Auftrag, und
+      // kopplungsID.superKID ist bei Auftrags-, Bestell- und
+      // Wareneingangsposition identisch. Darueber laesst sich positionsgenau
+      // vergleichen, was kalkuliert war und was wirklich bezahlt wurde.
+      //
+      // Notwendig, weil PDS den ekPreis an der Position beim Anlegen kopiert und
+      // spaeter nicht nachzieht: Auftrag 2025-10313 fuehrt bis in die bezahlte
+      // Rechnung 832,07 Euro als EK, obwohl Bestellung 2025-50445 und
+      // Wareneingang 2025-60525 beide 1.650,00 belegen. Ohne diesen Abgleich
+      // sieht der Auftrag sauber kalkuliert aus, obwohl 818 Euro Deckung fehlen.
+      const projektakteUUID = (det.projektakteUUID as string | undefined) ?? undefined
+      const istJeKid = new Map<string, { ek: number; quelle: string; beleg: string }>()
+
+      if (projektakteUUID) {
+        // Reihenfolge ist Absicht: der Wareneingang ueberschreibt die Bestellung,
+        // weil er sagt, was tatsaechlich geliefert und berechnet wurde.
+        for (const typ of ["BESTELLUNG", "WARENEINGANG"]) {
+          const liste = await pds("/vorgang/listvorgaengebyprojektakte", {
+            projektakteUUID,
+            vorgangstyp: typ,
+            page: 0,
+            entriesPerPage: 100,
+          }).catch(() => null)
+
+          for (const kopf of (liste?.resultList ?? []) as Array<Record<string, any>>) {
+            const d = await pds("/vorgang/details", { uuid: kopf.uuid, vorgangstyp: typ })
+              .catch(() => null)
+            if (!d) continue
+            const pos: Position[] = []
+            sammle((d.rootEbene ?? {}) as Ebene, pos)
+            for (const q of pos) {
+              const kid = q.kopplungsID?.superKID
+              const ek = q.ekPreis?.gesamtPreis ?? 0
+              if (!kid || ek <= 0) continue
+              istJeKid.set(kid, { ek, quelle: typ, beleg: String(kopf.vorgangsNummer ?? "") })
+            }
+          }
+        }
+      }
+
+      // Geraetezeilen um den belegten Einkauf ergaenzen und die effektiven
+      // Materialkosten bilden: belegt, wo ein Beleg existiert, sonst kalkuliert.
+      let ekEffektiv = 0
+      let abweichungMaterial = 0
+      let anzahlBelegt = 0
+
+      for (const z of geraete) {
+        const kid = z.super_kid as string | null
+        const treffer = kid ? istJeKid.get(kid) : undefined
+        const kalkuliert = z.ek_gesamt as number
+        if (treffer) {
+          z.ek_belegt = runde(treffer.ek)
+          z.ek_quelle = treffer.quelle === "WARENEINGANG" ? "Wareneingang" : "Bestellung"
+          z.ek_beleg = treffer.beleg
+          z.abweichung = runde(treffer.ek - kalkuliert)
+          ekEffektiv += treffer.ek
+          abweichungMaterial += treffer.ek - kalkuliert
+          anzahlBelegt++
+        } else {
+          z.ek_belegt = null
+          z.ek_quelle = "nicht belegt — Lagerware oder Bestellung ohne Projektaktenbezug"
+          ekEffektiv += kalkuliert
+        }
+      }
+
       // Leitgroesse: Gesamterloes minus die Einkaufspreise, die wirklich
       // Einkaufspreise sind. Eigenleistungs-Positionen bleiben aussen vor, weil
       // ihr EK der VK ist — sie abzuziehen wuerde die Deckung um genau ihren
       // eigenen Erloes kuerzen und den Auftrag zu schlecht darstellen.
       const deckungMaterialUndLohn = vkGesamt - ekFremd
+      // Dasselbe, aber mit dem belegten Einkauf statt dem kalkulierten. Das ist
+      // die Zahl, die zaehlt.
+      const deckungIst = vkGesamt - ekEffektiv
 
       // Was in den Leistungspositionen als EK steht, ist bereits erfasst und
       // muss nicht erneut von Hand eingetragen werden.
@@ -327,6 +402,8 @@ Deno.serve(async (req: Request) => {
             soll_ek_leistungen: runde(ekLeistungen),
             soll_vk_leistungen: runde(vkLeistungen),
             soll_stand: new Date().toISOString(),
+            ist_ek_bestellungen: anzahlBelegt > 0 ? runde(ekEffektiv) : null,
+            ist_bestellungen_stand: anzahlBelegt > 0 ? new Date().toISOString() : null,
           },
           { onConflict: "pds_vorgang_uuid" },
         )
@@ -349,8 +426,23 @@ Deno.serve(async (req: Request) => {
           deckung_material_und_lohn: runde(deckungMaterialUndLohn),
           ist_bereits_erfasst: runde(istBereitsErfasst),
         },
+        ist: {
+          ek_effektiv: runde(ekEffektiv),
+          positionen_belegt: anzahlBelegt,
+          positionen_ohne_beleg: geraete.length - anzahlBelegt,
+          abweichung_material: runde(abweichungMaterial),
+          deckung_ist: runde(deckungIst),
+        },
         positionen: { geraete, leistungen, eigenleistung, montage },
-        hinweis: bauHinweis({
+        hinweis: abweichungMaterial !== 0
+          ? `Der belegte Einkauf weicht um ${runde(abweichungMaterial)} Euro von der ` +
+            `Kalkulation ab. Deckung nach tatsaechlichem Einkauf: ${runde(deckungIst)} Euro ` +
+            `statt kalkuliert ${runde(deckungMaterialUndLohn)}. ` +
+            (geraete.length - anzahlBelegt > 0
+              ? `${geraete.length - anzahlBelegt} Position(en) ohne Beleg — Lagerware oder ` +
+                "Bestellung ohne Projektaktenbezug, dort bleibt der kalkulierte Wert stehen."
+              : "Alle Positionen sind ueber Bestellung oder Wareneingang belegt.")
+          : bauHinweis({
           anzahlLeistungen: leistungen.length,
           anzahlMontage: montage.length,
           istBereitsErfasst: runde(istBereitsErfasst),
