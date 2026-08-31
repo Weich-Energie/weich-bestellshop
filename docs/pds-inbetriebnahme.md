@@ -11,7 +11,16 @@ dahin nur einen Fehlerhinweis.
 
 ## 1. Migrationen einspielen
 
-Supabase Studio → SQL Editor, in dieser Reihenfolge, jede einzeln:
+**Der einfache Weg:** [docs/sql/inbetriebnahme-komplett.sql](sql/inbetriebnahme-komplett.sql)
+enthält alle drei Migrationen in einer Transaktion, dazu das Hinterlegen der
+Klima-UUIDs und die Prüfabfragen. In Supabase Studio → SQL Editor einfügen und
+ausführen. Bricht etwas ab, ist nichts geschrieben.
+
+Vor dem Ausführen eine Zeile anpassen: im Abschnitt „Klima-Ziele im Shop
+hinterlegen" den Namen der Shop-Kategorie eintragen, unter der die Klima-C-Teile
+laufen, und die drei Zeilen einkommentieren.
+
+Einzeln geht auch, in dieser Reihenfolge:
 
 ```
 supabase/migrations/008_pds_katalog_sync.sql
