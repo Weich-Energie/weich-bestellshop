@@ -15,9 +15,18 @@ Operationen). Grundlage für den Sync `shop_artikel` → PDS-Katalogeintrag.
 Pflichtfelder: `create` braucht nur `name` + `typ`. `addlieferanteneintrag`
 braucht `katalogUUID` + `lieferantUUID`. `update` braucht `uuid`.
 
-**Alle vier sind im MCP-Server derzeit deaktiviert** (`ALLOW_WRITES` aus). Die
-Freigabe soll genau auf diese vier begrenzt bleiben, nicht global erfolgen —
-`/katalog/delete` und alles außerhalb des Katalogs bleiben gesperrt.
+**Seit 01.09.2026 freigegeben.** `api_details` meldet für die schreibenden
+Operationen `deaktiviert: false`. Der MCP-Server kennt zusätzlich das Feld
+`loeschoperation`; bei `/katalog/delete` steht es auf `true`, die Sperre dafür
+ist aber standardmäßig aus — Löschen wäre also technisch möglich und bleibt
+Handarbeit im PDS-Client.
+
+**`/katalog/update` ist ein echtes Teilupdate.** Am 01.09.2026 verifiziert: Ein
+Aufruf mit nur `uuid`, `warengruppeUUID` und `kategorieUUID` lässt alle übrigen
+Felder unverändert — Langtext mit mehrzeiliger Leistungsbeschreibung,
+Einkaufs- und Verkaufspreis, Maßeinheit, MwSt-Typ und sämtliche
+Lieferanteneinträge. Für Massenänderungen genügt deshalb ein Aufruf je Artikel;
+die Felder vorher zu lesen und mitzusenden ist nicht nötig.
 
 ## 2. Feld-Mapping `shop_artikel` → `/katalog/create`
 

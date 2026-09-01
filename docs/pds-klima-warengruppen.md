@@ -213,6 +213,22 @@ gefiltert werden: 1.465 Artikel vom Typ `ARTIKEL`, bei `entriesPerPage: 1000`
 also zwei Seiten. Dieser Abzug gehört als erster Schritt in das Sync-Werkzeug,
 zusammen mit einer Liste aller Artikel in `(SHK)Wärmepumpe` zur Durchsicht.
 
+## Durchgeführt am 01.09.2026
+
+Alle 62 Artikel sind umgehängt, je Artikel ein `/katalog/update` mit `uuid`,
+`warengruppeUUID` und `kategorieUUID`. Ergebnis:
+
+| Zielwarengruppe | Artikel |
+|---|---|
+| `(KLIMA)Außengerät` | 21 |
+| `(KLIMA)Innengerät` | 33 |
+| `(KLIMA)Installationsmaterial` | 2 |
+| `(KLIMA)Zubehör` | 2 |
+| `(KLIMA)Dienstleistungen` | 4 |
+
+Die beiden Altherma-Wandgeräte `ELBX12E9W` und `ETBH12E9W` wurden nachweislich
+nicht angefasst und stehen weiter in ihren SHK-Warengruppen.
+
 ## Ablauf
 
 1. ~~Fünf Warengruppen und den Kategoriezweig in PDS anlegen.~~ **Erledigt am
