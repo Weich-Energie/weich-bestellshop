@@ -45,6 +45,9 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
   const [artikelnr, setArtikelnr] = useState('')
   const [preis, setPreis] = useState('')
   const [einheit, setEinheit] = useState('Stück')
+  // Aufschlagsklasse: bestimmt die Kalkulationsgruppe in PDS. Kein Vorgabewert,
+  // weil eine falsche Klasse den Verkaufspreis dauerhaft verzerrt.
+  const [aufschlagsklasse, setAufschlagsklasse] = useState('')
   const [aktiv, setAktiv] = useState(true)
   const [tagsRaw, setTagsRaw] = useState('')
   const [bildExternUrl, setBildExternUrl] = useState('')
@@ -82,6 +85,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       setArtikelnr(artikel.artikelnr || '')
       setPreis(artikel.preis_netto != null ? String(artikel.preis_netto) : '')
       setEinheit(normalizeEinheit(artikel.einheit) || 'Stück')
+      setAufschlagsklasse(artikel.aufschlagsklasse || '')
       setAktiv(artikel.aktiv !== false)
       setTagsRaw((artikel.tags || []).map((t) => t.name).join(', '))
       setBildExternUrl(artikel.bild_ist_extern ? (artikel.bild_url || '') : '')
@@ -96,6 +100,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       setArtikelnr(prefill.artikelnr || '')
       setPreis(prefill.preis_netto != null ? String(prefill.preis_netto) : '')
       setEinheit(normalizeEinheit(prefill.einheit) || 'Stück')
+      setAufschlagsklasse(prefill.aufschlagsklasse || '')
       setAktiv(true)
       setTagsRaw(prefill.tags || '')
       setBildExternUrl(prefill.bild_extern_url || '')
@@ -103,6 +108,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
     } else {
       setName(''); setBeschreibung(''); setKategorieId('')
       setLieferant(''); setLieferantUrl(''); setArtikelnr(''); setPreis(''); setEinheit('Stück')
+      setAufschlagsklasse('')
       setAktiv(true); setTagsRaw(''); setBildExternUrl('')
       setVarianten([]); setGebinde([])
     }
@@ -226,6 +232,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
         artikelnr: artikelnr.trim() || null,
         preis_netto: preis ? Number(preis.replace(',', '.')) : null,
         einheit: einheit || null,
+        aufschlagsklasse: aufschlagsklasse || null,
         aktiv,
       }
       if (bildExternUrl && !bildDatei) {
@@ -415,6 +422,26 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
                     <Input value={einheit} onChange={(e) => setEinheit(e.target.value)} placeholder="Stück, Meter, Packung..." />
                   </Field.Root>
                 </Stack>
+
+                <Field.Root>
+                  <Field.Label>Aufschlag (für PDS)</Field.Label>
+                  <NativeSelect.Root>
+                    <NativeSelect.Field
+                      value={aufschlagsklasse}
+                      onChange={(e) => setAufschlagsklasse(e.target.value)}
+                    >
+                      <option value="">– keiner, Verkauf zum Einkaufspreis –</option>
+                      <option value="haupt">Hauptkomponente / Gerät — 30 %</option>
+                      <option value="fest">Festes Material — 35 % (Konsole, Pumpe, Ständer, Dämpfer)</option>
+                      <option value="verbrauch">Verbrauch / Meterware — 100 % (Kabel, Kanal, Fittings)</option>
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
+                  <Field.HelperText>
+                    Bestimmt die Kalkulationsgruppe beim Übertragen nach PDS. Ohne Angabe setzt
+                    PDS den Verkaufspreis gleich dem Einkaufspreis.
+                  </Field.HelperText>
+                </Field.Root>
 
                 <Field.Root>
                   <Field.Label>Tags (kommagetrennt)</Field.Label>

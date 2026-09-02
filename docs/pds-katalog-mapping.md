@@ -44,7 +44,7 @@ die Felder vorher zu lesen und mitzusenden ist nicht nötig.
 | `warengruppeUUID` | Mapping-Tabelle | siehe 5. |
 | `erloesgruppeUUID` | Hersteller oder `627ce5ee-…` | Erlösgruppe = Herstellerdimension, siehe 6. |
 | `kostengruppeUUID` | **leer lassen** | im Mandanten durchgängig ungepflegt |
-| `kalkulationsgruppeUUID` | **leer lassen** | es existiert nur „0 Allgemein" |
+| `kalkulationsgruppeUUID` | aus `shop_artikel.aufschlagsklasse` | siehe 12. — ohne Gruppe setzt PDS VK = EK |
 | `kostenart*UUID` | **leer lassen** | durchgängig ungepflegt |
 | `gewicht` | — | Shop führt es nicht |
 
@@ -289,3 +289,47 @@ Klima-Dummy — `Rohrpaket im Kabelkanal je Innengerät (pro laufendem Meter)`
 Lieferanteneinträge mit widersprüchlichen EK-Preisen (8,84 € und 80,00 €), einer
 davon mit dem vollständigen Artikelnamen im Feld `bestellnummer`. Das ist der
 Zustand, den dieser Sync ersetzen soll.
+
+
+## 12. Aufschlag: die Kalkulationsgruppe
+
+PDS erzeugt die Preisstrategie aus dem Standard-Lieferanteneintrag und setzt
+dabei **VK = EK**. Ein per API angelegter Artikel ist also bestellbar, aber ohne
+Aufschlag kalkuliert.
+
+Der Klimarechner rechnet `VK = EK × (1 + Aufschlag)`, ausdrücklich als Markup und
+nicht als Handelsspanne
+([kalkulationslogik.md](../../klimarechner/docs/kalkulationslogik.md)):
+
+| Klasse im Shop | Aufschlag | Inhalt |
+|---|---|---|
+| `haupt` | 30 % | Geräte — der Kunde vergleicht online |
+| `fest` | 35 % | Konsole, Pumpe, Reparaturschalter, Ständer, Dämpfer |
+| `verbrauch` | 100 % | Leitungen, Kanal, Schutzschlauch, Fittings — deckt Verschnitt |
+
+Migration 011 legt `shop_pds_kalkulationsgruppen` an und ergänzt
+`shop_artikel.aufschlagsklasse`. Im Artikel-Dialog steht dafür ein Auswahlfeld;
+ohne Angabe wird keine Gruppe mitgegeben und es bleibt bei VK = EK.
+
+Die Klasse hängt **am Artikel, nicht an der Kategorie** — in „Klima" liegen sowohl
+der Dämpfungssockel (`fest`) als auch Kabelkanal (`verbrauch`).
+
+### Was in PDS von Hand entstehen muss
+
+Drei Kalkulationsgruppen mit genau diesen Sätzen. Die API kann sie weder anlegen
+noch ihre Sätze lesen — `listkalkulationsgruppen` liefert nur Bezeichnungen, im
+Mandanten bislang ausschliesslich „0 Allgemein". Vorschlag für die Benennung:
+
+```
+(KLIMA)Haupt 30%
+(KLIMA)Fest 35%
+(KLIMA)Verbrauch 100%
+```
+
+Danach ihre UUIDs in `shop_pds_kalkulationsgruppen.pds_uuid` eintragen. Solange
+das fehlt, meldet der Trockenlauf es als Hinweis und überträgt ohne Gruppe.
+
+Der eigentliche Gewinn liegt nicht im gefüllten Verkaufspreis: Die Aufschläge
+stehen damit im Artikelstamm, an der Stelle, wo auch das Angebot sie hernimmt.
+Heute existiert die Logik zweimal — im Rechner und im Kopf dessen, der das
+Angebot schreibt.

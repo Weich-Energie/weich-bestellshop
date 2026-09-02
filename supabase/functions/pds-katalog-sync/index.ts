@@ -62,6 +62,7 @@ type Artikel = {
   kategorie_id: string | null
   lieferant_id: string | null
   lieferant: string | null
+  aufschlagsklasse: string | null
 }
 
 Deno.serve(async (req: Request) => {
@@ -112,7 +113,7 @@ Deno.serve(async (req: Request) => {
       .from("shop_artikel")
       .select(
         "id, name, beschreibung, artikelnr, einheit, preis_netto, bild_url, aktiv, " +
-          "pds_katalog_uuid, kategorie_id, lieferant_id, lieferant",
+          "pds_katalog_uuid, kategorie_id, lieferant_id, lieferant, aufschlagsklasse",
       )
       .eq("id", artikelId)
       .maybeSingle<Artikel>()
@@ -185,6 +186,32 @@ Deno.serve(async (req: Request) => {
       )
     }
 
+    // Aufschlagsklasse auf die PDS-Kalkulationsgruppe übersetzen. Fehlt sie oder
+    // ist in PDS noch keine Gruppe hinterlegt, wird keine mitgegeben — dann setzt
+    // PDS den Verkaufspreis gleich dem Einkaufspreis. Das ist kein Abbruchgrund:
+    // ein C-Teil, das im Montagematerial aufgeht, braucht keinen eigenen VK.
+    const { data: kalk } = artikel.aufschlagsklasse
+      ? await sb
+          .from("shop_pds_kalkulationsgruppen")
+          .select("bezeichnung, aufschlag_prozent, pds_uuid")
+          .eq("klasse", artikel.aufschlagsklasse)
+          .maybeSingle()
+      : { data: null }
+
+    const hinweiseZurKalkulation: string[] = []
+    if (!artikel.aufschlagsklasse) {
+      hinweiseZurKalkulation.push(
+        "Keine Aufschlagsklasse gesetzt — PDS wird den Verkaufspreis gleich dem " +
+          "Einkaufspreis setzen (0 Prozent Aufschlag).",
+      )
+    } else if (!kalk?.pds_uuid) {
+      hinweiseZurKalkulation.push(
+        `Aufschlagsklasse "${artikel.aufschlagsklasse}" hat in PDS keine ` +
+          "Kalkulationsgruppe hinterlegt. Die Gruppen sind dort von Hand anzulegen, " +
+          "die API kann das nicht — bis dahin bleibt VK gleich EK.",
+      )
+    }
+
     // ─── Nutzlasten bauen ───────────────────────────────────────────────────
     const { data: gebinde } = await sb
       .from("shop_artikel_gebinde")
@@ -204,8 +231,11 @@ Deno.serve(async (req: Request) => {
       kategorieUUID: kategorie?.pds_kategorie_uuid,
       warengruppeUUID: kategorie?.pds_warengruppe_uuid,
       mwstTypUUID: MWST_ALLGEMEIN,
-      // kostengruppe, kalkulationsgruppe und Kostenarten bleiben leer — sie sind
-      // im Mandanten durchgaengig ungepflegt, siehe docs/pds-katalog-mapping.md.
+      // Nur setzen, wenn wirklich eine Gruppe hinterlegt ist. Ein leeres Feld
+      // mitzusenden waere nicht dasselbe wie es weglassen.
+      ...(kalk?.pds_uuid ? { kalkulationsgruppeUUID: kalk.pds_uuid } : {}),
+      // kostengruppe und Kostenarten bleiben leer — im Mandanten durchgaengig
+      // ungepflegt, siehe docs/pds-katalog-mapping.md.
     }
 
     // Der EK-Preis geht ausschliesslich hier hinein. Weder create noch update
@@ -260,6 +290,10 @@ Deno.serve(async (req: Request) => {
       return json({
         status: "trockenlauf",
         hinweis: "Nichts an PDS gesendet. Fuer die echte Uebertragung dry_run: false setzen.",
+        kalkulation: kalk?.pds_uuid
+          ? `Kalkulationsgruppe "${kalk.bezeichnung}" (${kalk.aufschlag_prozent} Prozent Aufschlag) wird mitgegeben.`
+          : undefined,
+        zur_kalkulation: hinweiseZurKalkulation.length ? hinweiseZurKalkulation : undefined,
         wuerde_senden: {
           "/katalog/create": createRumpf,
           "/katalog/addlieferanteneintrag": { katalogUUID: "(aus create)", ...lieferantRumpf },
@@ -343,7 +377,7 @@ Deno.serve(async (req: Request) => {
     return json({
       status: "uebertragen",
       pds_katalog_uuid: katalogUUID,
-      warnungen,
+      warnungen: [...warnungen, ...hinweiseZurKalkulation],
       hinweis: artikel.bild_url
         ? "Bild wurde nicht uebertragen: /katalog/updateAbbildung erwartet multipart/form-data, " +
           "kein JSON (am 01.09.2026 geprueft, Tomcat-400 bei JSON-Body). Anbindung offen."
