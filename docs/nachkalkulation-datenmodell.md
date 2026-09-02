@@ -84,7 +84,7 @@ Eine Katalogsuche nach einer Leistung „Vielen Dank" liefert allerdings null
 Treffer. Muster C ist an keinem Auftrag belegt; die Logik hängt an `positionsTyp`
 und deckt den Fall ab, falls er auftritt.
 
-## Der eigentliche Stolperstein: Einkaufspreis gleich Verkaufspreis
+## Einkaufspreis gleich Verkaufspreis — der Normalfall, nicht der Fehler
 
 Auftrag 2026-127 (belegt 31.03.2026) zeigt, wie neuere Aufträge aussehen. Die
 Montagepositionen tragen jetzt einen Katalogbezug — aber sieh auf die Preise:
@@ -97,17 +97,26 @@ Montagepositionen tragen jetzt einen Katalogbezug — aber sieh auf die Preise:
 | Zuleitung 230 V inkl. Kanal | 15 lfm | **375,00 €** | **375,00 €** |
 | Gerüststellung Klimaanlage | 2 Stck | 0,00 € | 700,00 € |
 
-Bei Rohrpaket und Zuleitung ist der Einkaufspreis gleich dem Verkaufspreis. Die
-Ursache steht im Katalog: der Artikel „Zuleitung(230V) inkl. Kanal"
-(`24c0ee16-…`) führt `ekEinzelpreis 25.00` gegen `vkEinzelpreis 25`, und sein
-einziger Lieferanteneintrag ist `6139e897-1a04-48fa-bdd5-b9ac2e47ebd2` — **die
-Weich GmbH selbst**, in PDS als Lieferant mit der Nummer 70022 angelegt.
+Bei Rohrpaket und Zuleitung ist der Einkaufspreis gleich dem Verkaufspreis.
 
-Diese Positionen sind Eigenleistungen. Ihr ausgewiesener „EK" ist der
-Verkaufspreis, kein Einstandspreis. Was das ausmacht, zeigt derselbe Artikel
-zweimal: das Rohrpaket steht im Auftrag mit 80 €/lfm als Einkauf, während der
-Katalog beim echten Fremdlieferanten **8,84 €/lfm** führt. Bei 4 lfm sind das
-35,36 € tatsächliche Kosten gegenüber 320 € ausgewiesenen.
+**Korrektur vom 02.09.2026:** Daraus wurde hier zunächst geschlossen, der
+ausgewiesene Einkaufspreis sei unecht — jemand habe den Verkaufspreis in das
+EK-Feld geschrieben. Das war falsch. Am Testartikel nachgemessen: Ein per API mit
+4,85 € Einkaufspreis angelegter Artikel erhält die Preisstrategie
+`ekEinzelpreis 4.85` gegen `vkEinzelpreis 4.85`. Der Einkaufspreis ist dabei
+völlig korrekt — es fehlt nur der Aufschlag.
+
+**`EK = VK` ist in PDS also der Normalzustand jedes Artikels ohne Aufschlag.**
+Der Klimarechner rechnet `VK = EK × (1 + Aufschlag)` als Markup, nicht als
+Handelsspanne: 30 % auf Geräte, 35 % auf feste Materialien, 100 % auf Verbrauch
+und Meterware. Wo diese Aufschläge in PDS nicht als Kalkulationsgruppe
+hinterlegt sind, bleibt der Verkaufspreis auf dem Einkaufspreis stehen.
+
+Belastbar bleibt ein anderes Merkmal: Rohrpaket und Zuleitung tragen
+`6139e897-1a04-48fa-bdd5-b9ac2e47ebd2` als Lieferanten — **die Weich GmbH
+selbst**, in PDS mit der Lieferantennummer 70022. Das sind Eigenleistungen, und
+dort ist der „Einkaufspreis" ein interner Satz. Beim Rohrpaket stehen 80 €/lfm,
+während der echte Fremdlieferant im Katalog **8,84 €/lfm** führt.
 
 Diese Preisführung ist Vergangenheit (Auskunft des Betriebs, 30.08.2026) — die
 alten Angebote wurden so erstellt, und sie bleibt stehen. Für die Nachkalkulation
@@ -121,9 +130,11 @@ Materialkosten abgezogen werden. Täte man es, würde die Deckung um genau ihren
 eigenen Erlös gekürzt und der Auftrag zu schlecht dargestellt. Sie sind als
 „Kosten unbekannt" zu führen, nicht als „Kosten gleich Erlös".
 
-Erkannt werden sie an zwei Merkmalen — eigene Firma als `lieferantUUID`, oder
-`ekPreis` gleich `vkPreis` bei EK über null. Die Funktion weist sie getrennt als
-`positionen.eigenleistung` aus, mit dem Grund je Zeile.
+Erkannt werden sie an **einem** Merkmal: der eigenen Firma als `lieferantUUID`.
+Die Preisgleichheit taugt dafür nicht — sie würde korrekt erfasste
+Einkaufspreise verwerfen. Positionen mit echtem Fremdeinkauf und ohne Aufschlag
+weist die Funktion getrennt als `positionen.ohne_aufschlag` aus: eine
+Kalkulationslücke, kein Datenfehler.
 
 Für 2026-127 ergibt das:
 

@@ -41,11 +41,25 @@ const ERLAUBTE_PFADE = new Set([
 
 // Die Weich GmbH ist in PDS selbst als Lieferant angelegt (Lieferantennummer
 // 70022). Positionen mit diesem Lieferanten sind Eigenleistungen — Rohrpaket,
-// Zuleitung, Gerüststellung. Bei ihnen steht im Katalog der Verkaufspreis auch
-// im Einkaufspreis (nachgewiesen an "Zuleitung(230V) inkl. Kanal":
-// ekEinzelpreis 25.00 gegen vkEinzelpreis 25). Ihr ekPreis ist deshalb KEIN
-// Einstandspreis und darf nicht als Materialkosten zählen.
+// Zuleitung, Gerüststellung. Ihr "Einkaufspreis" ist ein interner Satz, kein
+// Einstandspreis, und zählt deshalb nicht als Materialkosten.
 const EIGENE_FIRMA_ALS_LIEFERANT = "6139e897-1a04-48fa-bdd5-b9ac2e47ebd2"
+
+// WARUM NICHT ÜBER "EK == VK": Diese Gleichheit ist in PDS der Normalfall, nicht
+// die Ausnahme. Am 02.09.2026 am Testartikel nachgemessen: Ein per API mit 4,85 €
+// Einkaufspreis angelegter Artikel bekommt die Preisstrategie
+// ekEinzelpreis 4.85 / vkEinzelpreis 4.85 — der Einkaufspreis ist dabei
+// vollkommen korrekt, es fehlt lediglich der Aufschlag.
+//
+// Der Klimarechner rechnet VK = EK × (1 + Aufschlag), als Markup und nicht als
+// Handelsspanne: 30 % auf Geräte, 35 % auf feste Materialien, 100 % auf
+// Verbrauch und Meterware (docs/kalkulationslogik.md im klimarechner). Wo diese
+// Aufschläge in PDS nicht als Kalkulationsgruppe hinterlegt sind, bleibt VK = EK.
+//
+// Eine Erkennung über die Preisgleichheit würde deshalb korrekt erfasste
+// Einkaufspreise als unbekannt verwerfen. Die Spanne wird stattdessen als eigene
+// Kennzahl ausgewiesen — sie sagt etwas über die Kalkulation, nichts über die
+// Belastbarkeit des Einkaufspreises.
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: CORS })
@@ -92,8 +106,8 @@ function bauHinweis(z: {
   if (z.anzahlEigenleistung > 0) {
     return (
       `${z.anzahlEigenleistung} Positionen mit ${z.vkEigenleistung} Euro Erloes tragen die eigene ` +
-      "Firma als Lieferant oder einen Einkaufspreis in Hoehe des Verkaufspreises — ihr " +
-      "ausgewiesener EK ist kein Einstandspreis. Genau hier fehlt das echte Material. " +
+      "Firma als Lieferant. Ihr ausgewiesener Einkaufspreis ist ein interner Satz, kein " +
+      "Einstandspreis — genau hier fehlt das echte Material. " +
       `Zu deckende Summe: ${z.deckung} Euro.`
     )
   }
@@ -251,9 +265,12 @@ Deno.serve(async (req: Request) => {
 
       const montage: Array<Record<string, unknown>> = []
       const geraete: Array<Record<string, unknown>> = []
-      // Positionen, deren ekPreis kein Einstandspreis ist: eigene Firma als
-      // Lieferant oder EK gleich VK. Ihr Erloes ist echt, ihre Kosten nicht.
+      // Positionen mit eigener Firma als Lieferant: Erloes ist echt, der
+      // ausgewiesene "Einkaufspreis" ist ein interner Satz.
       const eigenleistung: Array<Record<string, unknown>> = []
+      // Positionen mit echtem Fremdeinkauf, aber ohne Aufschlag — verkauft zum
+      // Einkaufspreis. Kein Datenfehler, sondern eine Kalkulationsluecke.
+      const ohneAufschlagListe: Array<Record<string, unknown>> = []
       // Leistungspositionen sind der Kern des Workarounds: dort wird das Material
       // gesammelt, das nicht als eigene Angebotszeile steht — im Klimarechner der
       // Sammelposten "Montagematerial", in aelteren Auftraegen die Leistung
@@ -277,19 +294,16 @@ Deno.serve(async (req: Request) => {
         vkGesamt += vk
 
         const istLeistung = p.positionsTyp === "LEISTUNG" || p.positionsTyp === "LOHN"
-        const istEigenleistung =
-          p.lieferantUUID === EIGENE_FIRMA_ALS_LIEFERANT || (ek > 0 && Math.abs(ek - vk) < 0.005)
+        const istEigenleistung = p.lieferantUUID === EIGENE_FIRMA_ALS_LIEFERANT
+        // Nur Beobachtung, kein Ausschlusskriterium: Position mit Einkaufspreis,
+        // aber ohne jeden Aufschlag.
+        const ohneAufschlag = ek > 0 && Math.abs(ek - vk) < 0.005
 
         if (istEigenleistung && !istLeistung) {
           // Erloes zaehlt, der ausgewiesene EK nicht. Was hier wirklich verbaut
           // wurde, ist gegenueberzustellen.
           vkEigenleistung += vk
-          eigenleistung.push({
-            ...zeile,
-            grund: p.lieferantUUID === EIGENE_FIRMA_ALS_LIEFERANT
-              ? "eigene Firma als Lieferant"
-              : "Einkaufspreis gleich Verkaufspreis",
-          })
+          eigenleistung.push({ ...zeile, grund: "eigene Firma als Lieferant" })
         } else if (istLeistung) {
           // Traegt der Eintrag einen EK, ist das der erfasste Materialeinstand
           // bzw. Lohnkosten — schon eine Ist-Zahl, nicht nur ein Plan.
@@ -299,7 +313,8 @@ Deno.serve(async (req: Request) => {
         } else if (p.katalogUUID) {
           ekFremd += ek
           vkGeraete += vk
-          geraete.push({ ...zeile, katalog_uuid: p.katalogUUID })
+          if (ohneAufschlag) ohneAufschlagListe.push(zeile)
+          geraete.push({ ...zeile, katalog_uuid: p.katalogUUID, ohne_aufschlag: ohneAufschlag })
         } else {
           // Freie Textposition ohne Katalogbezug — Montagematerial im aelteren
           // Stil, dort steht EK 0.
@@ -433,7 +448,7 @@ Deno.serve(async (req: Request) => {
           abweichung_material: runde(abweichungMaterial),
           deckung_ist: runde(deckungIst),
         },
-        positionen: { geraete, leistungen, eigenleistung, montage },
+        positionen: { geraete, leistungen, eigenleistung, montage, ohne_aufschlag: ohneAufschlagListe },
         hinweis: abweichungMaterial !== 0
           ? `Der belegte Einkauf weicht um ${runde(abweichungMaterial)} Euro von der ` +
             `Kalkulation ab. Deckung nach tatsaechlichem Einkauf: ${runde(deckungIst)} Euro ` +
