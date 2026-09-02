@@ -254,11 +254,23 @@ Lieferant geprüft. `shop_lieferanten` braucht eine Spalte für die PDS-UUID.
 
 ## 10. Was die API nicht kann
 
-- **Kein VK-Preis.** `preisStrategien.vkEinzelpreis` erscheint nur lesend in
-  `/katalog/details`; weder `create` noch `update` haben ein Preisfeld. Der EK
-  geht ausschließlich über `einkaufspreis` am Lieferanteneintrag. Für die
-  Nachkalkulation heißt das: VK aus dem Vorgang bzw. Reonic ziehen, nicht aus
-  dem Katalog erwarten.
+- **Kein VK-Preis, und keine Preisstrategie.** Weder `create` noch `update`
+  haben ein Preisfeld. Der EK geht ausschließlich über `einkaufspreis` am
+  Lieferanteneintrag.
+
+  Am 01.09.2026 am Testartikel `ZZ-TEST Kabelkanal 60x40 weiß`
+  (`1f2f1b0a-2e45-40b5-b1f8-cfea3134e711`) nachgemessen: Nach `create` **und**
+  `addlieferanteneintrag` mit 4,85 € Einkaufspreis bleibt `preisStrategien` am
+  Artikel **leer**. Bei gepflegten Bestandsartikeln steht dort ein Paar aus
+  `ekEinzelpreis` und `vkEinzelpreis` (Beispiel Bosch CL5000M: 1.140,35 gegen
+  1.520,43). Der Lieferanten-EK wandert also nicht von selbst in die
+  Preisstrategie des Artikels.
+
+  Folge für den Sync: Ein per API angelegter Artikel ist **bestellbar**, aber
+  **nicht verkaufsfähig kalkuliert**. Die Preisstrategie muss in PDS gesetzt
+  werden. Für C-Teile, die nur im Montagematerial aufgehen, ist das
+  verschmerzbar — für alles, was als eigene Angebotsposition erscheinen soll,
+  nicht. Das gehört in die Übergabe an den Betrieb.
 - **Keine Kategorien und Warengruppen anlegen.** Siehe 4. und 5.
 - **Löschen nur eingeschränkt.** `/katalog/delete` greift laut Beschreibung nur
   ohne Bestand und ohne andere Verwendung. Eine falsch angelegte Dublette
