@@ -1,0 +1,434 @@
+{
+  "stand": "2026-08-30",
+  "zweck": "Arbeitsliste fuer das Umhaengen der Klima-Artikel in PDS. Je Artikel wird per /katalog/update warengruppeUUID und kategorieUUID gesetzt, sonst nichts. Preise und Lieferanteneintraege bleiben unberuehrt — die Preisfuehrung der Altartikel ist Vergangenheit und soll so bleiben.",
+  "quelle": "docs/pds-klima-warengruppen.md, vom Betrieb freigegeben am 30.08.2026",
+  "warengruppen": {
+    "aussen": "481913dd-4d65-4948-ad77-46c5e3d0092b",
+    "innen": "7c3c5a86-b1e9-40fa-bf31-2a3482d2e417",
+    "installation": "2b2e46ea-de62-4d8f-b694-04355bf4d3dc",
+    "zubehoer": "d82c6990-55eb-46ae-9ca3-4c3bb8b60f67",
+    "dienstleistung": "36d66850-2d4a-4402-8754-f0c770108fc6"
+  },
+  "kategorien": {
+    "wurzel": "a9809a4d-bf51-439d-936e-1f4e76be6606",
+    "handelsware": "1b8ee957-5fb0-4ed6-8f48-d91868f1945c",
+    "aussen": {
+      "gruppe": "5f0f5b0f-1bb6-4ec4-a7a5-a5cb11056cf4",
+      "Daikin": "58d0dae9-44e5-45f9-8a43-d2d2487441bd",
+      "Panasonic": "e3fac48f-44a9-408c-af1e-b229f07c1ef2",
+      "Bosch": "58bdbe82-4855-47c1-8de2-d97e18817c4d"
+    },
+    "innen": {
+      "gruppe": "9b7fa267-ceb1-4d4c-b190-0bb0635d4e59",
+      "Daikin": "d87fab7e-9bcf-4a7e-99f4-5cb1a6a88161",
+      "Panasonic": "10df8b73-a520-40fc-91fa-073f348f9160",
+      "Bosch": "2dbb98de-d55c-4594-a818-24c3f377c028",
+      "Remko": "de09c6d7-596d-4fc9-a64f-ac365b1e9400"
+    },
+    "installation": {
+      "gruppe": "899522b5-fc11-41df-94a3-1a587eb93544"
+    },
+    "zubehoer": {
+      "gruppe": "902aab52-df81-4842-9de0-f9c4037f0ab6",
+      "Daikin": "d9329d62-6ce5-4c24-ba7e-fdee1e7eae4e",
+      "Panasonic": "f70f1bdd-7aba-4898-bb02-6b0ac567ffe2",
+      "Bosch": "787ff467-553e-4af0-a40e-fa369c6617ca"
+    },
+    "dienstleistung": {
+      "gruppe": "215db8a6-703d-4466-a2ed-69ea0d3e9a9d"
+    }
+  },
+  "artikel": [
+    {
+      "uuid": "46b95bd3-bdb2-4ac2-b153-7610a41dda67",
+      "name": "2MXM40A9",
+      "ziel": "aussen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "3e0fcfc2-b958-462d-9b44-61a88696d017",
+      "name": "2MXM50A8/9",
+      "ziel": "aussen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "a487c0ef-7561-44e3-8306-178e89894266",
+      "name": "3MXM40A8/9",
+      "ziel": "aussen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "075ffb9a-3cf6-4114-803e-a0c8f145a238",
+      "name": "3MXM52A8/9",
+      "ziel": "aussen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "89e26273-9ac3-4dcd-9169-e3da78ea97ca",
+      "name": "3MXM68A8/9",
+      "ziel": "aussen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "3c05829f-11fe-4572-a3a4-b74bb66115a3",
+      "name": "4MXM68A8/9",
+      "ziel": "aussen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "4b5e4bfb-3b95-4648-b367-d458664bed93",
+      "name": "4MXM80A8/9",
+      "ziel": "aussen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "768da29e-3a1e-4739-bc89-831146235f11",
+      "name": "5MXM90A8/9",
+      "ziel": "aussen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "868e8742-eb0a-413d-9fd1-1518448a3b0b",
+      "name": "CU-2Z35CBE",
+      "ziel": "aussen",
+      "hersteller": "Panasonic"
+    },
+    {
+      "uuid": "026e0d91-1056-4581-835a-226ce96f332e",
+      "name": "CU-2Z41CBE",
+      "ziel": "aussen",
+      "hersteller": "Panasonic"
+    },
+    {
+      "uuid": "d0f2c4f7-ae5d-421a-9131-ead8f74fbfc5",
+      "name": "CU-2Z50CBE",
+      "ziel": "aussen",
+      "hersteller": "Panasonic"
+    },
+    {
+      "uuid": "ecdcc797-4016-493c-bbe0-fb1d3649d452",
+      "name": "CU-3Z52CBE",
+      "ziel": "aussen",
+      "hersteller": "Panasonic"
+    },
+    {
+      "uuid": "d6d64f77-4f82-4e58-a983-7b5c9b4d2071",
+      "name": "CU-3Z68CBE",
+      "ziel": "aussen",
+      "hersteller": "Panasonic"
+    },
+    {
+      "uuid": "3f1104dd-e519-481f-9612-22e6da94ecb3",
+      "name": "CU-3Z75ABEC",
+      "ziel": "aussen",
+      "hersteller": "Panasonic"
+    },
+    {
+      "uuid": "651f3287-b738-4b03-ae7d-7451bbe63eb7",
+      "name": "CU-4Z68CBE",
+      "ziel": "aussen",
+      "hersteller": "Panasonic"
+    },
+    {
+      "uuid": "1d6c3f0c-db49-4f3e-8719-4156e3d38375",
+      "name": "CU-4Z80CBE",
+      "ziel": "aussen",
+      "hersteller": "Panasonic"
+    },
+    {
+      "uuid": "087adbf9-3a8f-46cd-8ceb-5ac4831ba0f1",
+      "name": "CU-5Z90CBE",
+      "ziel": "aussen",
+      "hersteller": "Panasonic"
+    },
+    {
+      "uuid": "e94a4e83-a8bf-4426-8ec5-6a3ab999c4af",
+      "name": "Bosch CL3000i 35 E Singlesplit",
+      "ziel": "aussen",
+      "hersteller": "Bosch"
+    },
+    {
+      "uuid": "53a97f49-2805-484c-b0d0-0c1bea921706",
+      "name": "Bosch CL7000i 35 E Singlesplit",
+      "ziel": "aussen",
+      "hersteller": "Bosch"
+    },
+    {
+      "uuid": "e5954410-8d32-4049-9647-5271abfe67b0",
+      "name": "Bosch CL5000M 53/2 E Multisplit",
+      "ziel": "aussen",
+      "hersteller": "Bosch"
+    },
+    {
+      "uuid": "7d91b0c0-21a5-4f94-8143-0a81c4824c26",
+      "name": "Bosch CL5000M 79/3 E Multisplit",
+      "ziel": "aussen",
+      "hersteller": "Bosch"
+    },
+    {
+      "uuid": "6756f93c-54bc-4a5b-b787-66a32e69ba22",
+      "name": "FTXJ20AW9 Emura",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "5cb60e93-14bb-44be-9b5d-20fc0b213950",
+      "name": "FTXJ35AW9 Emura",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "6567532c-6b16-458b-9a51-abac340b41cb",
+      "name": "FTXJ35AB9 Emura",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "896a4c56-060d-419e-a1cd-0ebad4d16070",
+      "name": "FTXJ42AB9 Emura",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "8f3329e9-80d1-4f8d-aa05-480416f67b87",
+      "name": "FTXA20CB Stylish",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "d90c5980-920f-4f4f-9f2e-434acb3bd5be",
+      "name": "FTXA20CW Stylish",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "5b2d78e9-ff8e-46f9-ae15-4677b5b7c2ad",
+      "name": "FTXA25CW Stylish",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "29e84e57-ed01-493b-8640-a96fe29fdd18",
+      "name": "FTXA25CB Stylish",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "8c006251-e977-42e6-a49b-ccad27db6ec9",
+      "name": "FTXA25CS Stylish",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "47251e7c-0e39-4fc9-b036-f396eadfecc0",
+      "name": "FTXA35CW Stylish",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "5f40d5dd-9dde-4b0e-b0c8-ce9a3700a289",
+      "name": "FTXA35CB Stylish",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "f639ac0c-6eba-4086-ab5a-ee997c0535de",
+      "name": "FTXA42CW Stylish",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "65bde86a-75bb-4f1c-af6f-298ba161f1fa",
+      "name": "FTXA50CW Stylish",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "f7cc2135-d62e-434f-a45d-da2cc062bca3",
+      "name": "FTXA50CB Stylish",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "543af989-46c3-43a4-bd0c-ef8c5aa50ba3",
+      "name": "CTXA15CW Stylish",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "368c2da8-dd77-4fc8-8e4c-ad5956584d4b",
+      "name": "CTXA15CB Stylish",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "ea29930b-5303-4fad-ba30-90fff6e69d32",
+      "name": "FTXM20A Perfera",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "38faaa24-d11d-46ff-bc26-f2d75f206c42",
+      "name": "FTXM25A Perfera",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "e9e2c7dc-b2a4-45d7-837b-a9a8bfbd27cc",
+      "name": "FTXM35A Perfera",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "6c0f966a-f9be-4ea3-9b0b-eb5bfd7e56d2",
+      "name": "FTXM42A Perfera",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "4cca5a1d-78e3-4875-a6dc-2eb80adc0e10",
+      "name": "FTXM50A Perfera",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "24bcb21c-947c-4b71-a99f-f751410ed8d6",
+      "name": "FTXM60A Perfera",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "870f49eb-3ab8-4569-93dc-e2fb47167637",
+      "name": "CTXM15A Perfera",
+      "ziel": "innen",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "36732089-6e8a-4b3e-bbcd-0454d99fc5a3",
+      "name": "CS-Z20CKEW Etherea",
+      "ziel": "innen",
+      "hersteller": "Panasonic"
+    },
+    {
+      "uuid": "08888c37-0c99-4c95-a719-a1306a544de8",
+      "name": "CS-Z25CKEW Etherea",
+      "ziel": "innen",
+      "hersteller": "Panasonic"
+    },
+    {
+      "uuid": "b7f2fe27-ae70-451c-af3a-3a8a426a1a38",
+      "name": "CS-Z35CKEW Etherea",
+      "ziel": "innen",
+      "hersteller": "Panasonic"
+    },
+    {
+      "uuid": "9be059e8-2e15-4997-b4cb-c1349afae58b",
+      "name": "CS-Z50CKEW Etherea",
+      "ziel": "innen",
+      "hersteller": "Panasonic"
+    },
+    {
+      "uuid": "a47f7b23-7349-401e-b8c4-91c0c8d1c09b",
+      "name": "CS-XZ35CKEW-H Etherea",
+      "ziel": "innen",
+      "hersteller": "Panasonic"
+    },
+    {
+      "uuid": "55bb1664-4e0a-4496-b1ff-ecb88e4108c0",
+      "name": "Bosch CL3000iU W 20 E",
+      "ziel": "innen",
+      "hersteller": "Bosch"
+    },
+    {
+      "uuid": "11c88bb0-b28c-433a-98ad-2b6421b2a4aa",
+      "name": "Bosch CL3000iU W 26 E",
+      "ziel": "innen",
+      "hersteller": "Bosch"
+    },
+    {
+      "uuid": "15a32f5f-eb1c-4545-b96a-8191276f7a23",
+      "name": "Bosch CL3200iU W 35 E",
+      "ziel": "innen",
+      "hersteller": "Bosch"
+    },
+    {
+      "uuid": "c0dfe505-8abb-4dc3-afed-5e6723389edc",
+      "name": "Bosch CL7000iU W 35 E",
+      "ziel": "innen",
+      "hersteller": "Bosch"
+    },
+    {
+      "uuid": "453d6e4d-f43e-4c4e-88b6-66fcaf08d3ba",
+      "name": "REMKO Deckenkassette MXD 204",
+      "ziel": "innen",
+      "hersteller": "Remko"
+    },
+    {
+      "uuid": "a8b265d6-2d02-4d05-8931-bb09bc89a8e9",
+      "name": "Rohrpaket im Kabelkanal je Innengeraet",
+      "ziel": "installation",
+      "hersteller": null
+    },
+    {
+      "uuid": "fd0961fe-9a35-447c-8dd8-b4f9af15b140",
+      "name": "Rohrpaket ohne Kabelkanal je Innengeraet",
+      "ziel": "installation",
+      "hersteller": null
+    },
+    {
+      "uuid": "b6f83a11-f805-4769-86ac-6c0ed9699081",
+      "name": "BYCQ140EB Geraeteblende",
+      "ziel": "zubehoer",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "93957b90-a7ee-4cf1-a20e-8e8852d83ca0",
+      "name": "BRC1H52K Fernbedienung Madoka",
+      "ziel": "zubehoer",
+      "hersteller": "Daikin"
+    },
+    {
+      "uuid": "024b3ad3-089c-4611-a50f-3c06453e1ada",
+      "name": "Arbeitsstunden Installation Klima",
+      "ziel": "dienstleistung",
+      "hersteller": null
+    },
+    {
+      "uuid": "9606b0c9-466a-4ba1-9ed3-3ff2c51a2961",
+      "name": "Elektroinstallation Klimaanlage",
+      "ziel": "dienstleistung",
+      "hersteller": null
+    },
+    {
+      "uuid": "7dbd2ad3-4b1e-41a2-b10f-5fc826516a98",
+      "name": "Gerueststellung Klimaanlage",
+      "ziel": "dienstleistung",
+      "hersteller": null
+    },
+    {
+      "uuid": "e465ba02-79ea-4446-915e-c7f784cf600b",
+      "name": "Pauschale fuer Aufmass-Service Klima",
+      "ziel": "dienstleistung",
+      "hersteller": null
+    }
+  ],
+  "ausgenommen": [
+    {
+      "uuid": "b9d26329-5a44-4a10-85ab-d1197dc2de36",
+      "name": "ELBX12E9W Altherma Wandgeraet",
+      "grund": "Waermepumpe, kein Klimageraet"
+    },
+    {
+      "uuid": "fb7e3e54-f0a8-4bc1-a508-9eba3e0334ad",
+      "name": "ETBH12E9W Altherma Wandgeraet",
+      "grund": "Waermepumpe, kein Klimageraet"
+    }
+  ],
+  "durchgefuehrt": {
+    "datum": "2026-09-01",
+    "anzahl": 62,
+    "verfahren": "je Artikel ein /katalog/update mit uuid, warengruppeUUID, kategorieUUID",
+    "hinweis": "Teilupdate verifiziert: nicht mitgesendete Felder bleiben unveraendert. An 'BOSCH Klimageraet CL5000M 53/2' geprueft — Langtext mit Leistungsbeschreibung, Preise, Masseinheit, MwSt-Typ und alle Lieferanteneintraege blieben erhalten.",
+    "stichprobe": "ELBX12E9W und ETBH12E9W (Altherma) nachweislich unberuehrt in ihren SHK-Warengruppen."
+  }
+}

@@ -65,10 +65,28 @@ Neue Edge Function `shop-ai` mit taskbasiertem Routing:
 - Text (Kategorie/Tag/Beschreibung): Haiku 4.5
 - Browser-Agent (Phase 7/8): Sonnet 4.6 mit Tool-Use
 
+## PDS-Anbindung (Stand 22.08.2026, nicht in Betrieb)
+- Der Shop ist **Anlage-Kanal fuer den PDS-Artikelstamm** — PDS bleibt
+  Systemfuehrer. Siehe ADR 0005.
+- Nicht ueber den MCP-Server, sondern direkt per Edge Function mit dem Key aus
+  `integration_secrets` (Muster: `weich-energie-app/functions/pds-preise`).
+- `pds-katalog-sync` schreibt: Whitelist auf vier Katalog-Pfade,
+  Trockenlauf ist Standard, Protokoll in `shop_pds_sync_log`. Angelegt wird nur
+  bei `pds_katalog_uuid is null` — `/katalog/delete` greift in PDS nur ohne
+  Bestand und Verwendung, eine Dublette bleibt fuer immer stehen.
+- `pds-auftrag-soll` liest Soll-Werte fuer die Nachkalkulation. In den
+  Kundenauftrag wird nie geschrieben, dort steht eine Pauschale.
+- Vorher von Hand in PDS anzulegen: fuenf `(KLIMA)`-Warengruppen und der
+  Kategoriezweig — per API nicht moeglich. Siehe docs/pds-klima-warengruppen.md.
+
 ## Domain-Doku
 - [CONTEXT.md](CONTEXT.md) — Domain-Glossar
 - [ROADMAP.md](ROADMAP.md) — Phasen 0-9
 - [docs/adr/](docs/adr/) — Architektur-Entscheidungen
+- [docs/pds-inbetriebnahme.md](docs/pds-inbetriebnahme.md) — Reihenfolge der Inbetriebnahme
+- [docs/pds-katalog-mapping.md](docs/pds-katalog-mapping.md) — Feld- und ID-Mapping Shop → PDS
+- [docs/pds-klima-warengruppen.md](docs/pds-klima-warengruppen.md) — Klima-Warengruppen und Umzugsliste
+- [docs/nachkalkulation-datenmodell.md](docs/nachkalkulation-datenmodell.md) — Soll/Ist-Modell
 
 ## Doku-Regel
 Wenn sich eine Kern-Entscheidung aendert: ADR schreiben, CLAUDE.md updaten, CONTEXT.md pflegen.

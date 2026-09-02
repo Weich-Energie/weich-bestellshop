@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Box, Flex, HStack, VStack, Text, Button, Spacer, IconButton } from '@chakra-ui/react'
 import {
   ShoppingCart, Package, ClipboardList, Heart, Send, LayoutGrid, LogOut, ShieldCheck,
-  Eye, EyeOff, Truck, History, Menu as MenuIcon, X,
+  Eye, EyeOff, Truck, History, Menu as MenuIcon, X, Upload, Calculator,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.jsx'
 
@@ -52,6 +52,8 @@ export default function Layout() {
           <Nav to="/admin/bedarf" icon={Send}>Bedarfsmeldungen</Nav>
           <Nav to="/admin/import" icon={Package}>Beleg-Import</Nav>
           <Nav to="/admin/lieferanten" icon={Truck}>Lieferanten</Nav>
+          <Nav to="/admin/pds-sync" icon={Upload}>Nach PDS übertragen</Nav>
+          <Nav to="/admin/nachkalkulation" icon={Calculator}>Nachkalkulation</Nav>
         </>
       )}
     </>

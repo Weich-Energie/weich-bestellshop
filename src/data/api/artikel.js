@@ -1,6 +1,11 @@
 import { supabase } from '../../supabaseClient.js'
 import { ensureTags } from './kategorien.js'
 
+// Bewusst OHNE die pds_-Spalten und lieferant_id aus Migration 008: diese Liste
+// treibt den Katalog, den jeder Monteur oeffnet. Steht die Migration noch aus,
+// wuerde eine Spalte hier die zentrale Seite lahmlegen. Den Sync-Status holt
+// listArtikelMitPdsStatus in pdsSync.js getrennt — faellt das aus, betrifft es
+// nur die Admin-Seite.
 const ARTIKEL_SELECT = `
   id, name, beschreibung, kategorie_id, bild_url, bild_ist_extern,
   lieferant, lieferant_url, artikelnr, preis_netto, einheit, aktiv,
