@@ -9,7 +9,7 @@ Operationen). Grundlage für den Sync `shop_artikel` → PDS-Katalogeintrag.
 |---|---|---|---|
 | 1 | `pds_createKatalogEintrag` | `POST /katalog/create` | Artikel anlegen, liefert `uuid` |
 | 2 | `pds_createLieferantEintrag` | `POST /katalog/addlieferanteneintrag` | Bestellnummer, EK-Preis, Gebinde |
-| 3 | `pds_updateKatalogEintragAbbildung` | `POST /katalog/updateAbbildung` | Produktbild |
+| 3 | `pds_updateKatalogEintragAbbildung` | `POST /katalog/updateAbbildung` | Produktbild — **braucht multipart, siehe unten** |
 | 4 | `pds_updateKatalogEintrag` | `POST /katalog/update` | Bestandsartikel korrigieren und umhängen, siehe 5. |
 
 Pflichtfelder: `create` braucht nur `name` + `typ`. `addlieferanteneintrag`

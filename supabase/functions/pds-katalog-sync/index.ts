@@ -345,7 +345,8 @@ Deno.serve(async (req: Request) => {
       pds_katalog_uuid: katalogUUID,
       warnungen,
       hinweis: artikel.bild_url
-        ? "Bild wurde nicht uebertragen — /katalog/updateAbbildung ist noch nicht angebunden."
+        ? "Bild wurde nicht uebertragen: /katalog/updateAbbildung erwartet multipart/form-data, " +
+          "kein JSON (am 01.09.2026 geprueft, Tomcat-400 bei JSON-Body). Anbindung offen."
         : undefined,
     })
   } catch (e) {
