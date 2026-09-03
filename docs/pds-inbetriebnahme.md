@@ -1,5 +1,17 @@
 # PDS-Anbindung in Betrieb nehmen
 
+> **ACHTUNG, Reihenfolge:** Vier Commits liegen unveröffentlicht auf `master`
+> (`46c1da0`, `bde56ee`, `60c8caf`, `8d04ed5`). Sie dürfen **erst nach**
+> Migration 011 gepusht werden.
+>
+> Grund: `ARTIKEL_SELECT` in `src/data/api/artikel.js` fragt jetzt die Spalte
+> `aufschlagsklasse` mit ab. Existiert sie in der Datenbank nicht, antwortet
+> PostgREST mit einem Fehler, `listArtikel` wirft, und **der Katalog lädt
+> nicht mehr** — für alle Nutzer, nicht nur für Admins. Da `master` per
+> Auto-Deploy live geht, wäre der Shop unmittelbar nach dem Push defekt.
+>
+> Richtige Reihenfolge: erst Migration 011 einspielen, dann pushen.
+
 Reihenfolge ist bindend. Jeder Schritt ist einzeln prüfbar, und bis Schritt 4
 wird nichts nach PDS geschrieben.
 
