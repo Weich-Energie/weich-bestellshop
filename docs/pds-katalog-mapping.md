@@ -355,10 +355,20 @@ Offen ist, warum. Zwei Möglichkeiten, beide nur im PDS-Client zu klären:
   die Gruppe. Dann bräuchte der Artikel eine andere Strategie oder gar keine,
   damit PDS aus EK und Gruppe rechnet.
 
-Bis das geklärt ist, gilt für per API angelegte Artikel weiterhin VK = EK, und
-der Verkaufspreis wird beim Einsetzen in den Vorgang von Hand gesetzt — wie
-bisher. Der Sync gibt die Gruppe trotzdem mit; sobald PDS sie auswertet, greift
-sie für alle bereits übertragenen Artikel rückwirkend.
+**Gegenprobe mit umgekehrter Reihenfolge (02.09.2026):** Der Dämpfungssockel
+hatte die Gruppe `(KLIMA)Fest` (35 %) **bevor** sein erster EK kam. Nach dem
+Öffnen im PDS-Client entstand die Preisstrategie — `ekEinzelpreis 10.00 /
+vkEinzelpreis 10.00`. Kein Aufschlag. Die Reihenfolge ist also nicht die
+Ursache.
+
+Nebenbefund: Die Preisstrategie entsteht offenbar erst beim **Öffnen des
+Artikels im Client**, nicht zeitgesteuert. Beide Artikel hatten sie erst nach
+dem Öffnen.
+
+Bis geklärt ist, warum die Gruppe nicht rechnet, gilt für per API angelegte
+Artikel VK = EK, und der Verkaufspreis wird beim Einsetzen in den Vorgang von
+Hand gesetzt — wie bisher. Der Sync gibt die Gruppe trotzdem mit; sollte PDS sie
+später auswerten, greift das rückwirkend.
 
 Der eigentliche Gewinn liegt nicht im gefüllten Verkaufspreis: Die Aufschläge
 stehen damit im Artikelstamm, an der Stelle, wo auch das Angebot sie hernimmt.
