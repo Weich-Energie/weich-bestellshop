@@ -401,3 +401,28 @@ und kann den VK beim Erzeugen des Angebots direkt in `vkPreis.einzelPreis`
 schreiben, mit `vkFix: true`, damit PDS ihn nicht aus dem Katalog überschreibt.
 Damit wandert die Aufschlagslogik nicht in den Artikelstamm, sondern in den
 Moment, in dem das Angebot entsteht — und dort greift sie zuverlässig.
+
+
+### Workaround: Musterangebot als Brücke zum Katalog-VK
+
+Vorschlag des Betriebs vom 02.09.2026, in Prüfung. Der PDS-Client bietet an
+Angebotspositionen die Funktion **„in Katalog übernehmen"**, die den Positions-VK
+in den Katalogartikel zurückschreibt. Damit lässt sich der einzige API-Schreibweg
+für den VK (`createVorgang`) als Brücke nutzen:
+
+1. Per API ein Angebot anlegen — Kunde ist die Weich GmbH selbst
+   (`6139e897-…`, Kundennummer 10039), damit kein echter Kunde ein Angebot
+   bekommt. Je Artikel eine Position mit `katalogUUID`, `vkPreis.einzelPreis`
+   = EK × (1 + Aufschlag) und `vkFix: true`.
+2. Im Client je Position „in Katalog übernehmen".
+3. Angebot löschen — per API gibt es dafür keinen Endpunkt, also im Client.
+
+Testangebot **2026-290** (`05188066-56ec-4a46-9f09-d64145f0193f`) mit dem
+Dämpfungssockel: EK 10,00, VK 13,50. Bezeichnung beginnt mit `ZZ-MUSTER`, damit
+es in jeder Liste als Hilfskonstrukt erkennbar ist.
+
+Zwei Dinge dabei gelernt: Eine `nummer` an der Position wird mit 412 abgelehnt,
+weil PDS die Positionsnummern selbst vergibt. Und PDS zieht Bestellnummer,
+Herstellernummer und Lieferant automatisch aus dem Katalog in die Position.
+
+Ergebnis der Übernahme: siehe unten, sobald im Client geprüft.
