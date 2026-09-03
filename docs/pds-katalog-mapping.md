@@ -374,3 +374,30 @@ Der eigentliche Gewinn liegt nicht im gefüllten Verkaufspreis: Die Aufschläge
 stehen damit im Artikelstamm, an der Stelle, wo auch das Angebot sie hernimmt.
 Heute existiert die Logik zweimal — im Rechner und im Kopf dessen, der das
 Angebot schreibt.
+
+
+## 13. Wege zum Verkaufspreis — vollständig geprüft am 02.09.2026
+
+Der Katalog-VK ist per API **nicht setzbar**. Alle 16 Katalog-Operationen
+geprüft, dazu eine Suche über die gesamte API nach Preis, Preisstrategie,
+Preisliste, Rabatt und Personenvertrag.
+
+| Weg | Ergebnis |
+|---|---|
+| `create` / `update` am Artikel | kein Preisfeld, nur `preisEinheit` (Bezugsmenge) |
+| Lieferanteneintrag | nur `einkaufspreis` |
+| Preisstrategie (`ekEinzelpreis` / `vkEinzelpreis`) | nur lesend in `/katalog/details`; entsteht beim ersten Öffnen im Client mit VK = EK |
+| Kalkulationsgruppe | zuweisbar, rechnet aber nicht — zweifach geprüft, in beiden Reihenfolgen (Gruppe vor EK, EK vor Gruppe), im Katalog wie im Angebot |
+| Personenvertrag | nur als `personenvertragUUID` am Vorgang referenzierbar, nicht per API anlegbar |
+| Kassenpreis (`kasseFlourDaten.kassenpreis`) | Kassenschnittstelle flour; `changeentry` hat kein Preisfeld |
+| **`createVorgang`** | **einziger Schreibweg**: je Position `vkPreis.einzelPreis`, `ekPreis.einzelPreis`, `vkFix`, dazu `rabatt` mit `TEUERUNGSZUSCHLAG` / `VERSCHNITT` in Prozent |
+| `updatePosition` | **kein Preisfeld** — nur Menge, Kurztext, Lager, Bestellnummer, Lieferant, Liefertermin |
+
+Der VK lässt sich also **ausschliesslich beim Anlegen eines Vorgangs** setzen,
+nicht am Artikel und nicht nachträglich an einer Position.
+
+Konsequenz für den Klimarechner: Er kennt EK und Aufschlagsklasse aus dem Shop
+und kann den VK beim Erzeugen des Angebots direkt in `vkPreis.einzelPreis`
+schreiben, mit `vkFix: true`, damit PDS ihn nicht aus dem Katalog überschreibt.
+Damit wandert die Aufschlagslogik nicht in den Artikelstamm, sondern in den
+Moment, in dem das Angebot entsteht — und dort greift sie zuverlässig.
