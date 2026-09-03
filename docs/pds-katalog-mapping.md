@@ -344,9 +344,21 @@ Zwei Erklärungen sind möglich, und die API kann sie nicht unterscheiden:
    Positions-VK aus EK und Gruppe, während der Katalog-VK unberührt bleibt.
 2. In der Gruppe ist kein Aufschlagssatz hinterlegt, nur die Bezeichnung.
 
-Zu klären im PDS-Client: den Testartikel `ZZ-TEST Kabelkanal` in ein
-Testangebot einsetzen. Erscheint dort 9,72 € als VK, gilt Erklärung 1 und alles
-ist richtig. Erscheint 4,86 €, fehlt der Satz in der Gruppe.
+**Im PDS-Client geprüft (02.09.2026): Im Testangebot steht 4,86 €.** Die Gruppe
+wirkt also auch beim Einsetzen in einen Vorgang nicht. Erklärung 1 ist damit
+ausgeschlossen.
+
+Offen ist, warum. Zwei Möglichkeiten, beide nur im PDS-Client zu klären:
+
+- In der Gruppe ist kein Aufschlagssatz hinterlegt, nur die Bezeichnung.
+- Die Preisstrategie „Nettopreis" am Artikel ist ein Festpreis und übersteuert
+  die Gruppe. Dann bräuchte der Artikel eine andere Strategie oder gar keine,
+  damit PDS aus EK und Gruppe rechnet.
+
+Bis das geklärt ist, gilt für per API angelegte Artikel weiterhin VK = EK, und
+der Verkaufspreis wird beim Einsetzen in den Vorgang von Hand gesetzt — wie
+bisher. Der Sync gibt die Gruppe trotzdem mit; sobald PDS sie auswertet, greift
+sie für alle bereits übertragenen Artikel rückwirkend.
 
 Der eigentliche Gewinn liegt nicht im gefüllten Verkaufspreis: Die Aufschläge
 stehen damit im Artikelstamm, an der Stelle, wo auch das Angebot sie hernimmt.
