@@ -327,3 +327,54 @@ Auftrag stehen, statt als Textposition mit EK 0? Das würde die Nachkalkulation
 langfristig in PDS selbst möglich machen, ändert aber die Angebotserstellung —
 und die Pauschale gegenüber dem Kunden soll bleiben. Betrifft nur neue Aufträge,
 nicht die 51 bestehenden.
+
+
+## Die Klammer zwischen Auftrag und Bestellung: kopplungsID
+
+Am 02.09.2026 gefunden und der Schlüssel zur Automatisierung. Eine
+Bestellposition trägt in `kopplungsID.kidUrsprung` **dieselbe ID wie die
+Auftragsposition**, aus der sie entstanden ist.
+
+Belegt an Auftrag 2025-10313 und Bestellung 2025-50445:
+
+```
+Auftragsposition 001   kopplungsID.kopplungsID  = 39468c90-fb76-4f1b-b397-c905d283c6f8
+Bestellposition  001   kopplungsID.kidUrsprung  = 39468c90-fb76-4f1b-b397-c905d283c6f8
+```
+
+Damit ist das Ist exakt auf das Soll zuordenbar — Position für Position, ohne
+über Namen oder `katalogUUID` zu raten. Die `katalogUUID` taugt dafür nicht: Ein
+Artikel kann in einem Auftrag mehrfach vorkommen, und dieselbe Bestellung kann
+Material für mehrere Aufträge enthalten (siehe Bestellung 2025-50170, „Für
+Stanke, Neubauer, Danzl, Yüzbasioglu, Federer").
+
+Der Weg für den automatischen Ist-Import:
+
+1. Auftrag lesen, Positionen mit ihrer `kopplungsID` merken
+2. Bestellungen zur `projektakteUUID` suchen — `/vorgang/listbestellungen` kann
+   **nicht** nach Projektakte filtern (nur `suchwort`, `suchfelder`,
+   `statusUUIDs`), die Trefferliste muss deshalb clientseitig auf die Projektakte
+   eingeschränkt werden
+3. Bestellpositionen über `kidUrsprung` den Auftragspositionen zuordnen
+4. `ekPreis` der Bestellposition ist der belegte Einkauf, `quelle = 'bestellung'`
+
+## Erstes Ergebnis
+
+| Auftrag 2025-10313, Status Abgerechnet | |
+|---|---|
+| Erlös | 3.740,00 € |
+| Einkauf kalkuliert | 1.536,34 € |
+| Deckung kalkuliert | 2.203,66 € |
+| Einkauf belegt, Bestellung 2025-50445 | 1.650,00 € |
+| davon im Auftrag kalkuliert | 832,07 € |
+| **Abweichung** | **+817,93 €** |
+| **Deckung tatsächlich** | **1.385,73 €** |
+
+Das Außengerät RXP50N8 war mit 832,07 € kalkuliert und kostete 1.650,00 €. 37 %
+der geplanten Deckung sind damit verloren, ohne dass es in PDS auffällt — der
+Einkaufspreis an der Auftragsposition wird beim Anlegen kopiert und nie
+nachgezogen.
+
+Offen bei diesem Auftrag: Für das Wandgerät FTXM50A (Soll-EK 704,27 €) liegt
+keine Bestellposition vor, vermutlich Lagerware. Sein Ist ist unbelegt und in
+der Rechnung oben mit dem Soll-Wert angesetzt.

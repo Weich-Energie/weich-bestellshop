@@ -239,16 +239,30 @@ Deno.serve(async (req: Request) => {
     }
 
     // Der EK-Preis geht ausschliesslich hier hinein. Weder create noch update
-    // haben ein Preisfeld, ein VK-Preis ist per API gar nicht setzbar.
+    // haben ein Preisfeld.
+    //
+    // Fehlt der Preis im Shop, wird das Feld WEGGELASSEN und nicht als 0
+    // gesendet. Null Euro liest sich in jeder Auswertung wie "kostenlos" und
+    // wandert von dort in die Preisstrategie des Artikels — genau der Fehler,
+    // der bei den Rohrpaketen zu unbrauchbaren Zahlen geführt hat. Ein leeres
+    // Feld heisst "unbekannt" und ist später per /katalog/updatelieferanteneintrag
+    // nachzutragen.
     const lieferantRumpf: Record<string, unknown> = {
       lieferantUUID: lieferant?.pds_person_uuid,
       bestellnummer: artikel.artikelnr ?? "",
       verpackungsmenge: gebinde?.stueckzahl ?? null,
-      einkaufspreis: {
-        preiseinheit: 1,
-        standardpreis: artikel.preis_netto ?? 0,
-      },
+      ...(artikel.preis_netto != null
+        ? { einkaufspreis: { preiseinheit: 1, standardpreis: artikel.preis_netto } }
+        : {}),
       standard: true,
+    }
+
+    if (artikel.preis_netto == null) {
+      hinweiseZurKalkulation.push(
+        "Kein Einkaufspreis im Shop hinterlegt — der Lieferanteneintrag wird ohne " +
+          "Preis angelegt. Nicht mit 0 Euro, denn das laese sich als kostenlos. " +
+          "Nachzutragen in PDS oder per /katalog/updatelieferanteneintrag.",
+      )
     }
 
     async function protokoll(
