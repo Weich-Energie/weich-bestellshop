@@ -314,20 +314,21 @@ ohne Angabe wird keine Gruppe mitgegeben und es bleibt bei VK = EK.
 Die Klasse hängt **am Artikel, nicht an der Kategorie** — in „Klima" liegen sowohl
 der Dämpfungssockel (`fest`) als auch Kabelkanal (`verbrauch`).
 
-### Was in PDS von Hand entstehen muss
+### In PDS angelegt (02.09.2026)
 
-Drei Kalkulationsgruppen mit genau diesen Sätzen. Die API kann sie weder anlegen
-noch ihre Sätze lesen — `listkalkulationsgruppen` liefert nur Bezeichnungen, im
-Mandanten bislang ausschliesslich „0 Allgemein". Vorschlag für die Benennung:
+Die drei Kalkulationsgruppen existieren, als **Aufschlag** auf den EK angelegt —
+nicht als Spanne. Der Unterschied ist bei gleichen Prozentzahlen erheblich:
+30 % Aufschlag auf 100 € ergibt 130 €, 30 % Spanne dagegen 142,86 €.
 
-```
-(KLIMA)Haupt 30%
-(KLIMA)Fest 35%
-(KLIMA)Verbrauch 100%
-```
+| Klasse | PDS-Bezeichnung | UUID |
+|---|---|---|
+| `haupt` | `(KLIMA)Haupt 30%` | `f0e86848-108f-4d24-8565-6c8ef51f1ed2` |
+| `fest` | `(KLIMA)Fest` | `ee1b48a0-3b06-40a8-965c-d2158c70af43` |
+| `verbrauch` | `(KLIMA)Verbrauch` | `9cb6fc8d-7332-4fb9-b189-2574fd57c185` |
 
-Danach ihre UUIDs in `shop_pds_kalkulationsgruppen.pds_uuid` eintragen. Solange
-das fehlt, meldet der Trockenlauf es als Hinweis und überträgt ohne Gruppe.
+Die UUIDs stehen in `shop_pds_kalkulationsgruppen.pds_uuid`; der Sync gibt sie
+seit dem an `create` mit. Die API konnte die Gruppen weder anlegen noch ihre
+Sätze lesen — `listkalkulationsgruppen` liefert nur Bezeichnungen.
 
 Der eigentliche Gewinn liegt nicht im gefüllten Verkaufspreis: Die Aufschläge
 stehen damit im Artikelstamm, an der Stelle, wo auch das Angebot sie hernimmt.
