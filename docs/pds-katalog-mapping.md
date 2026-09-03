@@ -330,6 +330,24 @@ Die UUIDs stehen in `shop_pds_kalkulationsgruppen.pds_uuid`; der Sync gibt sie
 seit dem an `create` mit. Die API konnte die Gruppen weder anlegen noch ihre
 Sätze lesen — `listkalkulationsgruppen` liefert nur Bezeichnungen.
 
+### Die Gruppe rechnet nicht in den Katalog-VK
+
+Am 02.09.2026 am Testartikel geprüft: Nach dem Setzen von `(KLIMA)Verbrauch`
+(100 %) blieb `vkEinzelpreis` auf dem EK. Auch eine anschliessende Änderung des
+Lieferanten-EK von 4,85 auf 4,86 ergab `ekEinzelpreis 4.86 / vkEinzelpreis 4.86`
+— kein Aufschlag.
+
+Die Kalkulationsgruppe wirkt also **nicht auf die Preisstrategie am Artikel**.
+Zwei Erklärungen sind möglich, und die API kann sie nicht unterscheiden:
+
+1. Die Gruppe greift erst beim Einsetzen in einen Vorgang — dann rechnet PDS den
+   Positions-VK aus EK und Gruppe, während der Katalog-VK unberührt bleibt.
+2. In der Gruppe ist kein Aufschlagssatz hinterlegt, nur die Bezeichnung.
+
+Zu klären im PDS-Client: den Testartikel `ZZ-TEST Kabelkanal` in ein
+Testangebot einsetzen. Erscheint dort 9,72 € als VK, gilt Erklärung 1 und alles
+ist richtig. Erscheint 4,86 €, fehlt der Satz in der Gruppe.
+
 Der eigentliche Gewinn liegt nicht im gefüllten Verkaufspreis: Die Aufschläge
 stehen damit im Artikelstamm, an der Stelle, wo auch das Angebot sie hernimmt.
 Heute existiert die Logik zweimal — im Rechner und im Kopf dessen, der das
