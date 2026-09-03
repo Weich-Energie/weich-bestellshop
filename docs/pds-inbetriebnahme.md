@@ -1,5 +1,22 @@
 # PDS-Anbindung in Betrieb nehmen
 
+> **Stand 02.09.2026 — der Kreislauf ist einmal vollständig durchlaufen.**
+> Der Shop-Artikel „Aspen Big Foot Dämpfungssockel" (Artikelnr. 2102327) steht
+> als Katalogartikel `92794ce5-3829-4dfe-b22f-380d81b6b317` in PDS: Kategorie
+> Klima > 3-Installationsmaterial, Warengruppe (KLIMA)Installationsmaterial,
+> Einheit Stck, Lieferant Frigotechnik mit Bestellnummer, Herstellernummer B6974,
+> Gewicht 10,2 kg, Kalkulationsgruppe (KLIMA)Fest, EK 10,00 € — letzterer ein
+> **angenommener Wert nach Vorgabe**, kein Lieferantenpreis. Die UUID ist im Shop
+> zurückgeschrieben, `pds_sync_status = gesynct`. Migrationen 008–011 sind
+> eingespielt, beide Functions deployt, alle Commits auf `master`.
+>
+> Die Nachkalkulation für Auftrag 2025-10313 (Abgerechnet) steht in der
+> Datenbank: 3.740 € Erlös, 2.203,66 € kalkulierte Deckung, 1.385,73 €
+> tatsächlich — 817,93 € Abweichung, das Ist über die Kopplungs-ID exakt der
+> Bestellposition zugeordnet.
+>
+> Die folgende Anleitung bleibt als Weg für jeden weiteren Artikel stehen.
+
 > **ACHTUNG, Reihenfolge:** Vier Commits liegen unveröffentlicht auf `master`
 > (`46c1da0`, `bde56ee`, `60c8caf`, `8d04ed5`). Sie dürfen **erst nach**
 > Migration 011 gepusht werden.
