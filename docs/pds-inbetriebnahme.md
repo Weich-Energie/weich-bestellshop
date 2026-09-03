@@ -121,9 +121,18 @@ Beide brauchen den PDS-Zugang in `integration_secrets` unter dem Schlüssel `pds
 
 ## 4. Erster Schreibversuch
 
-**Vorher klären: gibt es einen Testmandanten?** Wenn nicht, läuft der erste
-Versuch gegen die Produktion. Dann einen Artikel wählen, dessen Dublette
-verkraftbar wäre — kein Artikel, der schon in Aufträgen steckt.
+**Es gibt keinen Testmandanten** — am 02.09.2026 geklärt. Die API kennt kein
+Mandanten-Konzept: Es existiert keine Operation für Mandant, Firma oder
+Niederlassung, und welche Instanz der Zugang anspricht, entscheidet allein der
+API-Key. Dass es die Produktion ist, belegen die Daten selbst — 1.465 Artikel,
+51 Klima-Aufträge mit echten Kundendaten, ein Auftrag im Status „Abgerechnet".
+
+Der `webLink` in jeder Antwort zeigt auf `127.0.0.1:8090` und sieht deshalb wie
+eine lokale Testinstanz aus. Das ist er nicht: Es ist der Deeplink in den
+PDS-Windows-Client auf dem Rechner des jeweiligen Anwenders.
+
+Jeder Schreibversuch geht also gegen den Echtbetrieb. Deshalb einen Artikel
+wählen, dessen Dublette verkraftbar wäre — keinen, der schon in Aufträgen steckt.
 
 Ablauf auf der Seite „Nach PDS übertragen":
 
