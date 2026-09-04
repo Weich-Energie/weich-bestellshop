@@ -32,12 +32,30 @@ const CORS = {
 }
 
 // Mehr darf diese Funktion nicht. Ergänzungen gehören begründet, nicht nebenbei.
+//
+// /vorgang/create ist seit 04.09.2026 dabei — ADR 0005, Nachtrag. Grund: Die
+// Katalog-API hat kein Feld für den Verkaufspreis, und die Kalkulationsgruppe
+// rechnet im Mandanten nicht (zweifach geprüft). Der einzige Schreibweg für
+// einen VK ist eine Angebotsposition mit vkFix. Der PDS-Client kann diese
+// Position per "in Katalog übernehmen" in den Artikel zurückschreiben. Diese
+// Funktion legt dafür ein Musterangebot bei der Weich GmbH selbst an, damit
+// kein echter Kunde ein Angebot bekommt; gelöscht wird es im Client.
 const ERLAUBTE_PFADE = new Set([
   "/katalog/create",
   "/katalog/addlieferanteneintrag",
   "/katalog/updateAbbildung",
   "/katalog/update",
+  "/vorgang/create",
 ])
+
+// Die Weich GmbH ist in PDS auch als Kunde angelegt (Kundennummer 10039). Das
+// Musterangebot hängt an ihr, nicht an einem echten Kunden.
+const EIGENE_FIRMA_ALS_KUNDE = "6139e897-1a04-48fa-bdd5-b9ac2e47ebd2"
+
+// VK = EK × (1 + Aufschlag) — Markup, nicht Handelsspanne, wie im Klimarechner.
+function berechneVk(ek: number, aufschlagProzent: number): number {
+  return Math.round(ek * (1 + aufschlagProzent / 100) * 100) / 100
+}
 
 // PDS erwartet in massEinheit eine Zeichenkette, die exakt einer vorhandenen
 // Maßeinheit entspricht. Die Zuordnung steht in shop_pds_einheiten; dieser
@@ -307,6 +325,20 @@ Deno.serve(async (req: Request) => {
         kalkulation: kalk?.pds_uuid
           ? `Kalkulationsgruppe "${kalk.bezeichnung}" (${kalk.aufschlag_prozent} Prozent Aufschlag) wird mitgegeben.`
           : undefined,
+        musterangebot:
+          kalk && artikel.preis_netto != null && artikel.preis_netto > 0
+            ? {
+                vk: berechneVk(artikel.preis_netto, Number(kalk.aufschlag_prozent)),
+                hinweis:
+                  `Nach dem Anlegen entsteht ein Musterangebot bei der Weich GmbH mit VK ` +
+                  `${berechneVk(artikel.preis_netto, Number(kalk.aufschlag_prozent))} Euro ` +
+                  `(${kalk.aufschlag_prozent} Prozent auf ${artikel.preis_netto} Euro EK). ` +
+                  `Im Client: Position "in Katalog uebernehmen", dann Angebot loeschen.`,
+              }
+            : {
+                hinweis:
+                  "Kein Musterangebot: dafuer braucht der Artikel einen Einkaufspreis und eine Aufschlagsklasse.",
+              },
         zur_kalkulation: hinweiseZurKalkulation.length ? hinweiseZurKalkulation : undefined,
         wuerde_senden: {
           "/katalog/create": createRumpf,
@@ -388,9 +420,57 @@ Deno.serve(async (req: Request) => {
         .eq("id", artikel.id)
     }
 
+    // ─── Musterangebot fuer den Verkaufspreis ───────────────────────────────
+    // Nur wenn ein VK berechenbar ist. Ohne Einkaufspreis oder Aufschlagsklasse
+    // gibt es nichts zu uebernehmen; dann bleibt es bei VK = EK wie bisher.
+    let angebot: { uuid: string; vorgangs_nummer: string; vk: number; anleitung: string } | null = null
+    if (kalk && artikel.preis_netto != null && artikel.preis_netto > 0) {
+      const vk = berechneVk(artikel.preis_netto, Number(kalk.aufschlag_prozent))
+      try {
+        const v = await pds("/vorgang/create", {
+          context: { vorgangstyp: "ANGEBOT" },
+          vorgangsdaten: {
+            personUUID: EIGENE_FIRMA_ALS_KUNDE,
+            bezeichnung: `ZZ-MUSTER VK-Uebernahme: ${artikel.name} — nach Kataloguebernahme loeschen`,
+            selektionskriterien: [{ bezeichnung: "Gewerk", wert: "SHK" }],
+            rootEbene: {
+              bezeichnung: "Leistungsverzeichnis",
+              positionen: [
+                {
+                  positionsTyp: "ARTIKEL",
+                  positionsArt: "NORMAL",
+                  katalogUUID,
+                  menge: 1,
+                  ekPreis: { einzelPreis: artikel.preis_netto },
+                  vkPreis: { einzelPreis: vk },
+                  // Sonst zieht PDS den VK aus dem Katalog — und dort steht er
+                  // ja gerade noch nicht.
+                  vkFix: true,
+                },
+              ],
+            },
+          },
+        })
+        const nummer = String(v?.vorgangsNummer ?? "")
+        angebot = {
+          uuid: String(v?.uuid ?? ""),
+          vorgangs_nummer: nummer,
+          vk,
+          anleitung:
+            `Angebot ${nummer} im PDS-Client oeffnen, Position 001 "in Katalog uebernehmen", ` +
+            `danach das Angebot loeschen. Erst dann steht der VK ${vk} Euro am Artikel.`,
+        }
+      } catch (e) {
+        // Der Artikel steht in PDS und ist nachbestellbar — nur der VK fehlt.
+        // Kein Fehlerstatus, das Angebot laesst sich von Hand nachholen.
+        warnungen.push(`Musterangebot fehlgeschlagen: ${e instanceof Error ? e.message : e}`)
+      }
+    }
+
     return json({
       status: "uebertragen",
       pds_katalog_uuid: katalogUUID,
+      angebot: angebot ?? undefined,
       warnungen: [...warnungen, ...hinweiseZurKalkulation],
       hinweis: artikel.bild_url
         ? "Bild wurde nicht uebertragen: /katalog/updateAbbildung erwartet multipart/form-data, " +

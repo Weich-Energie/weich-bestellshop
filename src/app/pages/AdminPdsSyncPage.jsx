@@ -279,6 +279,20 @@ function Ergebnis({ artikel, echt, antwort, fehler, onClose }) {
               </Text>
             </HStack>
           ))}
+          {antwort.angebot && (
+            <Box borderWidth="1px" borderColor="blue.200" bg="blue.50" borderRadius="md" p={3}>
+              <Text fontSize="sm" fontWeight="medium" color="blue.800">
+                Musterangebot {antwort.angebot.vorgangs_nummer} angelegt — VK {antwort.angebot.vk} €
+              </Text>
+              <Text fontSize="sm" color="blue.900" mt={1}>
+                Noch zwei Handgriffe im PDS-Client, dann steht der Verkaufspreis am Artikel:
+              </Text>
+              <Box as="ol" pl={5} mt={1} fontSize="sm" color="blue.900">
+                <li>Angebot {antwort.angebot.vorgangs_nummer} öffnen, Position 001 → „in Katalog übernehmen"</li>
+                <li>Angebot löschen — es hängt an der Weich GmbH als Kunde, kein echter Kunde sieht es</li>
+              </Box>
+            </Box>
+          )}
           {antwort.hinweis && <Text fontSize="xs" color="fg.muted">{antwort.hinweis}</Text>}
         </VStack>
       )}

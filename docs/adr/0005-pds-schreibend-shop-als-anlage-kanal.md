@@ -85,3 +85,36 @@ Produktionsweg untauglich.
 
 **Globales `ALLOW_WRITES`.** Öffnet auch `/katalog/delete`, Personen, Vorgänge
 und Lager. Für das Anlegen von C-Teilen ist das eine unnötig grosse Fläche.
+
+
+## Nachtrag 04.09.2026 — fünfter Pfad: `/vorgang/create`
+
+Die Whitelist wächst um `/vorgang/create`. Der Grund liegt in einer Grenze der
+Katalog-API, die erst im Betrieb sichtbar wurde:
+
+Kein Katalog-Endpunkt schreibt einen Verkaufspreis. `create` und `update` kennen
+nur `preisEinheit`, der Lieferanteneintrag nur `einkaufspreis`, die
+Preisstrategie ist ausschliesslich lesbar. Die Kalkulationsgruppe — der von der
+API vorgesehene indirekte Weg — rechnet im Mandanten nicht, in beiden
+Reihenfolgen geprüft (Gruppe vor EK, EK vor Gruppe), im Katalog wie im Angebot.
+Ein per Sync angelegter Artikel stand damit mit VK = EK im Stamm.
+
+Der einzige API-Schreibweg für einen VK ist die Angebotsposition
+(`vkPreis.einzelPreis` mit `vkFix`). Der PDS-Client kann eine solche Position
+per „in Katalog übernehmen" in den Artikel zurückschreiben — am Dämpfungssockel
+belegt: 10,00 → 13,50 €.
+
+Der Sync legt deshalb nach erfolgreichem Anlegen ein **Musterangebot** an, wenn
+Einkaufspreis und Aufschlagsklasse vorhanden sind. Kunde ist die Weich GmbH
+selbst (Kundennummer 10039), damit kein echter Kunde ein Angebot erhält. Die
+Bezeichnung beginnt mit `ZZ-MUSTER`. Übernahme und Löschen bleiben Handarbeit
+im Client — für beides gibt es keinen API-Weg; `updatePosition` hat kein
+Preisfeld, Vorgänge lassen sich nicht per API löschen.
+
+Was sich damit **nicht** ändert: Kundenaufträge bleiben unberührt,
+`/katalog/delete` bleibt gesperrt, und ohne Einkaufspreis oder Aufschlagsklasse
+entsteht kein Angebot — der Artikel steht dann wie bisher mit VK = EK.
+
+Der Bestand brauchte diesen Weg nicht: 59 von 62 Klima-Artikeln tragen
+bereits gepflegte Verkaufspreise mit rund 33 % Aufschlag, die drei mit VK = EK
+sind bewusst so.
