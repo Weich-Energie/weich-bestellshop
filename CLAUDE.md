@@ -77,10 +77,14 @@ Neue Edge Function `shop-ai` mit taskbasiertem Routing:
   Bestand und Verwendung, eine Dublette bleibt fuer immer stehen.
 - `pds-auftrag-soll` liest Soll-Werte und Einzelpositionen fuer die
   Nachkalkulation. Rein lesend.
-- `pds-auftrag-nachtrag` schreibt das verbaute Material als **Nachtragsauftrag**
-  (`/vorgang/createnachtragsauftrag`, Nummer `2026-298-N1`). Der Hauptauftrag
-  wird nie veraendert; ein Nachtrag je Nachkalkulation; nur Artikel mit
-  `pds_katalog_uuid`. Nachtraege sind per API nicht loeschbar. Siehe ADR 0006
+- `pds-auftrag-transport` schreibt das verbaute Material als **Transportangebot**
+  bei der Weich GmbH (`/vorgang/create`, Typ ANGEBOT, Praefix `ZZ-TRANSPORT`).
+  Im PDS-Client wird die Ebene in den Kundenauftrag kopiert, danach das Angebot
+  geloescht. Grund: Die API kann in einen bestehenden Auftrag nichts einfuegen
+  (updateposition braucht vorhandene Positions-UUIDs, updatevorgang aendert nur
+  den Kopf). Der Nachtragsauftrag war der erste Versuch und ist verworfen —
+  er ist ein Vorgang neben dem Auftrag, nicht darin. Positionen tragen
+  `pds_transport_at`; ein zweiter Transport nimmt nur Neues mit. Siehe ADR 0006
   und docs/pds-nachtragsauftrag.md.
 - Kategorien, Warengruppen und Kalkulationsgruppen sind per API nur lesbar;
   die Klima-Struktur steht seit 01.09.2026 (docs/pds-klima-warengruppen.md).
@@ -93,7 +97,7 @@ Neue Edge Function `shop-ai` mit taskbasiertem Routing:
 - [docs/pds-katalog-mapping.md](docs/pds-katalog-mapping.md) — Feld- und ID-Mapping Shop → PDS
 - [docs/pds-klima-warengruppen.md](docs/pds-klima-warengruppen.md) — Klima-Warengruppen und Umzugsliste
 - [docs/nachkalkulation-datenmodell.md](docs/nachkalkulation-datenmodell.md) — Soll/Ist-Modell
-- [docs/pds-nachtragsauftrag.md](docs/pds-nachtragsauftrag.md) — verbautes Material als Nachtrag, Testprotokoll
+- [docs/pds-nachtragsauftrag.md](docs/pds-nachtragsauftrag.md) — Transportangebot statt Nachtrag: Befund, Test, Weg
 
 ## Doku-Regel
 Wenn sich eine Kern-Entscheidung aendert: ADR schreiben, CLAUDE.md updaten, CONTEXT.md pflegen.

@@ -8,7 +8,7 @@ import {
   Search, Download, Trash2, Plus, ArrowLeft, TrendingDown, TrendingUp, Eye, Send, RotateCcw,
 } from 'lucide-react'
 import {
-  sucheAuftraege, importiereSoll, nachtragVorschau, nachtragUebertragen, nachtragZuruecksetzen,
+  sucheAuftraege, importiereSoll, transportVorschau, transportUebertragen, transportZuruecksetzen,
 } from '../../data/api/pdsSync.js'
 import {
   listNachkalkulationen, addPosition, deletePosition, setStatus,
@@ -354,12 +354,23 @@ function Detail({ id, onZurueck }) {
                   </Table.Cell>
                   <Table.Cell textAlign="right"><Text fontSize="sm">{euro(p.ek_einzel)}</Text></Table.Cell>
                   <Table.Cell textAlign="right"><Text fontSize="sm">{euro(p.ek_gesamt)}</Text></Table.Cell>
-                  <Table.Cell><Badge size="sm" variant="subtle">{p.quelle}</Badge></Table.Cell>
                   <Table.Cell>
-                    <IconButton size="2xs" variant="ghost" colorPalette="red" aria-label="Löschen"
-                      onClick={() => handleDelete(p.id)}>
-                      <Trash2 size={12} />
-                    </IconButton>
+                    <HStack gap={1}>
+                      <Badge size="sm" variant="subtle">{p.quelle}</Badge>
+                      {p.pds_transport_at && (
+                        <Badge size="sm" colorPalette="green" variant="subtle">
+                          → PDS {new Date(p.pds_transport_at).toLocaleDateString('de-DE')}
+                        </Badge>
+                      )}
+                    </HStack>
+                  </Table.Cell>
+                  <Table.Cell>
+                    {!p.pds_transport_at && (
+                      <IconButton size="2xs" variant="ghost" colorPalette="red" aria-label="Löschen"
+                        onClick={() => handleDelete(p.id)}>
+                        <Trash2 size={12} />
+                      </IconButton>
+                    )}
                   </Table.Cell>
                 </Table.Row>
               ))}
@@ -378,7 +389,7 @@ function Detail({ id, onZurueck }) {
         </Box>
       </Box>
 
-      <NachtragBlock nk={nk} onGeaendert={neu} />
+      <TransportBlock nk={nk} onGeaendert={neu} />
     </Box>
   )
 }
@@ -419,8 +430,8 @@ function KalkuliertePositionen({ soll }) {
     <Box borderWidth="1px" borderRadius="lg" p={4} mb={4} bg="white">
       <Text fontWeight="bold" fontSize="sm" mb={1}>Kalkulierte Positionen aus dem Auftrag</Text>
       <Text fontSize="xs" color="fg.muted" mb={2}>
-        Stand des Auftrags in PDS. Diese Positionen bleiben unverändert — das verbaute Material
-        kommt als eigener Nachtrag dazu.
+        Stand des Auftrags in PDS, nur zur Orientierung. Das verbaute Material kommt über ein
+        Transportangebot dazu, das du im Client in diesen Auftrag kopierst.
       </Text>
       <Box overflowX="auto">
         <Table.Root variant="line" size="sm" minW="680px">
@@ -464,21 +475,26 @@ function KalkuliertePositionen({ soll }) {
   )
 }
 
-// ─── Nach PDS: verbautes Material als Nachtragsauftrag ─────────────────────
-// Die Vorschau zeigt exakt die Ebene, die in PDS entstehen wird. Ein Nachtrag
-// laesst sich per API nicht loeschen — deshalb Vorschau zuerst und Anlegen nur
-// nach Rueckfrage. Danach zeigt der Block den angelegten Nachtrag.
-function NachtragBlock({ nk, onGeaendert }) {
+// ─── Nach PDS: verbautes Material als Transportangebot ─────────────────────
+// Die API kann in den bestehenden Auftrag nichts einfuegen. Das Werkzeug legt
+// deshalb ein Angebot bei der Weich GmbH an, aus dem im PDS-Client in den
+// Kundenauftrag kopiert wird — so wie der Betrieb es mit dem Musterangebot
+// schon von Hand macht. Uebertragene Positionen sind markiert; ein zweiter
+// Transport nimmt nur Neues mit.
+function TransportBlock({ nk, onGeaendert }) {
   const [vorschau, setVorschau] = useState(null)
   const [laedt, setLaedt] = useState(false)
   const [sendet, setSendet] = useState(false)
   const [antwort, setAntwort] = useState(null)
   const [fehler, setFehler] = useState(null)
 
+  const offen = nk.positionen.filter((p) => !p.pds_transport_at).length
+  const uebertragen = nk.positionen.length - offen
+
   async function handleVorschau() {
     setLaedt(true); setFehler(null); setAntwort(null)
     try {
-      setVorschau(await nachtragVorschau(nk.id))
+      setVorschau(await transportVorschau(nk.id))
     } catch (e) {
       setFehler(e.message)
     } finally {
@@ -489,13 +505,13 @@ function NachtragBlock({ nk, onGeaendert }) {
   async function handleUebertragen() {
     if (!vorschau) return
     const ok = window.confirm(
-      `Nachtrag zu ${nk.pds_vorgangs_nummer} mit ${vorschau.ebene.positionen.length} Position(en) in PDS anlegen?\n\n` +
-      'Der Nachtrag lässt sich danach nur im PDS-Client wieder löschen.',
+      `Transportangebot mit ${vorschau.ebene.positionen.length} Position(en) für ${nk.pds_vorgangs_nummer} anlegen?\n\n` +
+      'Es hängt an der Weich GmbH als Kunde und wird nach dem Kopieren im PDS-Client gelöscht.',
     )
     if (!ok) return
     setSendet(true); setFehler(null)
     try {
-      const a = await nachtragUebertragen(nk.id)
+      const a = await transportUebertragen(nk.id)
       setAntwort(a)
       setVorschau(null)
       onGeaendert()
@@ -508,39 +524,18 @@ function NachtragBlock({ nk, onGeaendert }) {
 
   async function handleReset() {
     const ok = window.confirm(
-      `Nur zurücksetzen, wenn Nachtrag ${nk.pds_nachtrag_nummer} in PDS gelöscht wurde. ` +
-      'Sonst entsteht beim nächsten Übertragen ein zweiter Nachtrag.\n\nFortfahren?',
+      'Alle Positionen wieder als „nicht übertragen“ markieren?\n\n' +
+      'Nur sinnvoll, wenn das Transportangebot gelöscht wurde, ohne die Positionen zu kopieren.',
     )
     if (!ok) return
     setFehler(null)
     try {
-      await nachtragZuruecksetzen(nk.id)
+      await transportZuruecksetzen(nk.id)
       setAntwort(null)
       onGeaendert()
     } catch (e) {
       setFehler(e.message)
     }
-  }
-
-  if (nk.pds_nachtrag_nummer) {
-    const datum = nk.pds_nachtrag_at ? new Date(nk.pds_nachtrag_at).toLocaleDateString('de-DE') : '—'
-    return (
-      <Box borderWidth="1px" borderRadius="lg" p={4} mt={4} bg="green.50" borderColor="green.200">
-        <Text fontWeight="bold" fontSize="sm" color="green.800">
-          Nachtrag {nk.pds_nachtrag_nummer} in PDS angelegt
-        </Text>
-        <Text fontSize="sm" color="green.900" mt={1}>
-          {nk.pds_nachtrag_positionen ?? '—'} Position(en) am {datum}. Preise für den Kunden, Zusammenfassen
-          und das Streichen der von PDS eingefügten Nullmengen erfolgen im PDS-Client.
-        </Text>
-        {antwort?.anleitung && <Text fontSize="xs" color="fg.muted" mt={1}>{antwort.anleitung}</Text>}
-        {antwort?.warnung && <Text fontSize="xs" color="red.600" mt={1}>{antwort.warnung}</Text>}
-        <Button size="xs" variant="ghost" mt={2} onClick={handleReset}>
-          <RotateCcw size={12} /> Zurücksetzen — nur wenn der Nachtrag in PDS gelöscht wurde
-        </Button>
-        {fehler && <Text fontSize="sm" color="red.600" mt={2}>{fehler}</Text>}
-      </Box>
-    )
   }
 
   return (
@@ -549,20 +544,37 @@ function NachtragBlock({ nk, onGeaendert }) {
         <Box>
           <Text fontWeight="bold" fontSize="sm">Nach PDS übertragen</Text>
           <Text fontSize="xs" color="fg.muted">
-            Legt zu {nk.pds_vorgangs_nummer} einen Nachtrag mit einer eigenen Ebene für das verbaute
-            Material an. Der Auftrag selbst bleibt unverändert.
+            Legt ein Transportangebot bei der Weich GmbH an, mit einer Ebene für {nk.pds_vorgangs_nummer}.
+            Im PDS-Client kopierst du die Ebene in den Auftrag und löschst das Angebot.
           </Text>
         </Box>
         <Spacer />
-        <Button size="sm" variant="outline" onClick={handleVorschau} loading={laedt}
-          disabled={nk.positionen.length === 0}>
-          <Eye size={14} /> Vorschau
+        <Button size="sm" variant="outline" onClick={handleVorschau} loading={laedt} disabled={offen === 0}>
+          <Eye size={14} /> Vorschau {offen > 0 ? `(${offen} neu)` : ''}
         </Button>
       </Flex>
 
+      {nk.pds_transport_nummer && (
+        <Box mt={3} borderWidth="1px" borderRadius="md" p={3} bg="green.50" borderColor="green.200">
+          <Text fontSize="sm" fontWeight="medium" color="green.800">
+            Zuletzt: Transportangebot {nk.pds_transport_nummer} mit {nk.pds_transport_positionen ?? '—'} Position(en)
+            am {nk.pds_transport_at ? new Date(nk.pds_transport_at).toLocaleDateString('de-DE') : '—'}
+          </Text>
+          <Text fontSize="sm" color="green.900" mt={1}>
+            Im PDS-Client öffnen (Kunde Weich GmbH), Ebene in Auftrag {nk.pds_vorgangs_nummer} kopieren,
+            Kundenpreise dort anpassen, Angebot löschen. {uebertragen} Position(en) sind als übertragen markiert.
+          </Text>
+          {antwort?.anleitung && <Text fontSize="xs" color="fg.muted" mt={1}>{antwort.anleitung}</Text>}
+          {antwort?.warnung && <Text fontSize="xs" color="red.600" mt={1}>{antwort.warnung}</Text>}
+          <Button size="xs" variant="ghost" mt={2} onClick={handleReset}>
+            <RotateCcw size={12} /> Markierung aufheben — nur wenn ohne Kopieren gelöscht
+          </Button>
+        </Box>
+      )}
+
       {vorschau && (
         <Box mt={3}>
-          <Text fontSize="sm" fontWeight="medium" mb={1}>Ebene „{vorschau.ebene.bezeichnung}"</Text>
+          <Text fontSize="sm" fontWeight="medium" mb={1}>Ebene „{vorschau.ebene.bezeichnung}“</Text>
           <Box overflowX="auto">
             <Table.Root variant="line" size="sm" minW="680px">
               <Table.Header>
@@ -610,7 +622,7 @@ function NachtragBlock({ nk, onGeaendert }) {
           <HStack mt={3}>
             <Button size="sm" colorPalette="blue" onClick={handleUebertragen} loading={sendet}
               disabled={vorschau.ebene.positionen.length === 0}>
-              <Send size={14} /> Als Nachtrag in PDS anlegen
+              <Send size={14} /> Transportangebot in PDS anlegen
             </Button>
           </HStack>
         </Box>

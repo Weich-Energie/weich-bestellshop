@@ -241,3 +241,16 @@ Reihenfolge, damit nichts ins Leere läuft:
    im Client löschen.
 
 Aufzuräumen aus dem API-Test: Auftrag 2026-314 und Nachtrag 2026-314-N1.
+
+
+## Transportangebot statt Nachtrag (04.09.2026, nachmittags)
+
+1. Migration `013_pds_transportangebot.sql` ausführen (benennt die
+   Nachtrag-Spalten um, ergänzt `pds_transport_at` an der Position).
+2. `pds-auftrag-transport` deployen, `pds-auftrag-nachtrag` löschen
+   (`supabase functions delete pds-auftrag-nachtrag`).
+3. Frontend nach `master`.
+4. Probe am Testauftrag 2026-314: Position erfassen, Vorschau, übertragen.
+   Erwartet: neues Angebot `ZZ-TRANSPORT … fuer Auftrag 2026-314` bei der
+   Weich GmbH, Positionen im Shop mit grünem Kennzeichen. Danach im Client
+   kopieren oder direkt löschen; 2026-314 und 2026-314-N1 ebenfalls löschen.

@@ -1,24 +1,25 @@
-// pds-auftrag-nachtrag — Schreibt das verbaute Material einer Nachkalkulation
-// als Nachtragsauftrag nach PDS.
+// pds-auftrag-transport — Schreibt das verbaute Material einer Nachkalkulation
+// als Transportangebot nach PDS, aus dem der Client in den Kundenauftrag kopiert.
 //
-// ADR 0006 und docs/pds-nachtragsauftrag.md. Kurzfassung: Die Vorgangs-API
-// kann einen bestehenden Auftrag nicht um Positionen ergänzen, wohl aber einen
-// Nachtrag anlegen (/vorgang/createnachtragsauftrag). Der ist in PDS ein
-// eigener Vorgang mit der Nummer des Hauptauftrags plus "-N1"; der Hauptauftrag
-// bleibt unverändert — am 04.09.2026 an Testauftrag 2026-314 nachgewiesen.
+// ADR 0006 (Fassung 2) und docs/pds-nachtragsauftrag.md. Kurzfassung: Die
+// Vorgangs-API kann in einen bestehenden Auftrag keine Positionen einfügen —
+// updateposition braucht vorhandene Positions-UUIDs, updatevorgang ändert nur
+// den Kopf. Der Betrieb kopiert deshalb im PDS-Client aus einem Musterangebot
+// in den Auftrag. Diese Function liefert dieses Musterangebot je Auftrag: ein
+// Angebot bei der Weich GmbH (nie beim Kunden), eine Ebene, genau die
+// verbauten Positionen mit Menge, EK und VK. Nach dem Kopieren wird das Angebot
+// im Client gelöscht.
 //
 // Drei Aktionen, alle mit nachkalkulation_id:
-//   vorschau       — baut die Ebene, sendet nichts. Standard.
-//   uebertragen    — legt den Nachtrag an, genau einmal je Nachkalkulation.
-//   zuruecksetzen  — vergisst den Nachtrag im Shop. Nur wenn er in PDS von Hand
-//                    gelöscht wurde; sonst entsteht beim nächsten Mal -N2.
+//   vorschau       — baut die Ebene aus den noch nicht übertragenen Positionen,
+//                    sendet nichts. Standard.
+//   uebertragen    — legt das Transportangebot an und markiert die Positionen
+//                    als übertragen. Ein zweiter Aufruf nimmt nur Neues mit.
+//   zuruecksetzen  — hebt die Markierung aller Positionen auf. Für den Fall,
+//                    dass das Angebot gelöscht wurde, ohne zu kopieren.
 //
 // Übertragen werden nur Positionen mit Shop-Artikel UND PDS-Katalog-UUID.
-// Freitext und Artikel ohne Katalog-Sync bleiben im Shop; was in PDS steht,
-// muss dort auch im Katalog existieren.
-//
-// Ein Nachtrag lässt sich per API nicht löschen. Deshalb: Vorschau zeigt exakt
-// die Ebene, die entstehen wird, und das Frontend fragt vor dem Anlegen nach.
+// Was in PDS steht, muss dort auch im Katalog existieren.
 
 import { createClient } from "jsr:@supabase/supabase-js@2"
 
@@ -28,16 +29,18 @@ const CORS = {
 }
 
 // Positivliste. /vorgang/details nur, um vor dem Schreiben zu prüfen, dass der
-// Auftrag existiert und selbst kein Nachtrag ist.
+// Zielauftrag noch existiert — die Bezeichnung des Transports nennt ihn.
 const ERLAUBTE_PFADE = new Set([
   "/vorgang/details",
-  "/vorgang/createnachtragsauftrag",
+  "/vorgang/create",
 ])
 
-const PFAD_NACHTRAG = "/vorgang/createnachtragsauftrag"
+const PFAD_CREATE = "/vorgang/create"
 
-// Nachträge heißen "2026-298-N1". Auf einen Nachtrag darf kein weiterer.
-const IST_NACHTRAG = /-N\d+$/
+// Die Weich GmbH ist in PDS auch als Kunde angelegt (Kundennummer 10039). Das
+// Transportangebot hängt an ihr, nicht am Kunden — wie das Musterangebot für
+// den Katalog-VK in pds-katalog-sync.
+const EIGENE_FIRMA_ALS_KUNDE = "6139e897-1a04-48fa-bdd5-b9ac2e47ebd2"
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: CORS })
@@ -76,6 +79,7 @@ type NkPosition = {
   einheit: string | null
   ek_einzel: number | string | null
   quelle: string
+  pds_transport_at: string | null
   shop_artikel: Artikel | null
 }
 
@@ -104,7 +108,7 @@ Deno.serve(async (req: Request) => {
     if (authErr || !userData?.user?.email) return json({ error: "Ungueltige Session" }, 401)
 
     // service_role umgeht RLS — die Berechtigung wird hier selbst geprüft,
-    // fail-closed. Diese Function schreibt in ein Kundenprojekt in PDS.
+    // fail-closed. Diese Function legt Vorgänge in PDS an.
     const { data: profil } = await sb
       .from("employees")
       .select("berechtigungen")
@@ -125,9 +129,9 @@ Deno.serve(async (req: Request) => {
       .from("shop_nachkalkulation")
       .select(`
         id, pds_vorgang_uuid, pds_vorgangs_nummer, bezeichnung, status,
-        pds_nachtrag_uuid, pds_nachtrag_nummer,
+        pds_transport_uuid, pds_transport_nummer,
         shop_nachkalkulation_positionen (
-          id, artikel_id, freitext, menge, einheit, ek_einzel, quelle,
+          id, artikel_id, freitext, menge, einheit, ek_einzel, quelle, pds_transport_at,
           shop_artikel ( id, name, einheit, pds_katalog_uuid, preis_netto, aufschlagsklasse )
         )
       `)
@@ -138,43 +142,31 @@ Deno.serve(async (req: Request) => {
 
     // ─── Zurücksetzen ──────────────────────────────────────────────────────
     if (aktion === "zuruecksetzen") {
-      const { error } = await sb
+      const { error: e1 } = await sb
+        .from("shop_nachkalkulation_positionen")
+        .update({ pds_transport_at: null })
+        .eq("nachkalkulation_id", nkId)
+      if (e1) return json({ error: e1.message }, 500)
+      const { error: e2 } = await sb
         .from("shop_nachkalkulation")
         .update({
-          pds_nachtrag_uuid: null,
-          pds_nachtrag_nummer: null,
-          pds_nachtrag_at: null,
-          pds_nachtrag_positionen: null,
+          pds_transport_uuid: null,
+          pds_transport_nummer: null,
+          pds_transport_at: null,
+          pds_transport_positionen: null,
         })
         .eq("id", nkId)
-      if (error) return json({ error: error.message }, 500)
+      if (e2) return json({ error: e2.message }, 500)
       return json({
         status: "zurueckgesetzt",
         hinweis:
-          `Der Shop kennt zu ${nk.pds_vorgangs_nummer} keinen Nachtrag mehr. Existiert ` +
-          `${nk.pds_nachtrag_nummer ?? "der Nachtrag"} in PDS noch, entsteht beim nächsten ` +
-          "Übertragen ein zweiter.",
+          `Alle Positionen zu ${nk.pds_vorgangs_nummer} gelten wieder als nicht übertragen. ` +
+          "Der nächste Transport nimmt sie alle mit.",
       })
     }
 
     if (aktion !== "vorschau" && aktion !== "uebertragen") {
       return json({ error: 'aktion muss "vorschau", "uebertragen" oder "zuruecksetzen" sein' }, 400)
-    }
-
-    if (nk.pds_nachtrag_uuid) {
-      return json({
-        error:
-          `Zu ${nk.pds_vorgangs_nummer} wurde bereits Nachtrag ${nk.pds_nachtrag_nummer} angelegt. ` +
-          "Ein zweiter Aufruf würde -N2 erzeugen. Soll neu übertragen werden, den Nachtrag im " +
-          "PDS-Client löschen und hier zurücksetzen.",
-        nachtrag: { uuid: nk.pds_nachtrag_uuid, vorgangs_nummer: nk.pds_nachtrag_nummer },
-      }, 409)
-    }
-
-    if (IST_NACHTRAG.test(String(nk.pds_vorgangs_nummer))) {
-      return json({
-        error: `${nk.pds_vorgangs_nummer} ist selbst ein Nachtrag. Der Nachtrag gehört an den Hauptauftrag.`,
-      }, 400)
     }
 
     // ─── Aufschlagsklassen ─────────────────────────────────────────────────
@@ -188,7 +180,7 @@ Deno.serve(async (req: Request) => {
       ]),
     )
 
-    // ─── Positionen sortieren: übertragbar oder nicht ──────────────────────
+    // ─── Positionen sortieren: übertragbar, schon übertragen, nicht möglich ─
     // Gleiche Artikel werden zusammengezogen — zwei Monteurzettel mit je 10 m
     // Kabelkanal sind in PDS eine Position mit 20 m.
     type Uebertragbar = {
@@ -199,15 +191,21 @@ Deno.serve(async (req: Request) => {
       ek_einzel: number
       vk_einzel: number | null
       aufschlag_prozent: number | null
+      positions_ids: string[]
     }
     const jeKatalog = new Map<string, Uebertragbar>()
     const nichtUebertragbar: Array<{ name: string; menge: number; grund: string }> = []
+    let bereitsUebertragen = 0
 
     for (const p of (nk.shop_nachkalkulation_positionen ?? []) as NkPosition[]) {
       const menge = Number(p.menge)
       const a = p.shop_artikel
       const name = a?.name ?? p.freitext ?? "(ohne Bezeichnung)"
 
+      if (p.pds_transport_at) {
+        bereitsUebertragen++
+        continue
+      }
       if (!a) {
         nichtUebertragbar.push({ name, menge, grund: "Freitext ohne Shop-Artikel — zuerst als Artikel anlegen" })
         continue
@@ -234,6 +232,7 @@ Deno.serve(async (req: Request) => {
       const vorhanden = jeKatalog.get(a.pds_katalog_uuid)
       if (vorhanden) {
         vorhanden.menge = runde(vorhanden.menge + menge)
+        vorhanden.positions_ids.push(p.id)
       } else {
         jeKatalog.set(a.pds_katalog_uuid, {
           katalog_uuid: a.pds_katalog_uuid,
@@ -243,12 +242,15 @@ Deno.serve(async (req: Request) => {
           ek_einzel: runde(ek),
           vk_einzel: vk,
           aufschlag_prozent: aufschlag,
+          positions_ids: [p.id],
         })
       }
     }
 
     const uebertragbar = [...jeKatalog.values()]
-    const ebeneBezeichnung = `Verbautes Material — Bestellshop ${heuteDe()}`
+    const ebeneBezeichnung = `Verbautes Material fuer ${nk.pds_vorgangs_nummer} — Bestellshop ${heuteDe()}`
+    const angebotBezeichnung =
+      `ZZ-TRANSPORT verbautes Material fuer Auftrag ${nk.pds_vorgangs_nummer} — nach Kopieren loeschen`
 
     const summeEk = runde(uebertragbar.reduce((s, p) => s + p.ek_einzel * p.menge, 0))
     const alleMitVk = uebertragbar.every((p) => p.vk_einzel != null)
@@ -268,29 +270,36 @@ Deno.serve(async (req: Request) => {
     }))
 
     const anfrage = {
-      uuid: nk.pds_vorgang_uuid,
-      rootEbene: {
-        bezeichnung: "Leistungsverzeichnis",
-        ebenen: [
-          {
-            bezeichnung: ebeneBezeichnung,
-            ebeneArt: "NORMAL",
-            positionen: pdsPositionen,
-          },
-        ],
+      context: { vorgangstyp: "ANGEBOT" },
+      vorgangsdaten: {
+        personUUID: EIGENE_FIRMA_ALS_KUNDE,
+        bezeichnung: angebotBezeichnung,
+        selektionskriterien: [{ bezeichnung: "Gewerk", wert: "SHK" }],
+        rootEbene: {
+          bezeichnung: "Leistungsverzeichnis",
+          ebenen: [
+            {
+              bezeichnung: ebeneBezeichnung,
+              ebeneArt: "NORMAL",
+              positionen: pdsPositionen,
+            },
+          ],
+        },
       },
     }
 
     const vorschau = {
+      angebot_bezeichnung: angebotBezeichnung,
       ebene: {
         bezeichnung: ebeneBezeichnung,
-        positionen: uebertragbar.map((p) => ({
+        positionen: uebertragbar.map(({ positions_ids: _ids, ...p }) => ({
           ...p,
           ek_gesamt: runde(p.ek_einzel * p.menge),
           vk_gesamt: p.vk_einzel != null ? runde(p.vk_einzel * p.menge) : null,
         })),
       },
       nicht_uebertragbar: nichtUebertragbar,
+      bereits_uebertragen: bereitsUebertragen,
       summen: { ek: summeEk, vk: summeVk },
     }
 
@@ -299,13 +308,13 @@ Deno.serve(async (req: Request) => {
         status: "vorschau",
         ...vorschau,
         hinweis: uebertragbar.length === 0
-          ? "Keine übertragbare Position. Übertragen werden nur Shop-Artikel, die bereits in PDS angelegt sind."
-          : `${uebertragbar.length} Position(en) gehen als Nachtrag zu ${nk.pds_vorgangs_nummer}. ` +
-            "PDS kopiert zusätzlich alle Positionen des Hauptauftrags mit Menge 0 in den Nachtrag — " +
-            "das ist die Differenzdarstellung von PDS und im Client zu bereinigen." +
-            (nichtUebertragbar.length > 0
-              ? ` ${nichtUebertragbar.length} Position(en) bleiben im Shop.`
-              : ""),
+          ? (bereitsUebertragen > 0
+              ? `Alle ${bereitsUebertragen} Position(en) sind bereits übertragen. Neues Material zuerst erfassen.`
+              : "Keine übertragbare Position. Übertragen werden nur Shop-Artikel, die bereits in PDS angelegt sind.")
+          : `${uebertragbar.length} Position(en) gehen in ein Transportangebot bei der Weich GmbH. ` +
+            `Im PDS-Client die Ebene in Auftrag ${nk.pds_vorgangs_nummer} kopieren, dann das Angebot löschen.` +
+            (bereitsUebertragen > 0 ? ` ${bereitsUebertragen} Position(en) waren schon übertragen und bleiben aussen vor.` : "") +
+            (nichtUebertragbar.length > 0 ? ` ${nichtUebertragbar.length} Position(en) bleiben im Shop.` : ""),
       })
     }
 
@@ -341,25 +350,22 @@ Deno.serve(async (req: Request) => {
       return { ok: r.ok, status: r.status, daten, text }
     }
 
-    // Vor dem Schreiben: Existiert der Auftrag noch, und ist er wirklich der
-    // Hauptauftrag? Die Nummer im Shop kann veraltet sein.
+    // Vor dem Schreiben: Existiert der Zielauftrag noch? Das Angebot nennt ihn
+    // in der Bezeichnung, und ein Transport ins Leere hilft niemandem.
     const det = await pdsRoh("/vorgang/details", { uuid: nk.pds_vorgang_uuid, vorgangstyp: "AUFTRAG" })
     if (!det.ok || !det.daten?.uuid) {
       return json({ error: `Auftrag ${nk.pds_vorgangs_nummer} ist in PDS nicht mehr auffindbar (${det.status}).` }, 404)
     }
-    if (IST_NACHTRAG.test(String(det.daten.vorgangsNummer ?? ""))) {
-      return json({ error: `${det.daten.vorgangsNummer} ist in PDS ein Nachtrag — kein Nachtrag auf einen Nachtrag.` }, 400)
-    }
 
-    const antwort = await pdsRoh(PFAD_NACHTRAG, anfrage)
+    const antwort = await pdsRoh(PFAD_CREATE, anfrage)
 
-    // Protokoll wie beim Katalog-Sync, nur ohne Artikelbezug — der Nachtrag
-    // gehört zur Nachkalkulation, nicht zu einem Artikel.
+    // Protokoll wie beim Katalog-Sync, ohne Artikelbezug — der Transport gehört
+    // zur Nachkalkulation, nicht zu einem Artikel.
     await sb.from("shop_pds_sync_log").insert({
       artikel_id: null,
-      operation: PFAD_NACHTRAG,
+      operation: PFAD_CREATE,
       dry_run: false,
-      request: { nachkalkulation_id: nkId, ...anfrage },
+      request: { nachkalkulation_id: nkId, zweck: "transportangebot", ...anfrage },
       response: antwort.daten ?? { text: antwort.text.slice(0, 2000) },
       http_status: antwort.status,
       erfolg: antwort.ok,
@@ -368,43 +374,51 @@ Deno.serve(async (req: Request) => {
     })
 
     if (!antwort.ok) {
-      return json({ error: `PDS ${antwort.status} @ ${PFAD_NACHTRAG}: ${antwort.text.slice(0, 500)}` }, 502)
+      return json({ error: `PDS ${antwort.status} @ ${PFAD_CREATE}: ${antwort.text.slice(0, 500)}` }, 502)
     }
 
-    const nachtragUUID = String(antwort.daten?.uuid ?? "")
-    const nachtragNummer = String(antwort.daten?.vorgangsNummer ?? "")
+    const angebotUUID = String(antwort.daten?.uuid ?? "")
+    const angebotNummer = String(antwort.daten?.vorgangsNummer ?? "")
+    const jetzt = new Date().toISOString()
 
-    // Sofort festhalten — ab hier existiert der Nachtrag in PDS, und ein
-    // zweiter Klick darf keinen zweiten anlegen.
+    // Sofort festhalten — ab hier steht das Angebot in PDS, und die Positionen
+    // dürfen beim nächsten Transport nicht noch einmal mit.
+    const alleIds = uebertragbar.flatMap((p) => p.positions_ids)
+    const { error: posErr } = await sb
+      .from("shop_nachkalkulation_positionen")
+      .update({ pds_transport_at: jetzt })
+      .in("id", alleIds)
+
     const { error: updErr } = await sb
       .from("shop_nachkalkulation")
       .update({
-        pds_nachtrag_uuid: nachtragUUID || null,
-        pds_nachtrag_nummer: nachtragNummer || null,
-        pds_nachtrag_at: new Date().toISOString(),
-        pds_nachtrag_positionen: uebertragbar.length,
+        pds_transport_uuid: angebotUUID || null,
+        pds_transport_nummer: angebotNummer || null,
+        pds_transport_at: jetzt,
+        pds_transport_positionen: uebertragbar.length,
         ...(nk.status === "offen" ? { status: "erfasst" } : {}),
       })
       .eq("id", nkId)
 
+    const fehlerBeimMerken = posErr?.message ?? updErr?.message ?? null
+
     return json({
       status: "uebertragen",
-      nachtrag: {
-        uuid: nachtragUUID,
-        vorgangs_nummer: nachtragNummer,
+      angebot: {
+        uuid: angebotUUID,
+        vorgangs_nummer: angebotNummer,
         positionen: uebertragbar.length,
         ek_summe: summeEk,
         vk_summe: summeVk,
       },
       ...vorschau,
       anleitung:
-        `Nachtrag ${nachtragNummer} im PDS-Client öffnen. Die Ebene „${ebeneBezeichnung}" enthält ` +
-        "das verbaute Material. Die von PDS eingefügten Positionen mit Menge 0 sind die Differenz " +
-        "zum Hauptauftrag — streichen oder stehen lassen, je nach Kundendokument. Preise für den " +
-        "Kunden dort anpassen.",
-      warnung: updErr
-        ? `Der Nachtrag ${nachtragNummer} steht in PDS, konnte im Shop aber nicht vermerkt werden: ${updErr.message}. ` +
-          "Nicht erneut übertragen."
+        `Angebot ${angebotNummer} im PDS-Client öffnen (Kunde Weich GmbH). Die Ebene ` +
+        `„${ebeneBezeichnung}“ in Auftrag ${nk.pds_vorgangs_nummer} kopieren, dort Preise für den ` +
+        "Kunden anpassen, danach das Transportangebot löschen.",
+      warnung: fehlerBeimMerken
+        ? `Angebot ${angebotNummer} steht in PDS, konnte im Shop aber nicht vermerkt werden: ${fehlerBeimMerken}. ` +
+          "Nicht erneut übertragen, sonst entsteht ein zweites Angebot mit denselben Positionen."
         : undefined,
     })
   } catch (e) {

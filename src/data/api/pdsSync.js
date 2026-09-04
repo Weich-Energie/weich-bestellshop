@@ -135,20 +135,21 @@ export async function importiereSoll(vorgangUuid) {
   return invoke('pds-auftrag-soll', { aktion: 'importieren', vorgang_uuid: vorgangUuid })
 }
 
-// ─── Nachkalkulation: verbautes Material als Nachtrag nach PDS ────────────
-// ADR 0006. Vorschau sendet nichts; uebertragen legt in PDS einen Nachtrag an,
-// der sich per API nicht mehr loeschen laesst — deshalb immer erst Vorschau.
+// ─── Nachkalkulation: verbautes Material als Transportangebot nach PDS ────
+// ADR 0006 (Fassung 2). Die API kann in einen bestehenden Auftrag nichts
+// einfuegen. Das Werkzeug legt deshalb ein Angebot bei der Weich GmbH an, aus
+// dem im PDS-Client in den Kundenauftrag kopiert wird. Vorschau sendet nichts.
 
-export async function nachtragVorschau(nachkalkulationId) {
-  return invoke('pds-auftrag-nachtrag', { aktion: 'vorschau', nachkalkulation_id: nachkalkulationId })
+export async function transportVorschau(nachkalkulationId) {
+  return invoke('pds-auftrag-transport', { aktion: 'vorschau', nachkalkulation_id: nachkalkulationId })
 }
 
-export async function nachtragUebertragen(nachkalkulationId) {
-  return invoke('pds-auftrag-nachtrag', { aktion: 'uebertragen', nachkalkulation_id: nachkalkulationId })
+export async function transportUebertragen(nachkalkulationId) {
+  return invoke('pds-auftrag-transport', { aktion: 'uebertragen', nachkalkulation_id: nachkalkulationId })
 }
 
-// Nur, wenn der Nachtrag im PDS-Client geloescht wurde. Sonst entsteht beim
-// naechsten Uebertragen ein zweiter (-N2).
-export async function nachtragZuruecksetzen(nachkalkulationId) {
-  return invoke('pds-auftrag-nachtrag', { aktion: 'zuruecksetzen', nachkalkulation_id: nachkalkulationId })
+// Hebt die Markierung "uebertragen" aller Positionen auf — wenn das Angebot
+// geloescht wurde, ohne zu kopieren.
+export async function transportZuruecksetzen(nachkalkulationId) {
+  return invoke('pds-auftrag-transport', { aktion: 'zuruecksetzen', nachkalkulation_id: nachkalkulationId })
 }

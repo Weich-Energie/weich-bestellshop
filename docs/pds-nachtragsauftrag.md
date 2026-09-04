@@ -1,4 +1,8 @@
-# Verbautes Material als Nachtragsauftrag in PDS
+# Verbautes Material nach PDS — Befund, Test, Weg
+
+**Ergebnis (04.09.2026):** Der Nachtragsauftrag ist verworfen, das Werkzeug
+legt stattdessen ein **Transportangebot** an (ADR 0006, Fassung 2). Der Test
+unten bleibt als Beleg stehen, warum.
 
 Stand 04.09.2026. Ergebnis eines Tests am eigenen Haus, nicht an einem
 Kundenauftrag.
@@ -40,7 +44,37 @@ bestehenden Vorgang einhängt. `updatePosition` ändert nur vorhandene Positione
   die bestehenden Positionen so wie sie sind" nicht nur eingehalten, sondern
   technisch garantiert.
 
-## Was das für das Werkzeug bedeutet
+## Warum kein Nachtrag
+
+Der Nachtrag ist ein Vorgang **neben** dem Auftrag. Gewollt ist das Material
+**im** Auftrag, unter den kalkulierten Positionen. Die API kann dort nichts
+einfügen — geprüft gegen die OpenAPI-Spezifikation des Mandanten, nicht nur
+gegen den MCP-Katalog:
+
+| Endpunkt | Kann | Kann nicht |
+|---|---|---|
+| `/vorgang/updateposition` | Status, Kurztext, Menge, Lager, Nummern, Einheit, MwSt, Lieferant, Termin einer **vorhandenen** Position (UUID Pflicht) | Position anlegen, Katalogbezug, Preis |
+| `/vorgang/updatevorgang` | Kopf: externe Nummer, Status, Anschriften, Vertrag, Zahlungsbedingung, MwSt, Termin | Ebenen, Positionen |
+| `/vorgang/create` | neuer Vorgang mit voller Ebenenstruktur | bestehenden erweitern |
+| `/vorgang/createnachtragsauftrag` | Nachtrag als eigener Vorgang `-N1` | in den Auftrag schreiben |
+| `/service/createposition` | Position an Serviceauftrag | Aufträge vom Typ AUFTRAG |
+
+## Der Weg: Transportangebot
+
+Der Betrieb kopiert im PDS-Client Positionen aus einem Musterangebot in den
+Kundenauftrag. Das Werkzeug liefert dieses Musterangebot je Auftrag:
+
+1. Auftrag in der Nachkalkulation holen, verbautes Material erfassen.
+2. „Vorschau" zeigt die Ebene, die entstehen wird, samt dem, was im Shop bleibt.
+3. „Transportangebot in PDS anlegen" erzeugt ein Angebot bei der Weich GmbH
+   (`ZZ-TRANSPORT … fuer Auftrag 2026-298`) mit einer Ebene und genau den noch
+   nicht übertragenen Positionen. Diese werden mit `pds_transport_at` markiert.
+4. Im Client: Ebene in den Kundenauftrag kopieren, Kundenpreise anpassen,
+   Transportangebot löschen.
+5. Kommt später Material dazu: erfassen, erneut übertragen — es geht nur das
+   Neue mit.
+
+## Ursprünglicher Plan mit dem Nachtrag (verworfen, bleibt als Beleg)
 
 1. Auftrag wählen (Suche wie in der Nachkalkulation, Nachträge `-N…` aus der
    Auswahl herausfiltern, damit kein Nachtrag auf einen Nachtrag entsteht).
