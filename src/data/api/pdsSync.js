@@ -134,3 +134,21 @@ export async function sucheAuftraege(suchwort = 'Klima') {
 export async function importiereSoll(vorgangUuid) {
   return invoke('pds-auftrag-soll', { aktion: 'importieren', vorgang_uuid: vorgangUuid })
 }
+
+// ─── Nachkalkulation: verbautes Material als Nachtrag nach PDS ────────────
+// ADR 0006. Vorschau sendet nichts; uebertragen legt in PDS einen Nachtrag an,
+// der sich per API nicht mehr loeschen laesst — deshalb immer erst Vorschau.
+
+export async function nachtragVorschau(nachkalkulationId) {
+  return invoke('pds-auftrag-nachtrag', { aktion: 'vorschau', nachkalkulation_id: nachkalkulationId })
+}
+
+export async function nachtragUebertragen(nachkalkulationId) {
+  return invoke('pds-auftrag-nachtrag', { aktion: 'uebertragen', nachkalkulation_id: nachkalkulationId })
+}
+
+// Nur, wenn der Nachtrag im PDS-Client geloescht wurde. Sonst entsteht beim
+// naechsten Uebertragen ein zweiter (-N2).
+export async function nachtragZuruecksetzen(nachkalkulationId) {
+  return invoke('pds-auftrag-nachtrag', { aktion: 'zuruecksetzen', nachkalkulation_id: nachkalkulationId })
+}

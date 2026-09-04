@@ -65,19 +65,25 @@ Neue Edge Function `shop-ai` mit taskbasiertem Routing:
 - Text (Kategorie/Tag/Beschreibung): Haiku 4.5
 - Browser-Agent (Phase 7/8): Sonnet 4.6 mit Tool-Use
 
-## PDS-Anbindung (Stand 22.08.2026, nicht in Betrieb)
+## PDS-Anbindung (Stand 04.09.2026, in Betrieb)
 - Der Shop ist **Anlage-Kanal fuer den PDS-Artikelstamm** — PDS bleibt
   Systemfuehrer. Siehe ADR 0005.
 - Nicht ueber den MCP-Server, sondern direkt per Edge Function mit dem Key aus
   `integration_secrets` (Muster: `weich-energie-app/functions/pds-preise`).
-- `pds-katalog-sync` schreibt: Whitelist auf vier Katalog-Pfade,
+- `pds-katalog-sync` schreibt: Whitelist auf vier Katalog-Pfade plus
+  `/vorgang/create` fuer das Musterangebot (einziger Weg zum Katalog-VK).
   Trockenlauf ist Standard, Protokoll in `shop_pds_sync_log`. Angelegt wird nur
   bei `pds_katalog_uuid is null` — `/katalog/delete` greift in PDS nur ohne
   Bestand und Verwendung, eine Dublette bleibt fuer immer stehen.
-- `pds-auftrag-soll` liest Soll-Werte fuer die Nachkalkulation. In den
-  Kundenauftrag wird nie geschrieben, dort steht eine Pauschale.
-- Vorher von Hand in PDS anzulegen: fuenf `(KLIMA)`-Warengruppen und der
-  Kategoriezweig — per API nicht moeglich. Siehe docs/pds-klima-warengruppen.md.
+- `pds-auftrag-soll` liest Soll-Werte und Einzelpositionen fuer die
+  Nachkalkulation. Rein lesend.
+- `pds-auftrag-nachtrag` schreibt das verbaute Material als **Nachtragsauftrag**
+  (`/vorgang/createnachtragsauftrag`, Nummer `2026-298-N1`). Der Hauptauftrag
+  wird nie veraendert; ein Nachtrag je Nachkalkulation; nur Artikel mit
+  `pds_katalog_uuid`. Nachtraege sind per API nicht loeschbar. Siehe ADR 0006
+  und docs/pds-nachtragsauftrag.md.
+- Kategorien, Warengruppen und Kalkulationsgruppen sind per API nur lesbar;
+  die Klima-Struktur steht seit 01.09.2026 (docs/pds-klima-warengruppen.md).
 
 ## Domain-Doku
 - [CONTEXT.md](CONTEXT.md) — Domain-Glossar
@@ -87,6 +93,7 @@ Neue Edge Function `shop-ai` mit taskbasiertem Routing:
 - [docs/pds-katalog-mapping.md](docs/pds-katalog-mapping.md) — Feld- und ID-Mapping Shop → PDS
 - [docs/pds-klima-warengruppen.md](docs/pds-klima-warengruppen.md) — Klima-Warengruppen und Umzugsliste
 - [docs/nachkalkulation-datenmodell.md](docs/nachkalkulation-datenmodell.md) — Soll/Ist-Modell
+- [docs/pds-nachtragsauftrag.md](docs/pds-nachtragsauftrag.md) — verbautes Material als Nachtrag, Testprotokoll
 
 ## Doku-Regel
 Wenn sich eine Kern-Entscheidung aendert: ADR schreiben, CLAUDE.md updaten, CONTEXT.md pflegen.

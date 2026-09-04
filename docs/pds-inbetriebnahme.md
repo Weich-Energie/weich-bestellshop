@@ -222,3 +222,22 @@ Fehler im Mapping würde sich sonst sechzigfach fortschreiben.
 - **Stunden erfassen?** Der Klimarechner hält seine Standardzeiten für
   Platzhalter, die aus echter Nachkalkulation kommen sollen. Offene Entscheidung,
   siehe [nachkalkulation-datenmodell.md](nachkalkulation-datenmodell.md).
+
+
+## Nachtragsauftrag (04.09.2026)
+
+Reihenfolge, damit nichts ins Leere läuft:
+
+1. Migration `012_pds_nachtrag.sql` im Supabase-SQL-Editor ausführen — fünf
+   neue Spalten an `shop_nachkalkulation`. Ohne sie scheitert der Soll-Import
+   beim Speichern der Einzelpositionen.
+2. `pds-auftrag-soll` neu deployen (filtert Nachträge aus der Suche, speichert
+   `soll_positionen`).
+3. `pds-auftrag-nachtrag` deployen.
+4. Frontend nach `master` — ab da live.
+5. Probe: Testauftrag 2026-314 (Weich GmbH als Kunde) in der Nachkalkulation
+   holen, eine Position erfassen, Vorschau, übertragen. Erwartet: 2026-314-N2,
+   weil N1 bereits aus dem API-Test existiert. Danach 2026-314 samt Nachträgen
+   im Client löschen.
+
+Aufzuräumen aus dem API-Test: Auftrag 2026-314 und Nachtrag 2026-314-N1.

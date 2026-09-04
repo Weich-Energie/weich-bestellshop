@@ -3,11 +3,12 @@ import { supabase } from '../../supabaseClient.js'
 const NK_SELECT = `
   id, pds_vorgang_uuid, pds_vorgangs_nummer, bezeichnung,
   soll_vk_gesamt, soll_ek_geraete, soll_vk_geraete, soll_erloes_montage,
-  soll_ek_leistungen, soll_vk_leistungen, soll_stand,
+  soll_ek_leistungen, soll_vk_leistungen, soll_stand, soll_positionen,
+  pds_nachtrag_uuid, pds_nachtrag_nummer, pds_nachtrag_at, pds_nachtrag_positionen,
   status, notiz, created_at, updated_at,
   shop_nachkalkulation_positionen (
     id, artikel_id, freitext, menge, einheit, ek_einzel, ek_gesamt, quelle, notiz,
-    shop_artikel ( id, name, einheit )
+    shop_artikel ( id, name, einheit, pds_katalog_uuid )
   )
 `
 

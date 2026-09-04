@@ -4,8 +4,12 @@ import {
   Box, Heading, Text, HStack, VStack, Button, Input, Table, Badge, Spinner, Flex, Spacer,
   IconButton,
 } from '@chakra-ui/react'
-import { Search, Download, Trash2, Plus, ArrowLeft, TrendingDown, TrendingUp } from 'lucide-react'
-import { sucheAuftraege, importiereSoll } from '../../data/api/pdsSync.js'
+import {
+  Search, Download, Trash2, Plus, ArrowLeft, TrendingDown, TrendingUp, Eye, Send, RotateCcw,
+} from 'lucide-react'
+import {
+  sucheAuftraege, importiereSoll, nachtragVorschau, nachtragUebertragen, nachtragZuruecksetzen,
+} from '../../data/api/pdsSync.js'
 import {
   listNachkalkulationen, addPosition, deletePosition, setStatus,
 } from '../../data/api/nachkalkulation.js'
@@ -261,6 +265,8 @@ function Detail({ id, onZurueck }) {
         <Kennzahl titel="Auftrag gesamt (VK)" wert={euro(nk.soll_vk_gesamt)} />
       </HStack>
 
+      <KalkuliertePositionen soll={nk.soll_positionen} />
+
       <Box borderWidth="1px" borderRadius="lg" p={4} mb={4} bg="white">
         <Text fontWeight="bold" fontSize="sm" mb={2}>Verbautes Material erfassen</Text>
         <HStack gap={2} flexWrap="wrap" align="start">
@@ -337,6 +343,11 @@ function Detail({ id, onZurueck }) {
                         noch kein Shop-Artikel — Kandidat für die Katalog-Anlage
                       </Text>
                     )}
+                    {p.artikel && !p.artikel.pds_katalog_uuid && (
+                      <Text fontSize="xs" color="orange.600">
+                        noch nicht in PDS — vor dem Nachtrag unter „Nach PDS übertragen" anlegen
+                      </Text>
+                    )}
                   </Table.Cell>
                   <Table.Cell textAlign="right">
                     <Text fontSize="sm">{Number(p.menge)} {p.einheit || ''}</Text>
@@ -366,6 +377,8 @@ function Detail({ id, onZurueck }) {
           </Table.Root>
         </Box>
       </Box>
+
+      <NachtragBlock nk={nk} onGeaendert={neu} />
     </Box>
   )
 }
@@ -375,6 +388,235 @@ function Kennzahl({ titel, wert, farbe }) {
     <Box borderWidth="1px" borderRadius="lg" p={4} bg="white" minW="190px" flex="1">
       <Text fontSize="xs" color="fg.muted" mb={1}>{titel}</Text>
       <Text fontSize="xl" fontWeight="bold" color={farbe}>{wert}</Text>
+    </Box>
+  )
+}
+
+// ─── Kalkulierte Positionen aus dem PDS-Auftrag (nur Anzeige) ──────────────
+// Kommt aus soll_positionen, das der Soll-Import ablegt. Aeltere Importe haben
+// das Feld noch nicht — dann hilft ein erneutes "Soll holen" in der Uebersicht.
+// Der Hauptauftrag wird nie veraendert (ADR 0006), deshalb kein Bearbeiten.
+function KalkuliertePositionen({ soll }) {
+  if (!soll) {
+    return (
+      <Box borderWidth="1px" borderRadius="lg" p={4} mb={4} bg="white">
+        <Text fontWeight="bold" fontSize="sm" mb={1}>Kalkulierte Positionen aus dem Auftrag</Text>
+        <Text fontSize="sm" color="fg.muted">
+          Für diesen Import liegen die Einzelpositionen noch nicht vor. In der Übersicht den Auftrag
+          erneut suchen und „Soll holen" — die erfassten Positionen bleiben dabei erhalten.
+        </Text>
+      </Box>
+    )
+  }
+
+  const gruppen = [
+    ['Gerät', soll.geraete], ['Leistung', soll.leistungen],
+    ['Eigenleistung', soll.eigenleistung], ['Montage', soll.montage],
+  ]
+  const zeilen = gruppen.flatMap(([art, liste]) => (liste || []).map((p) => ({ ...p, art })))
+
+  return (
+    <Box borderWidth="1px" borderRadius="lg" p={4} mb={4} bg="white">
+      <Text fontWeight="bold" fontSize="sm" mb={1}>Kalkulierte Positionen aus dem Auftrag</Text>
+      <Text fontSize="xs" color="fg.muted" mb={2}>
+        Stand des Auftrags in PDS. Diese Positionen bleiben unverändert — das verbaute Material
+        kommt als eigener Nachtrag dazu.
+      </Text>
+      <Box overflowX="auto">
+        <Table.Root variant="line" size="sm" minW="680px">
+          <Table.Header>
+            <Table.Row>
+              <Table.ColumnHeader>Position</Table.ColumnHeader>
+              <Table.ColumnHeader textAlign="right">Menge</Table.ColumnHeader>
+              <Table.ColumnHeader textAlign="right">EK</Table.ColumnHeader>
+              <Table.ColumnHeader textAlign="right">VK</Table.ColumnHeader>
+              <Table.ColumnHeader>Art</Table.ColumnHeader>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {zeilen.map((p, i) => (
+              <Table.Row key={`${p.nummer || 'p'}-${i}`}>
+                <Table.Cell>
+                  <Text fontSize="sm">{p.nummer ? `${p.nummer} · ` : ''}{p.kurztext || '—'}</Text>
+                  {p.ek_beleg && (
+                    <Text fontSize="xs" color="fg.muted">EK belegt durch {p.ek_quelle} {p.ek_beleg}</Text>
+                  )}
+                </Table.Cell>
+                <Table.Cell textAlign="right">
+                  <Text fontSize="sm">{p.menge != null ? Number(p.menge) : '—'} {p.einheit || ''}</Text>
+                </Table.Cell>
+                <Table.Cell textAlign="right"><Text fontSize="sm">{euro(p.ek_belegt ?? p.ek_gesamt)}</Text></Table.Cell>
+                <Table.Cell textAlign="right"><Text fontSize="sm">{euro(p.vk_gesamt)}</Text></Table.Cell>
+                <Table.Cell><Badge size="sm" variant="subtle">{p.art}</Badge></Table.Cell>
+              </Table.Row>
+            ))}
+            {zeilen.length === 0 && (
+              <Table.Row>
+                <Table.Cell colSpan={5}>
+                  <Text py={3} textAlign="center" color="fg.muted">Der Auftrag hat keine Positionen.</Text>
+                </Table.Cell>
+              </Table.Row>
+            )}
+          </Table.Body>
+        </Table.Root>
+      </Box>
+    </Box>
+  )
+}
+
+// ─── Nach PDS: verbautes Material als Nachtragsauftrag ─────────────────────
+// Die Vorschau zeigt exakt die Ebene, die in PDS entstehen wird. Ein Nachtrag
+// laesst sich per API nicht loeschen — deshalb Vorschau zuerst und Anlegen nur
+// nach Rueckfrage. Danach zeigt der Block den angelegten Nachtrag.
+function NachtragBlock({ nk, onGeaendert }) {
+  const [vorschau, setVorschau] = useState(null)
+  const [laedt, setLaedt] = useState(false)
+  const [sendet, setSendet] = useState(false)
+  const [antwort, setAntwort] = useState(null)
+  const [fehler, setFehler] = useState(null)
+
+  async function handleVorschau() {
+    setLaedt(true); setFehler(null); setAntwort(null)
+    try {
+      setVorschau(await nachtragVorschau(nk.id))
+    } catch (e) {
+      setFehler(e.message)
+    } finally {
+      setLaedt(false)
+    }
+  }
+
+  async function handleUebertragen() {
+    if (!vorschau) return
+    const ok = window.confirm(
+      `Nachtrag zu ${nk.pds_vorgangs_nummer} mit ${vorschau.ebene.positionen.length} Position(en) in PDS anlegen?\n\n` +
+      'Der Nachtrag lässt sich danach nur im PDS-Client wieder löschen.',
+    )
+    if (!ok) return
+    setSendet(true); setFehler(null)
+    try {
+      const a = await nachtragUebertragen(nk.id)
+      setAntwort(a)
+      setVorschau(null)
+      onGeaendert()
+    } catch (e) {
+      setFehler(e.message)
+    } finally {
+      setSendet(false)
+    }
+  }
+
+  async function handleReset() {
+    const ok = window.confirm(
+      `Nur zurücksetzen, wenn Nachtrag ${nk.pds_nachtrag_nummer} in PDS gelöscht wurde. ` +
+      'Sonst entsteht beim nächsten Übertragen ein zweiter Nachtrag.\n\nFortfahren?',
+    )
+    if (!ok) return
+    setFehler(null)
+    try {
+      await nachtragZuruecksetzen(nk.id)
+      setAntwort(null)
+      onGeaendert()
+    } catch (e) {
+      setFehler(e.message)
+    }
+  }
+
+  if (nk.pds_nachtrag_nummer) {
+    const datum = nk.pds_nachtrag_at ? new Date(nk.pds_nachtrag_at).toLocaleDateString('de-DE') : '—'
+    return (
+      <Box borderWidth="1px" borderRadius="lg" p={4} mt={4} bg="green.50" borderColor="green.200">
+        <Text fontWeight="bold" fontSize="sm" color="green.800">
+          Nachtrag {nk.pds_nachtrag_nummer} in PDS angelegt
+        </Text>
+        <Text fontSize="sm" color="green.900" mt={1}>
+          {nk.pds_nachtrag_positionen ?? '—'} Position(en) am {datum}. Preise für den Kunden, Zusammenfassen
+          und das Streichen der von PDS eingefügten Nullmengen erfolgen im PDS-Client.
+        </Text>
+        {antwort?.anleitung && <Text fontSize="xs" color="fg.muted" mt={1}>{antwort.anleitung}</Text>}
+        {antwort?.warnung && <Text fontSize="xs" color="red.600" mt={1}>{antwort.warnung}</Text>}
+        <Button size="xs" variant="ghost" mt={2} onClick={handleReset}>
+          <RotateCcw size={12} /> Zurücksetzen — nur wenn der Nachtrag in PDS gelöscht wurde
+        </Button>
+        {fehler && <Text fontSize="sm" color="red.600" mt={2}>{fehler}</Text>}
+      </Box>
+    )
+  }
+
+  return (
+    <Box borderWidth="1px" borderRadius="lg" p={4} mt={4} bg="white">
+      <Flex align="center" gap={2} flexWrap="wrap">
+        <Box>
+          <Text fontWeight="bold" fontSize="sm">Nach PDS übertragen</Text>
+          <Text fontSize="xs" color="fg.muted">
+            Legt zu {nk.pds_vorgangs_nummer} einen Nachtrag mit einer eigenen Ebene für das verbaute
+            Material an. Der Auftrag selbst bleibt unverändert.
+          </Text>
+        </Box>
+        <Spacer />
+        <Button size="sm" variant="outline" onClick={handleVorschau} loading={laedt}
+          disabled={nk.positionen.length === 0}>
+          <Eye size={14} /> Vorschau
+        </Button>
+      </Flex>
+
+      {vorschau && (
+        <Box mt={3}>
+          <Text fontSize="sm" fontWeight="medium" mb={1}>Ebene „{vorschau.ebene.bezeichnung}"</Text>
+          <Box overflowX="auto">
+            <Table.Root variant="line" size="sm" minW="680px">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>Position</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="right">Menge</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="right">EK einzeln</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="right">VK einzeln</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="right">VK gesamt</Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {vorschau.ebene.positionen.map((p) => (
+                  <Table.Row key={p.katalog_uuid}>
+                    <Table.Cell><Text fontSize="sm">{p.name}</Text></Table.Cell>
+                    <Table.Cell textAlign="right"><Text fontSize="sm">{Number(p.menge)} {p.einheit || ''}</Text></Table.Cell>
+                    <Table.Cell textAlign="right"><Text fontSize="sm">{euro(p.ek_einzel)}</Text></Table.Cell>
+                    <Table.Cell textAlign="right">
+                      <Text fontSize="sm">{p.vk_einzel != null ? euro(p.vk_einzel) : 'aus PDS-Katalog'}</Text>
+                      {p.aufschlag_prozent != null && (
+                        <Text fontSize="xs" color="fg.muted">{Number(p.aufschlag_prozent)} % Aufschlag</Text>
+                      )}
+                    </Table.Cell>
+                    <Table.Cell textAlign="right"><Text fontSize="sm">{p.vk_gesamt != null ? euro(p.vk_gesamt) : '—'}</Text></Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table.Root>
+          </Box>
+          <Text fontSize="sm" mt={2}>
+            EK gesamt {euro(vorschau.summen.ek)} · VK gesamt{' '}
+            {vorschau.summen.vk != null ? euro(vorschau.summen.vk) : 'teilweise aus PDS-Katalog'}
+          </Text>
+          {vorschau.nicht_uebertragbar.length > 0 && (
+            <Box mt={2} borderWidth="1px" borderColor="orange.200" bg="orange.50" borderRadius="md" p={2}>
+              <Text fontSize="xs" fontWeight="medium" color="orange.800">
+                Bleibt im Shop ({vorschau.nicht_uebertragbar.length})
+              </Text>
+              {vorschau.nicht_uebertragbar.map((p, i) => (
+                <Text key={i} fontSize="xs" color="orange.900">{p.name} — {p.grund}</Text>
+              ))}
+            </Box>
+          )}
+          <Text fontSize="xs" color="fg.muted" mt={2}>{vorschau.hinweis}</Text>
+          <HStack mt={3}>
+            <Button size="sm" colorPalette="blue" onClick={handleUebertragen} loading={sendet}
+              disabled={vorschau.ebene.positionen.length === 0}>
+              <Send size={14} /> Als Nachtrag in PDS anlegen
+            </Button>
+          </HStack>
+        </Box>
+      )}
+
+      {fehler && <Text fontSize="sm" color="red.600" mt={2}>{fehler}</Text>}
     </Box>
   )
 }

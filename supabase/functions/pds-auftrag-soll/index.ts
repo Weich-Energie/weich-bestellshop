@@ -1,8 +1,9 @@
 // pds-auftrag-soll — Liest die Soll-Werte eines Klima-Auftrags aus PDS.
 //
 // Ausschliesslich lesend. Sie ruft nur /vorgang/listauftraege und
-// /vorgang/details auf und schreibt nichts nach PDS zurück — der Kundenauftrag
-// bleibt unberührt, dort steht bewusst eine Pauschale für Montagematerial.
+// /vorgang/details auf und schreibt nichts nach PDS zurück. Das Schreiben —
+// verbautes Material als Nachtragsauftrag — macht pds-auftrag-nachtrag
+// (ADR 0006); der Hauptauftrag bleibt auch dort unverändert.
 //
 // Zwei Aktionen:
 //   { aktion: "suchen",   suchwort }        -> Auftragsliste zur Auswahl
@@ -212,12 +213,17 @@ Deno.serve(async (req: Request) => {
 
       // Nur das Nötige zurückgeben. Die Antwort von PDS enthält auch
       // Personenbezüge, die im Frontend hier nichts zu suchen haben.
-      const treffer = (liste?.resultList ?? []).map((a: Record<string, any>) => ({
-        vorgang_uuid: a.uuid,
-        vorgangs_nummer: a.vorgangsNummer,
-        bezeichnung: a.bezeichnung,
-        status: a.vorgangStatus?.bezeichnung ?? null,
-      }))
+      const treffer = (liste?.resultList ?? [])
+        .map((a: Record<string, any>) => ({
+          vorgang_uuid: a.uuid,
+          vorgangs_nummer: a.vorgangsNummer,
+          bezeichnung: a.bezeichnung,
+          status: a.vorgangStatus?.bezeichnung ?? null,
+        }))
+        // Nachträge (2026-298-N1) erscheinen in der Liste als eigene Aufträge.
+        // Sie gehören nicht in die Auswahl: Nachkalkuliert wird der
+        // Hauptauftrag, und auf einen Nachtrag darf kein weiterer.
+        .filter((t: Record<string, any>) => !/-N\d+$/.test(String(t.vorgangs_nummer ?? "")))
 
       // Schon importierte Aufträge markieren, damit keiner zweimal angefasst wird.
       const { data: vorhanden } = await sb
@@ -232,7 +238,7 @@ Deno.serve(async (req: Request) => {
       )
 
       return json({
-        anzahl: liste?.totalHitCount ?? treffer.length,
+        anzahl: treffer.length,
         auftraege: treffer.map((t: Record<string, any>) => ({
           ...t,
           nachkalkulation: bekannt.get(t.vorgang_uuid) ?? null,
@@ -419,6 +425,10 @@ Deno.serve(async (req: Request) => {
             soll_stand: new Date().toISOString(),
             ist_ek_bestellungen: anzahlBelegt > 0 ? runde(ekEffektiv) : null,
             ist_bestellungen_stand: anzahlBelegt > 0 ? new Date().toISOString() : null,
+            // Einzelpositionen fuer die Anzeige "was war kalkuliert" neben dem
+            // verbauten Material. Nur Anzeige — der Hauptauftrag wird nie
+            // veraendert (ADR 0006). Spalte aus Migration 012.
+            soll_positionen: { geraete, leistungen, eigenleistung, montage },
           },
           { onConflict: "pds_vorgang_uuid" },
         )
