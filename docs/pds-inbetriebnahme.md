@@ -198,6 +198,16 @@ Fehler im Mapping würde sich sonst sechzigfach fortschreiben.
 
 ## Was danach noch offen ist
 
+- **Die deployte Function hat noch keinen echten Artikel übertragen.** Der
+  Dämpfungssockel ging am 02.09.2026 über direkte API-Aufrufe nach PDS, die
+  UUID wurde über den Datenbankzugang zurückgeschrieben. Der Weg Shop-Admin →
+  „Übertragen" → `pds-katalog-sync` → PDS → UUID-Rücklauf ist damit
+  gebaut und deployt, aber nicht mit einem echten Artikel durchlaufen. Dafür
+  braucht es einen Artikel mit vollständigem Mapping — am einfachsten ein
+  neuer Frigotechnik-C-Teil in der Kategorie Klima — und einen Klick im Shop.
+  Der Adapter für Kondensatrohr eignet sich nicht: sein Lieferant saukalt.de
+  existiert weder in `shop_lieferanten` noch in PDS (geprüft 04.09.2026).
+
 - **Klima-Bestand umhängen.** Rund 60 Artikel liegen in `(SHK)Wärmepumpe` und
   gehören in die neuen Gruppen. Liste in
   [pds-klima-warengruppen.md](pds-klima-warengruppen.md); nicht per
