@@ -434,3 +434,29 @@ Vorsicht beim Skalieren auf den Bestand: Viele Bestandsartikel tragen bereits
 einen bewusst gesetzten VK — Geräte mit eingerechneter Montage (Comfora
 832 → 2.420). Kandidaten für die Übernahme sind nur Artikel mit VK = EK, also
 ohne jeden Aufschlag. Alles andere würde gepflegte Preise überschreiben.
+
+
+### Bestandsprüfung 04.09.2026: kein Musterangebot für die 62 Artikel nötig
+
+Alle 62 Klima-Bestandsartikel per `detailsbatch` auf ihre Preisstrategie
+geprüft. **59 tragen bereits einen gepflegten VK mit Aufschlag** — durchgängig
+rund 33 % (etwa 4MXM80A8/9: 2.407,10 → 3.209,39; FTXA20CB: 456,76 → 610,00),
+bei Geräten mit eingerechneter Montage deutlich mehr (Bosch CL3000i 35 E:
+553,40 → 1.810,01). Diese Preise sind bewusst gesetzt und dürfen nicht
+überschrieben werden.
+
+Nur drei Artikel haben VK = EK, und bei allen dreien ist das richtig so:
+
+| Artikel | EK = VK | Grund |
+|---|---|---|
+| Rohrpaket im Kabelkanal | 80,00 | Altpreisführung, bleibt (Auskunft 30.08.) |
+| Rohrpaket ohne Kabelkanal | 40,00 | dito |
+| Pauschale Aufmaß-Service | 126,05 | Dienstleistung, kein Materialaufschlag |
+
+**Der Musterangebot-Workaround gilt damit ausschliesslich für neue Artikel aus
+dem Shop** — die C-Teile, für die der Sync gebaut ist. Der Dämpfungssockel war
+der erste; jeder weitere geht denselben Weg: Sync legt den Artikel an, ein
+Angebot mit `vkFix` trägt den VK, „in Katalog übernehmen" im Client schreibt
+ihn in den Stamm.
+
+Das Testangebot 2026-290 kann gelöscht werden.
