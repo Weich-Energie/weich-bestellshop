@@ -49,6 +49,9 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
   // weil eine falsche Klasse den Verkaufspreis dauerhaft verzerrt.
   const [aufschlagsklasse, setAufschlagsklasse] = useState('')
   const [aktiv, setAktiv] = useState(true)
+  // Gehoert als Platzhalter (Menge 0) in die Montagematerial-Ebene jedes neuen
+  // Klima-Auftrags — ADR 0007. Wirkt erst, wenn der Artikel in PDS steht.
+  const [pdsPlatzhalter, setPdsPlatzhalter] = useState(false)
   const [tagsRaw, setTagsRaw] = useState('')
   const [bildExternUrl, setBildExternUrl] = useState('')
   const [bildDatei, setBildDatei] = useState(null)
@@ -87,6 +90,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       setEinheit(normalizeEinheit(artikel.einheit) || 'Stück')
       setAufschlagsklasse(artikel.aufschlagsklasse || '')
       setAktiv(artikel.aktiv !== false)
+      setPdsPlatzhalter(artikel.pds_platzhalter === true)
       setTagsRaw((artikel.tags || []).map((t) => t.name).join(', '))
       setBildExternUrl(artikel.bild_ist_extern ? (artikel.bild_url || '') : '')
       setVarianten((artikel.varianten || []).map((v) => ({ name: v.name })))
@@ -102,6 +106,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       setEinheit(normalizeEinheit(prefill.einheit) || 'Stück')
       setAufschlagsklasse(prefill.aufschlagsklasse || '')
       setAktiv(true)
+      setPdsPlatzhalter(false)
       setTagsRaw(prefill.tags || '')
       setBildExternUrl(prefill.bild_extern_url || '')
       setVarianten([]); setGebinde([])
@@ -109,7 +114,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       setName(''); setBeschreibung(''); setKategorieId('')
       setLieferant(''); setLieferantUrl(''); setArtikelnr(''); setPreis(''); setEinheit('Stück')
       setAufschlagsklasse('')
-      setAktiv(true); setTagsRaw(''); setBildExternUrl('')
+      setAktiv(true); setPdsPlatzhalter(false); setTagsRaw(''); setBildExternUrl('')
       setVarianten([]); setGebinde([])
     }
     setBildDatei(null); setError(null); setAiError(null); setBildsucheQuery('')
@@ -234,6 +239,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
         einheit: einheit || null,
         aufschlagsklasse: aufschlagsklasse || null,
         aktiv,
+        pds_platzhalter: pdsPlatzhalter,
       }
       if (bildExternUrl && !bildDatei) {
         fields.bild_url = bildExternUrl.trim()
@@ -542,6 +548,21 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
                   <input type="checkbox" checked={aktiv} onChange={(e) => setAktiv(e.target.checked)} id="aktiv-cb" />
                   <label htmlFor="aktiv-cb"><Text fontSize="sm">Artikel aktiv (im Katalog sichtbar)</Text></label>
                 </HStack>
+
+                <Box>
+                  <HStack>
+                    <input type="checkbox" checked={pdsPlatzhalter}
+                      onChange={(e) => setPdsPlatzhalter(e.target.checked)} id="pds-platzhalter-cb" />
+                    <label htmlFor="pds-platzhalter-cb">
+                      <Text fontSize="sm">Platzhalter in neuen Klima-Aufträgen (PDS)</Text>
+                    </label>
+                  </HStack>
+                  <Text fontSize="xs" color="fg.muted" mt={1} pl={6}>
+                    Steht dann mit Menge 0 in der Ebene „Montagematerial (Nachkalkulation)" jedes neu
+                    angelegten Klima-Auftrags; die Nachkalkulation setzt später die verbaute Menge.
+                    Wirkt erst, wenn der Artikel nach PDS übertragen ist.
+                  </Text>
+                </Box>
 
                 {error && <Text color="red.500" fontSize="sm">{error}</Text>}
               </VStack>

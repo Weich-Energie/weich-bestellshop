@@ -135,21 +135,25 @@ export async function importiereSoll(vorgangUuid) {
   return invoke('pds-auftrag-soll', { aktion: 'importieren', vorgang_uuid: vorgangUuid })
 }
 
-// ─── Nachkalkulation: verbautes Material als Transportangebot nach PDS ────
-// ADR 0006 (Fassung 2). Die API kann in einen bestehenden Auftrag nichts
-// einfuegen. Das Werkzeug legt deshalb ein Angebot bei der Weich GmbH an, aus
-// dem im PDS-Client in den Kundenauftrag kopiert wird. Vorschau sendet nichts.
+// ─── Nachkalkulation: verbautes Material in den PDS-Auftrag ──────────────
+// ADR 0007. Positionen mit Platzhalter im Auftrag bekommen ihre Menge per
+// updateposition; der Rest geht als Transportangebot (ADR 0006), aus dem im
+// PDS-Client kopiert wird. Die Vorschau zeigt beides und sendet nichts.
 
-export async function transportVorschau(nachkalkulationId) {
-  return invoke('pds-auftrag-transport', { aktion: 'vorschau', nachkalkulation_id: nachkalkulationId })
+export async function materialVorschau(nachkalkulationId) {
+  return invoke('pds-auftrag-material', { aktion: 'vorschau', nachkalkulation_id: nachkalkulationId })
 }
 
-export async function transportUebertragen(nachkalkulationId) {
-  return invoke('pds-auftrag-transport', { aktion: 'uebertragen', nachkalkulation_id: nachkalkulationId })
+export async function mengenSetzen(nachkalkulationId) {
+  return invoke('pds-auftrag-material', { aktion: 'mengen_setzen', nachkalkulation_id: nachkalkulationId })
 }
 
-// Hebt die Markierung "uebertragen" aller Positionen auf — wenn das Angebot
-// geloescht wurde, ohne zu kopieren.
-export async function transportZuruecksetzen(nachkalkulationId) {
-  return invoke('pds-auftrag-transport', { aktion: 'zuruecksetzen', nachkalkulation_id: nachkalkulationId })
+export async function transportAnlegen(nachkalkulationId) {
+  return invoke('pds-auftrag-material', { aktion: 'transport_anlegen', nachkalkulation_id: nachkalkulationId })
+}
+
+// Hebt die Markierung "uebertragen" aller Positionen auf. Vorsicht: Mengen, die
+// schon im Auftrag stehen, wuerden beim naechsten Setzen erneut addiert.
+export async function materialZuruecksetzen(nachkalkulationId) {
+  return invoke('pds-auftrag-material', { aktion: 'zuruecksetzen', nachkalkulation_id: nachkalkulationId })
 }

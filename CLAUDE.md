@@ -77,15 +77,18 @@ Neue Edge Function `shop-ai` mit taskbasiertem Routing:
   Bestand und Verwendung, eine Dublette bleibt fuer immer stehen.
 - `pds-auftrag-soll` liest Soll-Werte und Einzelpositionen fuer die
   Nachkalkulation. Rein lesend.
-- `pds-auftrag-transport` schreibt das verbaute Material als **Transportangebot**
-  bei der Weich GmbH (`/vorgang/create`, Typ ANGEBOT, Praefix `ZZ-TRANSPORT`).
-  Im PDS-Client wird die Ebene in den Kundenauftrag kopiert, danach das Angebot
-  geloescht. Grund: Die API kann in einen bestehenden Auftrag nichts einfuegen
-  (updateposition braucht vorhandene Positions-UUIDs, updatevorgang aendert nur
-  den Kopf). Der Nachtragsauftrag war der erste Versuch und ist verworfen —
-  er ist ein Vorgang neben dem Auftrag, nicht darin. Positionen tragen
-  `pds_transport_at`; ein zweiter Transport nimmt nur Neues mit. Siehe ADR 0006
-  und docs/pds-nachtragsauftrag.md.
+- `pds-auftrag-material` bringt das verbaute Material in den Auftrag (ADR 0007):
+  Neue Klima-Auftraege tragen seit Meghs Anlage eine Ebene „Montagematerial
+  (Nachkalkulation)" mit Platzhaltern (Menge 0) aus der Sicht
+  `shop_pds_montagematerial_platzhalter` (Kennzeichen `pds_platzhalter` am
+  Artikel). Der Shop setzt dort die Mengen per `/vorgang/updateposition` —
+  nur Menge, nur Shop-Artikel. Material ohne Platzhalter und aeltere Auftraege
+  gehen als Transportangebot bei der Weich GmbH (`/vorgang/create`, ANGEBOT,
+  Praefix `ZZ-TRANSPORT`) zum Kopieren im Client (ADR 0006). Grund fuer beides:
+  Die API kann an einen bestehenden Auftrag keine Positionen anhaengen; der
+  Nachtragsauftrag war der erste Versuch und ist verworfen. Positionen tragen
+  `pds_transport_at`, nichts geht zweimal. Vorgaenge sind per API nicht
+  loeschbar. Siehe docs/pds-montagematerial-platzhalter.md.
 - Kategorien, Warengruppen und Kalkulationsgruppen sind per API nur lesbar;
   die Klima-Struktur steht seit 01.09.2026 (docs/pds-klima-warengruppen.md).
 
@@ -97,7 +100,8 @@ Neue Edge Function `shop-ai` mit taskbasiertem Routing:
 - [docs/pds-katalog-mapping.md](docs/pds-katalog-mapping.md) — Feld- und ID-Mapping Shop → PDS
 - [docs/pds-klima-warengruppen.md](docs/pds-klima-warengruppen.md) — Klima-Warengruppen und Umzugsliste
 - [docs/nachkalkulation-datenmodell.md](docs/nachkalkulation-datenmodell.md) — Soll/Ist-Modell
-- [docs/pds-nachtragsauftrag.md](docs/pds-nachtragsauftrag.md) — Transportangebot statt Nachtrag: Befund, Test, Weg
+- [docs/pds-nachtragsauftrag.md](docs/pds-nachtragsauftrag.md) — warum kein Nachtrag: Befund und Test
+- [docs/pds-montagematerial-platzhalter.md](docs/pds-montagematerial-platzhalter.md) — Platzhalter-Ebene fuer die Auftragsanlage (an Megh)
 
 ## Doku-Regel
 Wenn sich eine Kern-Entscheidung aendert: ADR schreiben, CLAUDE.md updaten, CONTEXT.md pflegen.

@@ -8,7 +8,7 @@ import {
   Search, Download, Trash2, Plus, ArrowLeft, TrendingDown, TrendingUp, Eye, Send, RotateCcw,
 } from 'lucide-react'
 import {
-  sucheAuftraege, importiereSoll, transportVorschau, transportUebertragen, transportZuruecksetzen,
+  sucheAuftraege, importiereSoll, materialVorschau, mengenSetzen, transportAnlegen, materialZuruecksetzen,
 } from '../../data/api/pdsSync.js'
 import {
   listNachkalkulationen, addPosition, deletePosition, setStatus,
@@ -389,7 +389,7 @@ function Detail({ id, onZurueck }) {
         </Box>
       </Box>
 
-      <TransportBlock nk={nk} onGeaendert={neu} />
+      <MaterialBlock nk={nk} onGeaendert={neu} />
     </Box>
   )
 }
@@ -430,8 +430,8 @@ function KalkuliertePositionen({ soll }) {
     <Box borderWidth="1px" borderRadius="lg" p={4} mb={4} bg="white">
       <Text fontWeight="bold" fontSize="sm" mb={1}>Kalkulierte Positionen aus dem Auftrag</Text>
       <Text fontSize="xs" color="fg.muted" mb={2}>
-        Stand des Auftrags in PDS, nur zur Orientierung. Das verbaute Material kommt über ein
-        Transportangebot dazu, das du im Client in diesen Auftrag kopierst.
+        Stand des Auftrags in PDS, nur zur Orientierung. Platzhalter der Ebene „Montagematerial"
+        bekommen ihre Menge direkt; alles andere geht über ein Transportangebot.
       </Text>
       <Box overflowX="auto">
         <Table.Root variant="line" size="sm" minW="680px">
@@ -475,16 +475,15 @@ function KalkuliertePositionen({ soll }) {
   )
 }
 
-// ─── Nach PDS: verbautes Material als Transportangebot ─────────────────────
-// Die API kann in den bestehenden Auftrag nichts einfuegen. Das Werkzeug legt
-// deshalb ein Angebot bei der Weich GmbH an, aus dem im PDS-Client in den
-// Kundenauftrag kopiert wird — so wie der Betrieb es mit dem Musterangebot
-// schon von Hand macht. Uebertragene Positionen sind markiert; ein zweiter
-// Transport nimmt nur Neues mit.
-function TransportBlock({ nk, onGeaendert }) {
+// ─── Nach PDS: Mengen setzen oder Transportangebot ─────────────────────────
+// ADR 0007. Die Vorschau teilt die offenen Positionen in zwei Gruppen:
+//   mengen    — Platzhalter im Auftrag vorhanden, Menge wird per API gesetzt
+//   transport — kein Platzhalter, geht als Angebot zum Kopieren im Client
+// Beides wird getrennt ausgeloest, damit klar ist, was wohin geht.
+function MaterialBlock({ nk, onGeaendert }) {
   const [vorschau, setVorschau] = useState(null)
   const [laedt, setLaedt] = useState(false)
-  const [sendet, setSendet] = useState(false)
+  const [sendet, setSendet] = useState(null) // 'mengen' | 'transport' | null
   const [antwort, setAntwort] = useState(null)
   const [fehler, setFehler] = useState(null)
 
@@ -494,7 +493,7 @@ function TransportBlock({ nk, onGeaendert }) {
   async function handleVorschau() {
     setLaedt(true); setFehler(null); setAntwort(null)
     try {
-      setVorschau(await transportVorschau(nk.id))
+      setVorschau(await materialVorschau(nk.id))
     } catch (e) {
       setFehler(e.message)
     } finally {
@@ -502,37 +501,53 @@ function TransportBlock({ nk, onGeaendert }) {
     }
   }
 
-  async function handleUebertragen() {
+  async function handleMengen() {
     if (!vorschau) return
     const ok = window.confirm(
-      `Transportangebot mit ${vorschau.ebene.positionen.length} Position(en) für ${nk.pds_vorgangs_nummer} anlegen?\n\n` +
-      'Es hängt an der Weich GmbH als Kunde und wird nach dem Kopieren im PDS-Client gelöscht.',
+      `Mengen von ${vorschau.mengen.length} Platzhalter-Position(en) in Auftrag ${nk.pds_vorgangs_nummer} setzen?\n\n` +
+      'Geändert wird nur die Menge dieser Positionen. Rückgängig nur im PDS-Client.',
     )
     if (!ok) return
-    setSendet(true); setFehler(null)
+    setSendet('mengen'); setFehler(null)
     try {
-      const a = await transportUebertragen(nk.id)
-      setAntwort(a)
-      setVorschau(null)
-      onGeaendert()
+      const a = await mengenSetzen(nk.id)
+      setAntwort(a); setVorschau(null); onGeaendert()
     } catch (e) {
       setFehler(e.message)
     } finally {
-      setSendet(false)
+      setSendet(null)
+    }
+  }
+
+  async function handleTransport() {
+    if (!vorschau) return
+    const ok = window.confirm(
+      `Transportangebot mit ${vorschau.transport.ebene.positionen.length} Position(en) für ${nk.pds_vorgangs_nummer} anlegen?\n\n` +
+      'Es hängt an der Weich GmbH als Kunde und wird nach dem Kopieren im PDS-Client gelöscht.',
+    )
+    if (!ok) return
+    setSendet('transport'); setFehler(null)
+    try {
+      const a = await transportAnlegen(nk.id)
+      setAntwort(a); setVorschau(null); onGeaendert()
+    } catch (e) {
+      setFehler(e.message)
+    } finally {
+      setSendet(null)
     }
   }
 
   async function handleReset() {
     const ok = window.confirm(
       'Alle Positionen wieder als „nicht übertragen“ markieren?\n\n' +
-      'Nur sinnvoll, wenn das Transportangebot gelöscht wurde, ohne die Positionen zu kopieren.',
+      'Mengen, die schon im Auftrag stehen, würden beim nächsten Setzen erneut addiert. ' +
+      'Nur sinnvoll, wenn in PDS nichts angekommen ist.',
     )
     if (!ok) return
     setFehler(null)
     try {
-      await transportZuruecksetzen(nk.id)
-      setAntwort(null)
-      onGeaendert()
+      await materialZuruecksetzen(nk.id)
+      setAntwort(null); onGeaendert()
     } catch (e) {
       setFehler(e.message)
     }
@@ -544,70 +559,135 @@ function TransportBlock({ nk, onGeaendert }) {
         <Box>
           <Text fontWeight="bold" fontSize="sm">Nach PDS übertragen</Text>
           <Text fontSize="xs" color="fg.muted">
-            Legt ein Transportangebot bei der Weich GmbH an, mit einer Ebene für {nk.pds_vorgangs_nummer}.
-            Im PDS-Client kopierst du die Ebene in den Auftrag und löschst das Angebot.
+            Platzhalter der Ebene „Montagematerial" in {nk.pds_vorgangs_nummer} bekommen ihre Menge direkt.
+            Material ohne Platzhalter geht als Transportangebot zum Kopieren im Client.
           </Text>
         </Box>
         <Spacer />
         <Button size="sm" variant="outline" onClick={handleVorschau} loading={laedt} disabled={offen === 0}>
-          <Eye size={14} /> Vorschau {offen > 0 ? `(${offen} neu)` : ''}
+          <Eye size={14} /> Vorschau {offen > 0 ? `(${offen} offen)` : ''}
         </Button>
       </Flex>
 
-      {nk.pds_transport_nummer && (
+      {antwort?.status === 'mengen_gesetzt' && (
         <Box mt={3} borderWidth="1px" borderRadius="md" p={3} bg="green.50" borderColor="green.200">
           <Text fontSize="sm" fontWeight="medium" color="green.800">
-            Zuletzt: Transportangebot {nk.pds_transport_nummer} mit {nk.pds_transport_positionen ?? '—'} Position(en)
-            am {nk.pds_transport_at ? new Date(nk.pds_transport_at).toLocaleDateString('de-DE') : '—'}
+            {antwort.anzahl} Menge(n) in Auftrag {nk.pds_vorgangs_nummer} gesetzt
           </Text>
-          <Text fontSize="sm" color="green.900" mt={1}>
-            Im PDS-Client öffnen (Kunde Weich GmbH), Ebene in Auftrag {nk.pds_vorgangs_nummer} kopieren,
-            Kundenpreise dort anpassen, Angebot löschen. {uebertragen} Position(en) sind als übertragen markiert.
-          </Text>
-          {antwort?.anleitung && <Text fontSize="xs" color="fg.muted" mt={1}>{antwort.anleitung}</Text>}
-          {antwort?.warnung && <Text fontSize="xs" color="red.600" mt={1}>{antwort.warnung}</Text>}
-          <Button size="xs" variant="ghost" mt={2} onClick={handleReset}>
-            <RotateCcw size={12} /> Markierung aufheben — nur wenn ohne Kopieren gelöscht
-          </Button>
+          <Text fontSize="xs" color="green.900" mt={1}>{antwort.anleitung}</Text>
+          {antwort.offen_transport > 0 && (
+            <Text fontSize="xs" color="orange.700" mt={1}>
+              {antwort.offen_transport} Position(en) ohne Platzhalter sind noch offen — erneut „Vorschau", dann Transportangebot.
+            </Text>
+          )}
+          {antwort.warnung && <Text fontSize="xs" color="red.600" mt={1}>{antwort.warnung}</Text>}
         </Box>
+      )}
+
+      {(antwort?.status === 'transport_angelegt' || (!antwort && nk.pds_transport_nummer)) && (
+        <Box mt={3} borderWidth="1px" borderRadius="md" p={3} bg="green.50" borderColor="green.200">
+          <Text fontSize="sm" fontWeight="medium" color="green.800">
+            Transportangebot {antwort?.angebot?.vorgangs_nummer || nk.pds_transport_nummer} mit{' '}
+            {antwort?.angebot?.positionen ?? nk.pds_transport_positionen ?? '—'} Position(en)
+            {!antwort && nk.pds_transport_at ? ` vom ${new Date(nk.pds_transport_at).toLocaleDateString('de-DE')}` : ''}
+          </Text>
+          <Text fontSize="xs" color="green.900" mt={1}>
+            {antwort?.anleitung ||
+              `Im PDS-Client öffnen (Kunde Weich GmbH), Ebene in Auftrag ${nk.pds_vorgangs_nummer} kopieren, Kundenpreise anpassen, Angebot löschen.`}
+          </Text>
+          {antwort?.warnung && <Text fontSize="xs" color="red.600" mt={1}>{antwort.warnung}</Text>}
+        </Box>
+      )}
+
+      {uebertragen > 0 && (
+        <HStack mt={2} gap={2}>
+          <Text fontSize="xs" color="fg.muted">{uebertragen} Position(en) als übertragen markiert.</Text>
+          <Button size="2xs" variant="ghost" onClick={handleReset}>
+            <RotateCcw size={11} /> Markierung aufheben
+          </Button>
+        </HStack>
       )}
 
       {vorschau && (
         <Box mt={3}>
-          <Text fontSize="sm" fontWeight="medium" mb={1}>Ebene „{vorschau.ebene.bezeichnung}“</Text>
-          <Box overflowX="auto">
-            <Table.Root variant="line" size="sm" minW="680px">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>Position</Table.ColumnHeader>
-                  <Table.ColumnHeader textAlign="right">Menge</Table.ColumnHeader>
-                  <Table.ColumnHeader textAlign="right">EK einzeln</Table.ColumnHeader>
-                  <Table.ColumnHeader textAlign="right">VK einzeln</Table.ColumnHeader>
-                  <Table.ColumnHeader textAlign="right">VK gesamt</Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {vorschau.ebene.positionen.map((p) => (
-                  <Table.Row key={p.katalog_uuid}>
-                    <Table.Cell><Text fontSize="sm">{p.name}</Text></Table.Cell>
-                    <Table.Cell textAlign="right"><Text fontSize="sm">{Number(p.menge)} {p.einheit || ''}</Text></Table.Cell>
-                    <Table.Cell textAlign="right"><Text fontSize="sm">{euro(p.ek_einzel)}</Text></Table.Cell>
-                    <Table.Cell textAlign="right">
-                      <Text fontSize="sm">{p.vk_einzel != null ? euro(p.vk_einzel) : 'aus PDS-Katalog'}</Text>
-                      {p.aufschlag_prozent != null && (
-                        <Text fontSize="xs" color="fg.muted">{Number(p.aufschlag_prozent)} % Aufschlag</Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell textAlign="right"><Text fontSize="sm">{p.vk_gesamt != null ? euro(p.vk_gesamt) : '—'}</Text></Table.Cell>
-                  </Table.Row>
-                ))}
-              </Table.Body>
-            </Table.Root>
-          </Box>
-          <Text fontSize="sm" mt={2}>
-            EK gesamt {euro(vorschau.summen.ek)} · VK gesamt{' '}
-            {vorschau.summen.vk != null ? euro(vorschau.summen.vk) : 'teilweise aus PDS-Katalog'}
-          </Text>
+          {vorschau.mengen.length > 0 && (
+            <Box mb={3}>
+              <Text fontSize="sm" fontWeight="medium" mb={1}>
+                Mengen setzen — {vorschau.mengen.length} Platzhalter im Auftrag
+              </Text>
+              <Box overflowX="auto">
+                <Table.Root variant="line" size="sm" minW="620px">
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeader>Position im Auftrag</Table.ColumnHeader>
+                      <Table.ColumnHeader textAlign="right">bisher</Table.ColumnHeader>
+                      <Table.ColumnHeader textAlign="right">+ verbaut</Table.ColumnHeader>
+                      <Table.ColumnHeader textAlign="right">neu</Table.ColumnHeader>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {vorschau.mengen.map((m) => (
+                      <Table.Row key={m.position_uuid}>
+                        <Table.Cell>
+                          <Text fontSize="sm">{m.nummer ? `${m.nummer} · ` : ''}{m.name}</Text>
+                          <Text fontSize="xs" color="fg.muted">{m.ebene}</Text>
+                        </Table.Cell>
+                        <Table.Cell textAlign="right"><Text fontSize="sm">{m.menge_aktuell} {m.einheit || ''}</Text></Table.Cell>
+                        <Table.Cell textAlign="right"><Text fontSize="sm">+{m.menge_plus}</Text></Table.Cell>
+                        <Table.Cell textAlign="right"><Text fontSize="sm" fontWeight="medium">{m.menge_neu} {m.einheit || ''}</Text></Table.Cell>
+                      </Table.Row>
+                    ))}
+                  </Table.Body>
+                </Table.Root>
+              </Box>
+              <Button size="sm" colorPalette="blue" mt={2} onClick={handleMengen} loading={sendet === 'mengen'}>
+                <Send size={14} /> Mengen in Auftrag setzen
+              </Button>
+            </Box>
+          )}
+
+          {vorschau.transport.ebene.positionen.length > 0 && (
+            <Box mb={3}>
+              <Text fontSize="sm" fontWeight="medium" mb={1}>
+                Ohne Platzhalter — {vorschau.transport.ebene.positionen.length} Position(en) als Transportangebot
+              </Text>
+              {!vorschau.auftrag.hat_platzhalter_ebene && (
+                <Text fontSize="xs" color="fg.muted" mb={1}>
+                  Dieser Auftrag hat keine Ebene „Montagematerial (Nachkalkulation)" — er stammt aus der Zeit vor
+                  den Platzhaltern. Alles geht über das Transportangebot.
+                </Text>
+              )}
+              <Box overflowX="auto">
+                <Table.Root variant="line" size="sm" minW="620px">
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeader>Position</Table.ColumnHeader>
+                      <Table.ColumnHeader textAlign="right">Menge</Table.ColumnHeader>
+                      <Table.ColumnHeader textAlign="right">EK einzeln</Table.ColumnHeader>
+                      <Table.ColumnHeader textAlign="right">VK einzeln</Table.ColumnHeader>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {vorschau.transport.ebene.positionen.map((p) => (
+                      <Table.Row key={p.katalog_uuid}>
+                        <Table.Cell><Text fontSize="sm">{p.name}</Text></Table.Cell>
+                        <Table.Cell textAlign="right"><Text fontSize="sm">{Number(p.menge)} {p.einheit || ''}</Text></Table.Cell>
+                        <Table.Cell textAlign="right"><Text fontSize="sm">{euro(p.ek_einzel)}</Text></Table.Cell>
+                        <Table.Cell textAlign="right">
+                          <Text fontSize="sm">{p.vk_einzel != null ? euro(p.vk_einzel) : 'aus PDS-Katalog'}</Text>
+                        </Table.Cell>
+                      </Table.Row>
+                    ))}
+                  </Table.Body>
+                </Table.Root>
+              </Box>
+              <Button size="sm" variant="outline" colorPalette="blue" mt={2} onClick={handleTransport}
+                loading={sendet === 'transport'}>
+                <Send size={14} /> Transportangebot anlegen
+              </Button>
+            </Box>
+          )}
+
           {vorschau.nicht_uebertragbar.length > 0 && (
             <Box mt={2} borderWidth="1px" borderColor="orange.200" bg="orange.50" borderRadius="md" p={2}>
               <Text fontSize="xs" fontWeight="medium" color="orange.800">
@@ -619,12 +699,6 @@ function TransportBlock({ nk, onGeaendert }) {
             </Box>
           )}
           <Text fontSize="xs" color="fg.muted" mt={2}>{vorschau.hinweis}</Text>
-          <HStack mt={3}>
-            <Button size="sm" colorPalette="blue" onClick={handleUebertragen} loading={sendet}
-              disabled={vorschau.ebene.positionen.length === 0}>
-              <Send size={14} /> Transportangebot in PDS anlegen
-            </Button>
-          </HStack>
         </Box>
       )}
 
