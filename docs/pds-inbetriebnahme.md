@@ -198,15 +198,19 @@ Fehler im Mapping würde sich sonst sechzigfach fortschreiben.
 
 ## Was danach noch offen ist
 
-- **Die deployte Function hat noch keinen echten Artikel übertragen.** Der
-  Dämpfungssockel ging am 02.09.2026 über direkte API-Aufrufe nach PDS, die
-  UUID wurde über den Datenbankzugang zurückgeschrieben. Der Weg Shop-Admin →
-  „Übertragen" → `pds-katalog-sync` → PDS → UUID-Rücklauf ist damit
-  gebaut und deployt, aber nicht mit einem echten Artikel durchlaufen. Dafür
-  braucht es einen Artikel mit vollständigem Mapping — am einfachsten ein
-  neuer Frigotechnik-C-Teil in der Kategorie Klima — und einen Klick im Shop.
-  Der Adapter für Kondensatrohr eignet sich nicht: sein Lieferant saukalt.de
-  existiert weder in `shop_lieferanten` noch in PDS (geprüft 04.09.2026).
+- ~~Die deployte Function hat noch keinen echten Artikel übertragen.~~
+  **Erledigt am 04.09.2026, 06:45 Uhr.** Der Testartikel `ZZ-TEST Kabelkanal
+  40x40 weiß (Shop-Sync-Test)` ging über den Knopf im Shop-Admin durch
+  `pds-katalog-sync` nach PDS. Protokoll in `shop_pds_sync_log`: drei Zeilen,
+  alle HTTP 200 — `/katalog/create`, `/katalog/addlieferanteneintrag`,
+  `/vorgang/create`. Ergebnis in PDS (`e7276526-1c49-4020-a8c7-92436aa6cfd5`):
+  Kategorie 3-Installationsmaterial, Warengruppe (KLIMA)Installationsmaterial,
+  Einheit `m`, MwSt Allgemein, Kalkulationsgruppe (KLIMA)Verbrauch,
+  Lieferanteneintrag Frigotechnik mit Bestellnummer ZZ-TEST-002 und EK 3,20 €.
+  Musterangebot **2026-291** bei der Weich GmbH mit VK 6,40 € und `vkFix`.
+  Im Shop steht `gesynct` mit der UUID. Der Adapter für Kondensatrohr eignet
+  sich weiterhin nicht: sein Lieferant saukalt.de existiert weder in
+  `shop_lieferanten` noch in PDS.
 
 - **Klima-Bestand umhängen.** Rund 60 Artikel liegen in `(SHK)Wärmepumpe` und
   gehören in die neuen Gruppen. Liste in
