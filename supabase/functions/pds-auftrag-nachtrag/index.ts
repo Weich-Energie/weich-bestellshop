@@ -213,7 +213,7 @@ Deno.serve(async (req: Request) => {
         continue
       }
       if (!a.pds_katalog_uuid) {
-        nichtUebertragbar.push({ name, menge, grund: "Artikel noch nicht in PDS — zuerst unter „Nach PDS übertragen" anlegen" })
+        nichtUebertragbar.push({ name, menge, grund: "Artikel noch nicht in PDS — zuerst unter „Nach PDS übertragen“ anlegen" })
         continue
       }
       if (!(menge > 0)) {
