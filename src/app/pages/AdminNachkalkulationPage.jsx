@@ -345,7 +345,7 @@ function Detail({ id, onZurueck }) {
                     )}
                     {p.artikel && !p.artikel.pds_katalog_uuid && (
                       <Text fontSize="xs" color="orange.600">
-                        noch nicht in PDS — vor dem Nachtrag unter „Nach PDS übertragen" anlegen
+                        noch nicht in PDS — vor dem Transport unter „Nach PDS übertragen" anlegen
                       </Text>
                     )}
                   </Table.Cell>
