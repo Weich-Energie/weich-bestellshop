@@ -425,4 +425,12 @@ Zwei Dinge dabei gelernt: Eine `nummer` an der Position wird mit 412 abgelehnt,
 weil PDS die Positionsnummern selbst vergibt. Und PDS zieht Bestellnummer,
 Herstellernummer und Lieferant automatisch aus dem Katalog in die Position.
 
-Ergebnis der Übernahme: siehe unten, sobald im Client geprüft.
+**Ergebnis (04.09.2026): funktioniert.** Nach „in Katalog übernehmen" im Client
+steht am Dämpfungssockel `ekEinzelpreis 10.00 / vkEinzelpreis 13.5`. Der Weg
+`createVorgang` → Client-Übernahme → Katalog ist damit der belegte Weg zum
+Katalog-VK.
+
+Vorsicht beim Skalieren auf den Bestand: Viele Bestandsartikel tragen bereits
+einen bewusst gesetzten VK — Geräte mit eingerechneter Montage (Comfora
+832 → 2.420). Kandidaten für die Übernahme sind nur Artikel mit VK = EK, also
+ohne jeden Aufschlag. Alles andere würde gepflegte Preise überschreiben.
