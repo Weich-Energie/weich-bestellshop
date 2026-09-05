@@ -12,7 +12,11 @@ weitere Lieferanten kommen als Playbook dazu.
 |---|---|
 | `lieferant-login-setzen.sh <slug>` | fragt Benutzer und Passwort ab und legt sie als `LIEFERANT_<SLUG>_BENUTZER/_PASSWORT` in `.env` (root, 600). Nichts erscheint im Klartext, nichts läuft durch den Chat. |
 | `produkt.mjs` | meldet sich mit diesen Daten an, speichert die Sitzung unter `state/<slug>.json`, öffnet eine Produkt-URL und gibt JSON aus: Titel, Artikelnummer, Herstellernummer, Matchcode, Verkaufseinheit, alle Preisangaben, Seitentext, Screenshot. |
+| `shop-lib.mjs` | gemeinsamer Unterbau: Playbooks, Login, Sitzung, Auslesen einer Produktseite, Blättern durch Trefferlisten. |
+| `sammeln.mjs` | ganze Suche oder Warengruppe: sammelt alle Produkt-URLs über alle Seiten (`--suche "Kabelkanal"` oder `--liste <kategorie-url>`), ruft jede Seite in einer Sitzung ab, schreibt ein JSON mit allen Produkten (`--out`). `--max` begrenzt, `--nur-urls` listet nur. |
 | `test-frigo.sh` | Probe: Login-Test und öffentliche Produktseite. |
+
+Lokal (`~/.weich-db`): `shop-zu-eingabe.mjs <roh.json> --klasse fest|verbrauch|auto --nachkalk --out <eingabe.json>` übersetzt das Sammelergebnis in die Eingabedatei für `artikel-import.mjs`. Preise werden nur übernommen, wenn eine Netto-Zahl eindeutig erkannt ist; alles andere bleibt leer und wird aufgelistet.
 
 Aufrufe (immer über das PowerShell-Werkzeug, SSH-Key liegt im Windows-Agent):
 
@@ -41,12 +45,23 @@ per `scp` hochladen, nur `bash <datei>` remote aufrufen.
   (ohne Trenner, deshalb Regex mit Vorausschau), „Ausgabe: 1 Stück"
   (Verkaufseinheit), Matchcode, Verpackungsgröße, Beschreibung, und der Satz
   „Bitte loggen Sie sich ein, um den Preis zu sehen".
-- Suche: `https://www.frigotechnik.de/?cl=search&searchparam=<begriff>`.
+- Suche: `https://www.frigotechnik.de/?cl=search&searchparam=<begriff>`, Blättern mit `&pgNr=N` (0-basiert, 24 Treffer je Seite).
+- Warengruppen haben feste URLs: `https://www.frigotechnik.de/Installationsmaterial/Konsolen-Profile/`, Blättern mit `/2/`, `/3/` …; Unterkategorien von Installationsmaterial u. a. Befestigungsmaterial, Isoliermaterialien, Isoliertes-Kupferrohr, Kabelschutz, Konsolen-Profile, Kunststoffrohr-Systeme, Kupferrohr, Loetfittings, Schellen, Schlaeuche, Verschraubungen. Probe am 05.09.2026: Konsolen & Profile = 123 Produkte auf 6 Seiten.
 - Kategorie „Installationsmaterial / Konsolen & Profile" ist der Einstieg für
   die Klima-C-Teile.
 - Der Preis-Selektor nach Login ist noch nicht bekannt; `produkt.mjs` sammelt
   vorerst alle Textstellen mit €-Zeichen und deren CSS-Klassen. Nach dem ersten
   angemeldeten Abruf den Selektor hier eintragen und im Skript festziehen.
+
+## Von der Warengruppe zum Artikelstamm (Ziel: „Warengruppe + Shop nennen, Rest läuft")
+
+```
+ssh: node sammeln.mjs --lieferant frigotechnik --liste <kategorie-url> --out /tmp/x.json
+scp zurück nach ~/.weich-db/eingaben/roh/
+node shop-zu-eingabe.mjs eingaben/roh/x.json --klasse auto --nachkalk --out eingaben/<datum>-frigotechnik-<gruppe>.json
+node artikel-import.mjs eingaben/<datum>-frigotechnik-<gruppe>.json          # Trockenlauf
+node artikel-import.mjs eingaben/<datum>-frigotechnik-<gruppe>.json --schreiben
+```
 
 ## Vom Link zum Artikel
 
