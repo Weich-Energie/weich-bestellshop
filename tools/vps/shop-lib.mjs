@@ -8,6 +8,7 @@
 // lieferant-login-setzen.sh gesetzt. Sie verlassen diesen Host nie.
 
 import { chromium } from 'playwright'
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -69,9 +70,43 @@ export function playbook(slug) {
   return pb
 }
 
-export function zugang(slug) {
+// Zugangsdaten: zuerst lokal aus .env (LIEFERANT_<SLUG>_BENUTZER/_PASSWORT),
+// sonst aus dem Shop. Dort hinterlegt ein Admin sie ueber "Zugang hinterlegen";
+// die Edge Function lieferant-zugang verschluesselt mit SUPPLIER_CRED_KEY und
+// speichert nur die Chiffre. Der VPS holt die Chiffre mit VPS_ZUGANG_TOKEN und
+// entschluesselt sie hier mit demselben Schluessel. Klartext gibt es nur im
+// Speicher dieses Prozesses.
+export async function zugang(slug) {
   const prefix = `LIEFERANT_${slug.toUpperCase().replace(/-/g, '_')}`
-  return { benutzer: process.env[`${prefix}_BENUTZER`], passwort: process.env[`${prefix}_PASSWORT`], prefix }
+  const lokal = { benutzer: process.env[`${prefix}_BENUTZER`], passwort: process.env[`${prefix}_PASSWORT`] }
+  if (lokal.benutzer && lokal.passwort) return { ...lokal, prefix, quelle: 'vps-env' }
+
+  const { SUPABASE_URL, SUPABASE_ANON_KEY, VPS_ZUGANG_TOKEN, SUPPLIER_CRED_KEY } = process.env
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !VPS_ZUGANG_TOKEN || !SUPPLIER_CRED_KEY) {
+    return { prefix, quelle: 'keine', grund: 'weder lokale Zugangsdaten noch Shop-Anbindung (SUPABASE_URL, SUPABASE_ANON_KEY, VPS_ZUGANG_TOKEN, SUPPLIER_CRED_KEY) in .env' }
+  }
+  const r = await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/lieferant-zugang`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      apikey: SUPABASE_ANON_KEY,
+      'x-vps-token': VPS_ZUGANG_TOKEN,
+    },
+    body: JSON.stringify({ aktion: 'chiffre', slug }),
+  })
+  const text = await r.text()
+  if (!r.ok) return { prefix, quelle: 'shop', grund: `Shop antwortet ${r.status}: ${text.slice(0, 200)}` }
+  const { chiffre } = JSON.parse(text)
+
+  // Byte-Format wie in zugang.mjs und der Edge Function: base64(iv[12] | tag[16] | ciphertext)
+  const key = Buffer.from(SUPPLIER_CRED_KEY, 'base64')
+  if (key.length !== 32) return { prefix, quelle: 'shop', grund: 'SUPPLIER_CRED_KEY hat nicht 32 Byte' }
+  const buf = Buffer.from(chiffre, 'base64')
+  const d = crypto.createDecipheriv('aes-256-gcm', key, buf.subarray(0, 12))
+  d.setAuthTag(buf.subarray(12, 28))
+  const daten = JSON.parse(Buffer.concat([d.update(buf.subarray(28)), d.final()]).toString('utf8'))
+  return { benutzer: daten.benutzer, passwort: daten.passwort, prefix, quelle: 'shop' }
 }
 
 // Browser samt Kontext oeffnen; meldet an, wenn gewuenscht. Gibt {browser, kontext, page, sitzung} zurueck.
@@ -79,10 +114,10 @@ export async function oeffnen(slug, { ohneLogin = false, neuAnmelden = false, br
   const pb = playbook(slug)
   fs.mkdirSync(stateDir, { recursive: true })
   const statePfad = path.join(stateDir, `${slug}.json`)
-  const z = zugang(slug)
+  const z = ohneLogin ? {} : await zugang(slug)
   if (!ohneLogin && (!z.benutzer || !z.passwort)) {
-    throw new Error(`Zugang fehlt: ${z.prefix}_BENUTZER/_PASSWORT nicht in ${envPfad}. ` +
-      `Setzen mit: bash /opt/weich-browser/lieferant-login-setzen.sh ${slug}`)
+    throw new Error(`Zugang fehlt fuer ${slug}: ${z.grund ?? 'im Shop unter Lieferanten "Zugang hinterlegen"'} ` +
+      `(oder lokal: bash /opt/weich-browser/lieferant-login-setzen.sh ${slug})`)
   }
 
   const browser = await chromium.launch({ headless: true })

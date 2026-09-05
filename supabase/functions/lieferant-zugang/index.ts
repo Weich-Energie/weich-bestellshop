@@ -24,6 +24,14 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: CORS })
 }
 
+// Vergleich ohne fruehen Abbruch, damit die Antwortzeit nichts ueber den
+// Token verraet.
+function zeitkonstantGleich(a: string, b: string): boolean {
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
+
 async function verschluesseln(klartext: string): Promise<string> {
   const keyB64 = Deno.env.get("SUPPLIER_CRED_KEY")
   if (!keyB64) throw new Error("SUPPLIER_CRED_KEY ist nicht gesetzt (Supabase → Edge Functions → Secrets)")
@@ -64,13 +72,37 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) return json({ error: "Nicht autorisiert" }, 401)
-
     const sb = createClient(
       Deno.env.get("SUPABASE_URL") || "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
     )
+
+    // ─── Abruf durch den VPS (weich-code) ──────────────────────────────────
+    // Der Browser-Dienst auf dem VPS holt sich die Chiffre eines Lieferanten
+    // und entschluesselt sie dort mit demselben SUPPLIER_CRED_KEY. Er weist
+    // sich mit VPS_ZUGANG_TOKEN aus (Header x-vps-token), nicht mit einer
+    // Nutzersession. Die Chiffre allein ist ohne den Schluessel wertlos;
+    // Benutzer oder Passwort im Klartext verlassen diese Funktion nie.
+    const vpsToken = req.headers.get("x-vps-token")
+    if (vpsToken) {
+      const erwartet = Deno.env.get("VPS_ZUGANG_TOKEN")
+      if (!erwartet || vpsToken.length !== erwartet.length || !zeitkonstantGleich(vpsToken, erwartet)) {
+        return json({ error: "Nicht autorisiert" }, 401)
+      }
+      const body = await req.json().catch(() => ({}))
+      if (body?.aktion !== "chiffre" || !body?.slug) return json({ error: 'aktion "chiffre" mit slug erwartet' }, 400)
+      const { data, error } = await sb
+        .from("shop_lieferanten")
+        .select("slug, zugang_chiffre, zugang_gesetzt_am")
+        .eq("slug", String(body.slug))
+        .maybeSingle()
+      if (error) throw error
+      if (!data?.zugang_chiffre) return json({ error: `Kein Zugang fuer ${body.slug} hinterlegt` }, 404)
+      return json({ slug: data.slug, chiffre: data.zugang_chiffre, gesetzt_am: data.zugang_gesetzt_am })
+    }
+
+    const authHeader = req.headers.get("Authorization")
+    if (!authHeader?.startsWith("Bearer ")) return json({ error: "Nicht autorisiert" }, 401)
 
     const { data: userData, error: authErr } = await sb.auth.getUser(authHeader.replace("Bearer ", ""))
     if (authErr || !userData?.user?.email) return json({ error: "Ungueltige Session" }, 401)

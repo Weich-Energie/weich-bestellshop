@@ -10,7 +10,8 @@ weitere Lieferanten kommen als Playbook dazu.
 
 | Datei | Aufgabe |
 |---|---|
-| `lieferant-login-setzen.sh <slug>` | fragt Benutzer und Passwort ab und legt sie als `LIEFERANT_<SLUG>_BENUTZER/_PASSWORT` in `.env` (root, 600). Nichts erscheint im Klartext, nichts läuft durch den Chat. |
+| `lieferant-login-setzen.sh <slug>` | Notweg ohne Shop: fragt Benutzer und Passwort ab und legt sie als `LIEFERANT_<SLUG>_BENUTZER/_PASSWORT` in `.env`. Normalfall ist das Hinterlegen im Shop, siehe unten. |
+| `schluessel-anlegen.sh` | erzeugt einmalig `SUPPLIER_CRED_KEY` (AES-256-GCM) und `VPS_ZUGANG_TOKEN`, schreibt sie in `.env` und legt eine Datei für `supabase secrets set --env-file` bereit. Am 05.09.2026 ausgeführt; beide stehen als Supabase-Secrets. **Den Key in den Passwortmanager sichern.** |
 | `produkt.mjs` | meldet sich mit diesen Daten an, speichert die Sitzung unter `state/<slug>.json`, öffnet eine Produkt-URL und gibt JSON aus: Titel, Artikelnummer, Herstellernummer, Matchcode, Verkaufseinheit, alle Preisangaben, Seitentext, Screenshot. |
 | `shop-lib.mjs` | gemeinsamer Unterbau: Playbooks, Login, Sitzung, Auslesen einer Produktseite, Blättern durch Trefferlisten. |
 | `sammeln.mjs` | ganze Suche oder Warengruppe: sammelt alle Produkt-URLs über alle Seiten (`--suche "Kabelkanal"` oder `--liste <kategorie-url>`), ruft jede Seite in einer Sitzung ab, schreibt ein JSON mit allen Produkten (`--out`). `--max` begrenzt, `--nur-urls` listet nur. |
@@ -30,6 +31,21 @@ node produkt.mjs --lieferant frigotechnik --ohne-login <produkt-url>        # nu
 Vorsicht bei Remote-Kommandos aus PowerShell: Backslash-Escapes (`\r`) kommen
 zerlegt an; `sed 's/\r$//'` löscht dann Buchstaben „r". Skripte lokal schreiben,
 per `scp` hochladen, nur `bash <datei>` remote aufrufen.
+
+## Zugänge im Shop hinterlegen (Normalfall)
+
+Admin → Lieferanten → „Zugang hinterlegen". Die Edge Function `lieferant-zugang`
+verschlüsselt Benutzer und Passwort mit `SUPPLIER_CRED_KEY` und speichert nur
+die Chiffre in `shop_lieferanten.zugang_chiffre`; auslesen kann sie kein
+Nutzer (Spalten-REVOKE). Der VPS holt die Chiffre über dieselbe Function mit
+dem Header `x-vps-token` (= `VPS_ZUGANG_TOKEN`, Aktion `chiffre`, `slug`) und
+entschlüsselt sie lokal mit demselben Key (`shop-lib.mjs`, `zugang()`).
+Klartext gibt es nur im Speicher des Abrufprozesses. Reihenfolge der Suche:
+erst `.env` (Notweg), dann Shop.
+
+Dafür stehen in `/opt/weich-browser/.env`: `SUPPLIER_CRED_KEY`,
+`VPS_ZUGANG_TOKEN`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` (der anon-Key ist
+öffentlich, er dient nur dem Gateway; die eigentliche Prüfung ist der Token).
 
 ## Playbook Frigotechnik (`frigotechnik.de`, OXID eShop mit B2B-Portal)
 
