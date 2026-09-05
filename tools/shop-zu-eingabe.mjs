@@ -38,7 +38,11 @@ function einheit(p) {
 }
 
 function preis(p) {
-  const zeilen = (p.preise || []).map((z) => z.text).filter((t) => !/brutto|inkl\.|uvp|listenpreis/i.test(t))
+  // Bevorzugt der vom Sammler eindeutig erkannte Nettopreis des Produkts selbst.
+  // Die Textstellen mit € sind nur Rueckfall — dort stehen auch Alternativ- und
+  // Empfehlungsartikel, deshalb nur die Zeile mit "Nettopreis:" akzeptieren.
+  if (typeof p.netto_preis === 'number' && p.netto_preis > 0) return p.netto_preis
+  const zeilen = (p.preise || []).map((z) => z.text).filter((t) => /Nettopreis\s*:/i.test(t))
   for (const t of zeilen) {
     const m = t.match(/(\d{1,3}(?:\.\d{3})*,\d{2})\s*€/) || t.match(/€\s*(\d{1,3}(?:\.\d{3})*,\d{2})/)
     if (m) return Number(m[1].replace(/\./g, '').replace(',', '.'))

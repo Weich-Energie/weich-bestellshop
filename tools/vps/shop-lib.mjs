@@ -44,7 +44,10 @@ export const PLAYBOOKS = {
       await page.fill('input[name="username"]', benutzer)
       await page.fill('input[name="password"]', passwort)
       await page.locator('form:has(input[name="password"]) button[type="submit"]').first().click()
-      await page.waitForLoadState('networkidle', { timeout: 45_000 }).catch(() => {})
+      // Der Ajax-Login laedt die Seite danach neu. networkidle kommt zu frueh —
+      // deshalb auf den Abmelden-Link warten, der erst nach dem Neuladen da ist.
+      await page.locator('a:has-text("Abmelden")').first().waitFor({ timeout: 25_000 }).catch(() => {})
+      await page.waitForTimeout(1500)
       return this.istAngemeldet(page)
     },
     async istAngemeldet(page) {
@@ -167,6 +170,14 @@ export async function produktDaten(page, url) {
     const innen = document.body.innerText.replace(/ /g, ' ')
     const greife = (re) => (innen.match(re) || [])[1]?.trim() ?? null
     const ausgabe = innen.match(/Ausgabe\s*:?\s*(\d+(?:[,.]\d+)?)\s*([A-Za-zäöüÄÖÜ]+)/)
+    // Frigotechnik (angemeldet): "Nettopreis: 31,93 €" und "Bruttopreis: 53,21 €"
+    // stehen im Produktkopf; Alternativ- und Empfehlungsartikel weiter unten
+    // tragen dieselben Woerter ohne Doppelpunkt — deshalb nur mit Doppelpunkt
+    // und nur der erste Treffer.
+    const zahl = (s) => (s ? Number(s.replace(/\./g, '').replace(',', '.')) : null)
+    const netto = zahl(greife(/Nettopreis\s*:\s*(\d{1,3}(?:\.\d{3})*,\d{2})\s*€/))
+    const brutto = zahl(greife(/Bruttopreis\s*:\s*(\d{1,3}(?:\.\d{3})*,\d{2})\s*€/))
+    const bestand = greife(/Bruttopreis\s*:\s*[\d.,]+\s*€\s*(\d+)\s*Stück/)
     const meta = (n) => document.querySelector(`meta[property="${n}"],meta[name="${n}"]`)?.content ?? null
     const haupt = document.querySelector('main') || document.body
     return {
@@ -178,6 +189,9 @@ export async function produktDaten(page, url) {
       ausgabe_menge: ausgabe ? Number(ausgabe[1].replace(',', '.')) : null,
       ausgabe_einheit: ausgabe ? ausgabe[2] : null,
       preis_nur_nach_login: /loggen Sie sich ein, um den Preis/i.test(innen),
+      netto_preis: netto,
+      brutto_preis: brutto,
+      bestand: bestand ? Number(bestand) : null,
       hersteller: treffer(/Hersteller/i, 3),
       einheit_hinweise: treffer(/Verpackungs(einheit|größe)|Mengeneinheit|Preiseinheit|je\s+(Stück|Meter|m\b)/i, 5),
       preise,

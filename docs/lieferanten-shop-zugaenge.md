@@ -65,9 +65,14 @@ Dafür stehen in `/opt/weich-browser/.env`: `SUPPLIER_CRED_KEY`,
 - Warengruppen haben feste URLs: `https://www.frigotechnik.de/Installationsmaterial/Konsolen-Profile/`, Blättern mit `/2/`, `/3/` …; Unterkategorien von Installationsmaterial u. a. Befestigungsmaterial, Isoliermaterialien, Isoliertes-Kupferrohr, Kabelschutz, Konsolen-Profile, Kunststoffrohr-Systeme, Kupferrohr, Loetfittings, Schellen, Schlaeuche, Verschraubungen. Probe am 05.09.2026: Konsolen & Profile = 123 Produkte auf 6 Seiten.
 - Kategorie „Installationsmaterial / Konsolen & Profile" ist der Einstieg für
   die Klima-C-Teile.
-- Der Preis-Selektor nach Login ist noch nicht bekannt; `produkt.mjs` sammelt
-  vorerst alle Textstellen mit €-Zeichen und deren CSS-Klassen. Nach dem ersten
-  angemeldeten Abruf den Selektor hier eintragen und im Skript festziehen.
+- Angemeldet (Kunde 10108920, Weich GmbH) steht im Produktkopf „Nettopreis:
+  31,93 €" (Element `.h1.primary`) und „Bruttopreis: 53,21 €", dahinter der
+  Bestand „91 Stück". `shop-lib.mjs` liefert das als `netto_preis`,
+  `brutto_preis`, `bestand`. Achtung: Alternativ- und Empfehlungsartikel weiter
+  unten tragen „Nettopreis 30,21 €" ohne Doppelpunkt — deshalb nur der erste
+  Treffer mit Doppelpunkt. Erster Abruf mit Preis am 05.09.2026.
+- Login-Erfolg erst nach dem Neuladen prüfen: auf den Link „Abmelden" warten,
+  `networkidle` kommt zu früh (Fehlersuche mit `login-debug.mjs <slug>`).
 
 ## Von der Warengruppe zum Artikelstamm (Ziel: „Warengruppe + Shop nennen, Rest läuft")
 
