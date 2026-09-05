@@ -1,4 +1,4 @@
-# Artikelpflege tagesaktuell — der Shop als aktuelle Wahrheit für C-Teile
+# Artikelpflege mit aktuellen Lieferantendaten — der Shop als aktuelle Wahrheit für C-Teile
 
 Stand 05.09.2026. Festlegung von Patrick Weich: Der Bestellshop wird laufend mit
 Daten aus den Lieferanten-Shops gefüttert und ist damit die **aktuelle** Quelle
