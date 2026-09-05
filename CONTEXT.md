@@ -12,6 +12,21 @@ viele Tags, optional Bild (Supabase Storage oder externe URL), optional Bestell-
 zum Lieferanten. Wird von Admins angelegt (manuell mit KI-Vorschlaegen, aus
 Bedarfsmeldungen materialisiert, oder aus dem Beleg-Import promotet).
 
+### Sichtbarkeit eines Artikels
+Zwei unabhaengige Kennzeichen, seit Migration 014:
+- **bestellbar** — der Artikel erscheint im Shop-Katalog und kann in den Warenkorb.
+- **Nachkalkulation Klima** — der Artikel erscheint in der Nachkalkulation und im
+  Aufmass; steht er in PDS, ist er zugleich Platzhalter (Menge 0) in der Ebene
+  „Montagematerial (Nachkalkulation)" jedes neuen Klima-Auftrags (ADR 0007).
+Ein Artikel kann beides, eines oder keines sein. Geraete werden kalkuliert, aber
+ueber den Grosshandel beschafft: Nachkalkulation ja, bestellbar nein.
+
+### Aufmass (geplant)
+Der Shop ist der Artikelstamm fuer das Aufmass auf der Baustelle. Die Aufmass-App
+wird eine eigene App mit eigener Optik und Haptik fuer diesen Einsatzzweck; sie
+greift auf den Artikelstamm des Shops zu und liefert das verbaute Material an die
+Nachkalkulation.
+
 ### Bedarfsmeldung
 Ein noch nicht katalogisierter Wunsch eines Mitarbeiters. Enthaelt Kurzbeschreibung,
 optional Foto vom Handy und Lieferanten-Link. Ist NICHT bestellbar — dient dem Admin

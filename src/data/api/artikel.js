@@ -9,16 +9,24 @@ import { ensureTags } from './kategorien.js'
 const ARTIKEL_SELECT = `
   id, name, beschreibung, kategorie_id, bild_url, bild_ist_extern,
   lieferant, lieferant_url, artikelnr, preis_netto, einheit, aktiv,
-  aufschlagsklasse, pds_platzhalter,
+  aufschlagsklasse, bestellbar, nachkalkulation_klima,
   shop_artikel_tags ( tag_id, shop_tags ( id, name ) ),
   shop_artikel_varianten ( id, name, sort_order ),
   shop_artikel_gebinde ( id, name, stueckzahl, ist_default, sort_order )
 `
 
 // Liest Artikel-Liste mit Kategorie, Tags, Varianten und Gebinden.
-export async function listArtikel({ includeInaktiv = false } = {}) {
+//
+// Zwei fachliche Sichten auf denselben Stamm (Migration 014): Der Katalog
+// zeigt nur bestellbare Artikel, die Nachkalkulation (und spaeter die
+// Aufmass-App) nur die mit Kennzeichen "Nachkalkulation Klima". Ein Artikel
+// kann in beiden, in einer oder in keiner Sicht liegen — Geraete etwa werden
+// kalkuliert, aber ueber den Grosshandel beschafft, nicht ueber den Shop.
+export async function listArtikel({ includeInaktiv = false, nurBestellbar = false, nurNachkalkulation = false } = {}) {
   let q = supabase.from('shop_artikel').select(ARTIKEL_SELECT).order('name', { ascending: true })
   if (!includeInaktiv) q = q.eq('aktiv', true)
+  if (nurBestellbar) q = q.eq('bestellbar', true)
+  if (nurNachkalkulation) q = q.eq('nachkalkulation_klima', true)
   const { data, error } = await q
   if (error) throw error
   return (data || []).map(normalizeArtikel)

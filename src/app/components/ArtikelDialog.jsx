@@ -49,9 +49,11 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
   // weil eine falsche Klasse den Verkaufspreis dauerhaft verzerrt.
   const [aufschlagsklasse, setAufschlagsklasse] = useState('')
   const [aktiv, setAktiv] = useState(true)
-  // Gehoert als Platzhalter (Menge 0) in die Montagematerial-Ebene jedes neuen
-  // Klima-Auftrags — ADR 0007. Wirkt erst, wenn der Artikel in PDS steht.
-  const [pdsPlatzhalter, setPdsPlatzhalter] = useState(false)
+  // Zwei Sichten auf den Stamm (Migration 014): bestellbar im Shop-Katalog,
+  // sichtbar in Nachkalkulation und Aufmass Klima. Letzteres macht den Artikel
+  // mit PDS-UUID zum Platzhalter (Menge 0) in jedem neuen Klima-Auftrag — ADR 0007.
+  const [bestellbar, setBestellbar] = useState(true)
+  const [nachkalkulationKlima, setNachkalkulationKlima] = useState(false)
   const [tagsRaw, setTagsRaw] = useState('')
   const [bildExternUrl, setBildExternUrl] = useState('')
   const [bildDatei, setBildDatei] = useState(null)
@@ -90,7 +92,8 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       setEinheit(normalizeEinheit(artikel.einheit) || 'Stück')
       setAufschlagsklasse(artikel.aufschlagsklasse || '')
       setAktiv(artikel.aktiv !== false)
-      setPdsPlatzhalter(artikel.pds_platzhalter === true)
+      setBestellbar(artikel.bestellbar !== false)
+      setNachkalkulationKlima(artikel.nachkalkulation_klima === true)
       setTagsRaw((artikel.tags || []).map((t) => t.name).join(', '))
       setBildExternUrl(artikel.bild_ist_extern ? (artikel.bild_url || '') : '')
       setVarianten((artikel.varianten || []).map((v) => ({ name: v.name })))
@@ -106,7 +109,8 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       setEinheit(normalizeEinheit(prefill.einheit) || 'Stück')
       setAufschlagsklasse(prefill.aufschlagsklasse || '')
       setAktiv(true)
-      setPdsPlatzhalter(false)
+      setBestellbar(prefill.bestellbar !== false)
+      setNachkalkulationKlima(prefill.nachkalkulation_klima === true)
       setTagsRaw(prefill.tags || '')
       setBildExternUrl(prefill.bild_extern_url || '')
       setVarianten([]); setGebinde([])
@@ -239,7 +243,8 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
         einheit: einheit || null,
         aufschlagsklasse: aufschlagsklasse || null,
         aktiv,
-        pds_platzhalter: pdsPlatzhalter,
+        bestellbar,
+        nachkalkulation_klima: nachkalkulationKlima,
       }
       if (bildExternUrl && !bildDatei) {
         fields.bild_url = bildExternUrl.trim()
@@ -544,23 +549,32 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
                   </VStack>
                 </Box>
 
-                <HStack>
-                  <input type="checkbox" checked={aktiv} onChange={(e) => setAktiv(e.target.checked)} id="aktiv-cb" />
-                  <label htmlFor="aktiv-cb"><Text fontSize="sm">Artikel aktiv (im Katalog sichtbar)</Text></label>
-                </HStack>
-
                 <Box>
-                  <HStack>
-                    <input type="checkbox" checked={pdsPlatzhalter}
-                      onChange={(e) => setPdsPlatzhalter(e.target.checked)} id="pds-platzhalter-cb" />
-                    <label htmlFor="pds-platzhalter-cb">
-                      <Text fontSize="sm">Platzhalter in neuen Klima-Aufträgen (PDS)</Text>
-                    </label>
-                  </HStack>
-                  <Text fontSize="xs" color="fg.muted" mt={1} pl={6}>
-                    Steht dann mit Menge 0 in der Ebene „Montagematerial (Nachkalkulation)" jedes neu
-                    angelegten Klima-Auftrags; die Nachkalkulation setzt später die verbaute Menge.
-                    Wirkt erst, wenn der Artikel nach PDS übertragen ist.
+                  <Text fontSize="sm" fontWeight="medium" mb={1}>Sichtbarkeit</Text>
+                  <VStack align="stretch" gap={1}>
+                    <HStack>
+                      <input type="checkbox" checked={aktiv} onChange={(e) => setAktiv(e.target.checked)} id="aktiv-cb" />
+                      <label htmlFor="aktiv-cb"><Text fontSize="sm">Artikel aktiv</Text></label>
+                    </HStack>
+                    <HStack>
+                      <input type="checkbox" checked={bestellbar}
+                        onChange={(e) => setBestellbar(e.target.checked)} id="bestellbar-cb" />
+                      <label htmlFor="bestellbar-cb">
+                        <Text fontSize="sm">Sichtbar und bestellbar im Shop</Text>
+                      </label>
+                    </HStack>
+                    <HStack>
+                      <input type="checkbox" checked={nachkalkulationKlima}
+                        onChange={(e) => setNachkalkulationKlima(e.target.checked)} id="nachkalk-cb" />
+                      <label htmlFor="nachkalk-cb">
+                        <Text fontSize="sm">Sichtbar in der Nachkalkulation Klima</Text>
+                      </label>
+                    </HStack>
+                  </VStack>
+                  <Text fontSize="xs" color="fg.muted" mt={1}>
+                    Ein Artikel kann nur kalkuliert werden (z. B. Geräte, die über den Großhandel kommen)
+                    oder nur bestellt werden. „Nachkalkulation Klima" macht ihn, sobald er in PDS steht,
+                    zum Platzhalter in der Montagematerial‑Ebene jedes neuen Klima‑Auftrags.
                   </Text>
                 </Box>
 

@@ -201,7 +201,8 @@ function Detail({ id, onZurueck }) {
   const { data: liste = [] } = useQuery({ queryKey: ['nachkalkulationen'], queryFn: listNachkalkulationen })
   const { data: artikelListe = [] } = useQuery({
     queryKey: ['shop-artikel'],
-    queryFn: () => listArtikel(),
+    // Nur Artikel mit Kennzeichen "Nachkalkulation Klima" (Migration 014).
+    queryFn: () => listArtikel({ nurNachkalkulation: true }),
   })
 
   const nk = liste.find((n) => n.id === id)

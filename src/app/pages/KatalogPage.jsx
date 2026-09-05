@@ -118,7 +118,8 @@ export default function KatalogPage() {
 
   const { data: artikelListe = [], isLoading } = useQuery({
     queryKey: ['shop-artikel'],
-    queryFn: () => listArtikel(),
+    // Nur bestellbare Artikel — Kalkulationsartikel bleiben dem Aufmass vorbehalten.
+    queryFn: () => listArtikel({ nurBestellbar: true }),
   })
   const { data: kategorien = [] } = useQuery({
     queryKey: ['shop-kategorien'],

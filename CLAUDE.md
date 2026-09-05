@@ -44,6 +44,12 @@ Ressourcenplanung, Service-Ticket und Betriebsradar.
 - Realtime-Sync fuer Bestellwuensche & Sammelbestellungen: kommt in Phase 4
 
 ## Wichtige Regeln
+- Artikel haben zwei Sichtbarkeiten (Migration 014): `bestellbar` (Shop-Katalog)
+  und `nachkalkulation_klima` (Nachkalkulation, Aufmass, Platzhalter in neuen
+  Klima-Auftraegen). Der Katalog filtert auf `bestellbar`, die Nachkalkulation
+  auf `nachkalkulation_klima`. Der Shop ist der **Artikelstamm fuer das Aufmass**
+  auf der Baustelle; die Aufmass-App wird eine eigene App mit eigener Optik, die
+  auf diesen Stamm zugreift.
 - Immer auf Deutsch (UI, Kommentare, KI-Output)
 - Chakra v3 Syntax: `Dialog.Root`, `Tabs.Root`, `Select` mit `createListCollection`
 - Fail-closed Auth-Check: KEIN `?? true` — nicht gesetzt = kein Zugriff
@@ -80,7 +86,7 @@ Neue Edge Function `shop-ai` mit taskbasiertem Routing:
 - `pds-auftrag-material` bringt das verbaute Material in den Auftrag (ADR 0007):
   Neue Klima-Auftraege tragen seit Meghs Anlage eine Ebene „Montagematerial
   (Nachkalkulation)" mit Platzhaltern (Menge 0) aus der Sicht
-  `shop_pds_montagematerial_platzhalter` (Kennzeichen `pds_platzhalter` am
+  `shop_pds_montagematerial_platzhalter` (Kennzeichen `nachkalkulation_klima` am
   Artikel). Der Shop setzt dort die Mengen per `/vorgang/updateposition` —
   nur Menge, nur Shop-Artikel. Material ohne Platzhalter und aeltere Auftraege
   gehen als Transportangebot bei der Weich GmbH (`/vorgang/create`, ANGEBOT,

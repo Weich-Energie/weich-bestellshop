@@ -258,11 +258,11 @@ Aufzuräumen aus dem API-Test: Auftrag 2026-314 und Nachtrag 2026-314-N1.
 
 ## Platzhalter-Ebene und Mengen per API (04.09.2026, abends)
 
-1. Migration `014_pds_platzhalter.sql` ausführen (Kennzeichen am Artikel, Sicht
+1. Migration `014_artikel_kennzeichen.sql` ausführen (bestellbar, Nachkalkulation Klima, Sicht
    für die Auftragsanlage).
 2. `pds-auftrag-material` deployen, `pds-auftrag-transport` löschen.
 3. Frontend nach `master`.
-4. Im Shop die Klima-C-Teile als „Platzhalter in neuen Klima-Aufträgen" markieren.
+4. Im Shop die Klima-C-Teile mit „Sichtbar in der Nachkalkulation Klima" kennzeichnen.
 5. Megh: Anlage um die Ebene erweitern — docs/pds-montagematerial-platzhalter.md.
 6. Probe an 2026-314 (eine Position mit Katalogbezug vorhanden): Kabelkanal
    erfassen, Vorschau muss ihn unter „Mengen setzen" zeigen, Menge 3 → 3+x.

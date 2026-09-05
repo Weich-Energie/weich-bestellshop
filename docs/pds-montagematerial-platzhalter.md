@@ -52,8 +52,8 @@ Aus der Supabase-Sicht `shop_pds_montagematerial_platzhalter` (Projekt
 | `aufschlagsklasse` | haupt / fest / verbrauch, nur Information |
 | `shop_artikel_id` | ID im Shop |
 
-Die Liste pflegen Shop-Admins über das Kennzeichen „Platzhalter in neuen
-Klima-Aufträgen" am Artikel. Nur aktive Artikel mit PDS-UUID erscheinen. Wer
+Die Liste pflegen Shop-Admins über das Kennzeichen „Sichtbar in der
+Nachkalkulation Klima" am Artikel (Spalte `nachkalkulation_klima`). Nur aktive Artikel mit PDS-UUID erscheinen. Wer
 einen Artikel neu über den Shop nach PDS anlegt und das Kennzeichen setzt, hat
 ihn ab dem nächsten Auftrag automatisch in der Ebene.
 

@@ -30,7 +30,7 @@ verbauten Mengen per `updateposition`. Im Client bleibt nur, was ohnehin
 Handarbeit ist: Kundenpreise anpassen und, falls gewünscht, Nullzeilen löschen.
 
 - **Welche Artikel Platzhalter sind, bestimmt der Shop.** Kennzeichen
-  `pds_platzhalter` am Artikel, gesetzt von einem Admin. Die Sicht
+  `nachkalkulation_klima` am Artikel („Sichtbar in der Nachkalkulation Klima"), gesetzt von einem Admin. Die Sicht
   `shop_pds_montagematerial_platzhalter` liefert die Liste an die Anlage
   (Migration 014, docs/pds-montagematerial-platzhalter.md). Bewusst kein
   Automatismus über Kategorie: In „Klima" liegen auch Geräte.
