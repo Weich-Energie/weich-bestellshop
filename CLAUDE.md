@@ -107,7 +107,7 @@ Neue Edge Function `shop-ai` mit taskbasiertem Routing:
 - [docs/pds-klima-warengruppen.md](docs/pds-klima-warengruppen.md) — Klima-Warengruppen und Umzugsliste
 - [docs/nachkalkulation-datenmodell.md](docs/nachkalkulation-datenmodell.md) — Soll/Ist-Modell
 - [docs/pds-nachtragsauftrag.md](docs/pds-nachtragsauftrag.md) — warum kein Nachtrag: Befund und Test
-- [docs/artikelpflege-tagesaktuell.md](docs/artikelpflege-tagesaktuell.md) — Shop als aktuelle Wahrheit fuer C-Teile, Import-Skript, PDS-Abgleich
+- [docs/artikelpflege-lieferantendaten.md](docs/artikelpflege-lieferantendaten.md) — Shop als aktuelle Wahrheit fuer C-Teile, Import-Skript, PDS-Abgleich
 - [docs/pds-montagematerial-platzhalter.md](docs/pds-montagematerial-platzhalter.md) — Platzhalter-Ebene fuer die Auftragsanlage (an Megh)
 
 ## Doku-Regel

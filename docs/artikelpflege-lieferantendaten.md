@@ -1,7 +1,7 @@
 # Artikelpflege mit aktuellen Lieferantendaten — der Shop als aktuelle Wahrheit für C-Teile
 
-Stand 05.09.2026. Festlegung von Patrick Weich: Der Bestellshop wird laufend mit
-Daten aus den Lieferanten-Shops gefüttert und ist damit die **aktuelle** Quelle
+Stand 05.09.2026. Festlegung von Patrick Weich: Der Bestellshop bekommt, wann immer sie anfallen, aktuelle
+Daten aus den Lieferanten-Shops und ist damit die **aktuelle** Quelle
 für Artikel und Einkaufspreise der C-Teile. PDS ist nicht aktuell und wird im
 Nachgang gegen den Shop abgeglichen.
 
