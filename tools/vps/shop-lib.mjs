@@ -174,6 +174,134 @@ export const PLAYBOOKS = {
     },
   },
 
+  // GUT Gruppe (gutonlineplus.de) — Haustechnik-Grosshandel. Login-Formular
+  // direkt auf der Startseite (#a3), Usercentrics-Consent davor.
+  gut: {
+    name: 'GUT',
+    basis: 'https://www.gutonlineplus.de',
+    loginUrl: 'https://www.gutonlineplus.de/',
+    pruefUrl: 'https://www.gutonlineplus.de/',
+    async dialogeSchliessen(page) {
+      for (const sel of ['button[data-testid="uc-deny-all-button"]', 'button:has-text("Ablehnen")', 'button:has-text("Einstellungen speichern")', 'button:has-text("Nur notwendige")', 'button:has-text("Speichern")']) {
+        if (await page.locator(sel).first().click({ timeout: 1500 }).then(() => true).catch(() => false)) break
+      }
+    },
+    async login(page, benutzer, passwort) {
+      await page.goto(this.loginUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 })
+      await this.dialogeSchliessen(page)
+      // jQuery-Mobile-App: das Login-Formular steckt in einem eingeklappten
+      // Benutzermenue (ul#UlMenuLogin, display:none). Erst das Menue oeffnen,
+      // sonst haelt Playwright die Felder fuer unsichtbar.
+      await page.locator('#a3_inputName').waitFor({ state: 'attached', timeout: 20_000 })
+      await page.locator('li.user .userBody, li.user, #MenuLogin').first().click({ timeout: 3000 }).catch(() => {})
+      await page.waitForTimeout(800)
+      if (!(await page.locator('#a3_inputName').isVisible().catch(() => false))) {
+        await page.evaluate(() => { const ul = document.querySelector('#UlMenuLogin'); if (ul) ul.style.display = 'block' })
+        await page.waitForTimeout(300)
+      }
+      if (await page.locator('#a3_inputName').isVisible().catch(() => false)) {
+        await page.fill('#a3_inputName', benutzer)
+        await page.fill('#a3_inputPass', passwort)
+        await page.locator('#a3_btnSubmit').click({ timeout: 5000 }).catch(async () => { await page.press('#a3_inputPass', 'Enter') })
+      } else {
+        // Felder bleiben unsichtbar (verschachtelte jQuery-Mobile-Panels):
+        // Werte per Skript setzen, Eingabe-Ereignisse ausloesen, Formular absenden.
+        await page.evaluate(({ b, p }) => {
+          const setze = (sel, wert) => { const e = document.querySelector(sel); e.value = wert; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })) }
+          setze('#a3_inputName', b); setze('#a3_inputPass', p)
+          const knopf = document.querySelector('#a3_btnSubmit')
+          if (knopf) knopf.click(); else document.querySelector('#a3').requestSubmit()
+        }, { b: benutzer, p: passwort })
+      }
+      await page.waitForLoadState('networkidle', { timeout: 45_000 }).catch(() => {})
+      await page.waitForTimeout(3000)
+      return this.istAngemeldet(page)
+    },
+    async istAngemeldet(page) {
+      // Nach dem Login verschwindet das Login-Formular aus dem Benutzermenue.
+      const pw = await page.locator('#a3_inputPass').count()
+      const abmelden = await page.locator('a:has-text("Abmelden"), a:has-text("Logout"), a[href*="logout"], a[href*="Logout"], #a3_btnLogout, [id*="Logout"]').count()
+      return abmelden > 0 || pw === 0
+    },
+    // Einseiten-App mit Hash-Routing: Produkte haben keine eigenen URLs. Suche
+    // ueber das Suchfeld, Treffer werden direkt aus der Liste gelesen.
+    async suchen(page, begriff) {
+      if (!/gutonlineplus\.de/.test(page.url())) await page.goto('https://www.gutonlineplus.de/', { waitUntil: 'domcontentloaded', timeout: 45_000 })
+      await this.dialogeSchliessen(page)
+      const feld = page.locator('input[placeholder*="Artikeln zu suchen"]:visible, input[placeholder*="Suchbegriff"]:visible').first()
+      await feld.waitFor({ timeout: 20_000 })
+      await feld.fill('')
+      await feld.fill(begriff)
+      await feld.press('Enter')
+      await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {})
+      await page.waitForTimeout(3500)
+    },
+    istProduktUrl: () => false,
+    sucheUrl: (begriff) => `https://www.gutonlineplus.de/p/search/${encodeURIComponent(begriff)}`,
+    netto: { selektor: '[data-cid="NetPriced"], .GCtextLine.bodyLG', muster: /([\d.]+,\d{2})\s*€/ },
+    // Treffer direkt aus der Ergebnistabelle lesen. Jede Zeile hat Elemente mit
+    // gemeinsamem id-Praefix "..._productTable_<n>"; der Nettopreis steht in
+    // data-cid="NetPriced", daneben "per 1 m" und "8,60 € Listenpreis".
+    async trefferAusListe(page) {
+      return page.evaluate(() => {
+        const out = []
+        for (const np of document.querySelectorAll('[data-cid="NetPriced"]')) {
+          const prefix = (np.id || '').replace(/_netPriceContainer.*$/, '')
+          if (!prefix || !/productTable_\d+$/.test(prefix)) continue
+          const zeile = Array.from(document.querySelectorAll(`[id^="${prefix}_"]`))
+          const texte = [...new Set(zeile.filter((e) => e.children.length === 0).map((e) => e.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean))]
+          const nettoText = np.textContent.replace(/\s+/g, ' ').trim()
+          const einheit = (np.parentElement?.textContent.match(/per\s+([\d,.]+\s*[A-Za-zäöü]+)/) || [])[1] ?? null
+          const listeT = texte.find((t) => /Listenpreis/.test(t)) || ''
+          const liste = (listeT.match(/([\d.]+,\d{2})/) || [])[1] ?? null
+          const artikelnummer = texte.find((t) => /^[A-Z0-9][A-Z0-9.\-\/]{4,}$/.test(t) && !/€/.test(t)) ?? null
+          const titel = texte.filter((t) => !/€|Listenpreis|^per\s|^m$|^Stück$/.test(t) && t !== artikelnummer).sort((a, b) => b.length - a.length)[0] ?? null
+          const zahl = (s) => (s ? Number(s.replace(/[^\d,]/g, '').replace(',', '.')) : null)
+          out.push({ url: location.href, artikelnummer, titel, netto_preis: zahl(nettoText), netto_quelle: `${nettoText} ${einheit ? 'per ' + einheit : ''} ${listeT}`.trim(), listenpreis: zahl(liste), einheit })
+        }
+        return out
+      })
+    },
+    seiteUrl(listeUrl, n) { return n === 0 ? listeUrl : listeUrl + (listeUrl.includes('?') ? '&' : '?') + `page=${n + 1}` },
+  },
+
+  // COLONS (colons.de) — SHK-Onlineshop. Login /login mit E-Mail, CookieFirst-Consent.
+  colons: {
+    name: 'Colons',
+    basis: 'https://www.colons.de',
+    loginUrl: 'https://www.colons.de/login',
+    pruefUrl: 'https://www.colons.de/',
+    async dialogeSchliessen(page) {
+      for (const sel of ['[data-cookiefirst-action="reject"]', 'button:has-text("Ablehnen")', 'button:has-text("Nur notwendige")', '[data-cookiefirst-action="save"]']) {
+        if (await page.locator(sel).first().click({ timeout: 1500 }).then(() => true).catch(() => false)) break
+      }
+    },
+    async login(page, benutzer, passwort) {
+      await page.goto(this.loginUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 })
+      await this.dialogeSchliessen(page)
+      await page.locator('input[type="password"]').first().waitFor({ timeout: 20_000 })
+      await page.locator('input[type="email"], input[placeholder*="E-Mail"]').first().fill(benutzer)
+      await page.locator('input[type="password"]').first().fill(passwort)
+      // Enter im Passwortfeld statt Klick: der Knopf "Jetzt Anmelden" wird im
+      // headless Browser nicht zuverlaessig als Teil des Formulars gefunden.
+      await page.press('input[type="password"]', 'Enter')
+      await page.waitForLoadState('networkidle', { timeout: 45_000 }).catch(() => {})
+      await page.waitForTimeout(2500)
+      return this.istAngemeldet(page)
+    },
+    async istAngemeldet(page) {
+      if (/\/login/.test(page.url())) return false
+      const abmelden = await page.locator('a:has-text("Abmelden"), a[href*="logout"]').count()
+      const pw = await page.locator('input[type="password"]').count()
+      return abmelden > 0 || pw === 0
+    },
+    // Produktseiten: /de/<slug>-<Artikelnummer, 6+ Ziffern>; Trefferliste .product-grid-item, Blaettern &page=N (1-basiert).
+    istProduktUrl: (h) => /colons\.de\/de\/[a-z0-9-]+-\d{6,}\/?$/i.test(h),
+    sucheUrl: (begriff) => `https://www.colons.de/search?q=${encodeURIComponent(begriff)}&ipp=24`,
+    seiteUrl(listeUrl, n) { const b = listeUrl.replace(/&page=\d+/, ''); return n === 0 ? b : b + `&page=${n + 1}` },
+    netto: { selektor: '.product__price, .product-detail__price, [class*="price"]', muster: /([\d.]+,\d{2})\s*€/ },
+  },
+
   // Schiessl Kaeltegesellschaft — Sylius/Symfony-Shop, Login mit E-Mail.
   'schiessl-kaelte': {
     name: 'Schiessl Kälte',
@@ -337,7 +465,9 @@ export async function produktDaten(page, url, pb) {
     return {
       titel: text(document.querySelector('h1')) || document.title.split(' | ')[0].split(' / ').pop(),
       seitentitel: document.title,
-      artikelnummer: greife(/Artikel-?(?:nummer|Nr\.?)\s*:?\s*(\d[\d.\-\/]{3,}|[A-Z0-9][A-Z0-9.\-\/]{3,}?)(?=\s|[A-Z][a-zä]|$)/i),
+      // "Artikelnummer: 2032030", "Artikelnummer 0000100847068", "Art-Nr.: 290492000", "Bestell-Nr.: 781.0005"
+      artikelnummer: greife(/(?:Artikel|Art\.?|Bestell)\s*-?\s*(?:nummer|Nr\.?)\s*:?\s*(\d[\d.\-\/]{3,}|[A-Z0-9][A-Z0-9.\-\/]{3,}?)(?=\s|[A-Z][a-zä]|$)/i),
+      gtin: greife(/(?:GTIN|EAN)\s*-?\s*(?:Nr\.?)?\s*:?\s*(\d{8,14})/i),
       // Frigotechnik "OEM-Nummer: MS257 105", R+F "Werksnummer 2MXM40A9", andere "Hersteller-Nr.: …"
       herstellernummer: greife(/(?:OEM|Hersteller|Werks)-?(?:Artikel)?-?(?:Nummer|Nr\.?)\s*:?\s*([A-Z0-9][A-Z0-9 .\-\/_]{2,}?)(?=\s+[A-Z][a-zä]|\s*$|\s{2,})/i),
       matchcode: greife(/Matchcode\s*:?\s*([A-Z0-9][A-Z0-9.\-\/]{2,})/i),

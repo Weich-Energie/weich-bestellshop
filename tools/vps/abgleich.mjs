@@ -49,12 +49,29 @@ for (const slug of shops) {
         // indexieren die Typbezeichnung nur in einer Schreibweise.
         const varianten = [...new Set([b.begriff, b.begriff.replace(/^[A-Z]{1,3}-/, ''), b.begriff.replace(/-/g, '')].filter((v) => v.length >= 4))]
         let urls = []
+        let listeTreffer = null
         for (const v of varianten) {
           await suchen(page, pb, v)
+          if (pb.trefferAusListe) {
+            // Shops ohne Produkt-URLs (GUT): Treffer stehen komplett in der Liste.
+            listeTreffer = await pb.trefferAusListe(page)
+            if (listeTreffer.length) { zeile.suchbegriff = v; break }
+            continue
+          }
           const links = await page.evaluate(() => [...new Set(Array.from(document.querySelectorAll('a[href]')).map((a) => a.href))])
           // Varianten-Links (?selectedcolor=…) auf die Produktseite zusammenziehen.
           urls = [...new Set(links.filter((h) => pb.istProduktUrl(h)).map((h) => h.split('?')[0].split('#')[0]))].slice(0, max)
           if (urls.length) { zeile.suchbegriff = v; break }
+        }
+        if (listeTreffer) {
+          zeile.gesucht = listeTreffer.length
+          for (const t of listeTreffer) {
+            const passt = locker || norm(`${t.titel} ${t.artikelnummer}`).includes(norm(b.begriff))
+            if (passt && zeile.passend.length < max) zeile.passend.push({ ...t, herstellernummer: null, brutto_preis: t.listenpreis ?? null, bestand: null })
+          }
+          treffer[b.begriff] = zeile
+          console.error(`[${slug}] ${b.begriff}: ${zeile.gesucht} in Liste, ${zeile.passend.length} passend`)
+          continue
         }
         zeile.gesucht = urls.length
         for (const u of urls) {

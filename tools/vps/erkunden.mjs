@@ -6,20 +6,23 @@
 // Ausgabe: JSON mit Link-Mustern (gruppiert nach Pfadform), Preis-Textstellen,
 // Blaetter-Links, Seitentext-Anfang.
 
-import { oeffnen, seiteOeffnen } from './shop-lib.mjs'
+import { oeffnen, seiteOeffnen, suchen } from './shop-lib.mjs'
 
 const args = process.argv.slice(2)
 const wert = (n, standard) => { const i = args.indexOf(`--${n}`); return i >= 0 && args[i + 1] ? args[i + 1] : standard }
-const mitWert = new Set(['--lieferant', '--shot'])
+const mitWert = new Set(['--lieferant', '--shot', '--tippen', '--suche'])
 const url = args.find((a, i) => !a.startsWith('--') && !(i > 0 && mitWert.has(args[i - 1])))
 const slug = wert('lieferant', '')
 const shot = wert('shot', null)
 if (!slug || !url) { console.error('Aufruf: node erkunden.mjs --lieferant <slug> <url>'); process.exit(1) }
 
 const tippen = wert('tippen', null)
+// --suche "Begriff": die Suche des Playbooks benutzen (wie abgleich.mjs).
+const sucheBegriff = wert('suche', null)
 const { browser, page, angemeldet, sitzung, pb } = await oeffnen(slug, { ohneLogin: args.includes('--ohne-login') })
 try {
-  await seiteOeffnen(page, url, pb)
+  if (sucheBegriff) await suchen(page, pb, sucheBegriff)
+  else await seiteOeffnen(page, url, pb)
   // --tippen "Begriff": in das Suchfeld der Seite tippen und Enter druecken —
   // fuer Shops, deren Suche nur ueber die eigene Eingabe funktioniert.
   if (tippen) {
@@ -56,8 +59,12 @@ try {
       .filter((e) => e.textContent.trim().length > 20).slice(0, 3)
       .map((e) => ({ tag: e.tagName, klasse: (e.className || '').toString().slice(0, 80), html: e.outerHTML.replace(/\s+/g, ' ').slice(0, 500) }))
     const anzahlText = (document.body.innerText.match(/(\d[\d.]*)\s+(Produkte|Artikel|Treffer|Ergebnisse)/i) || [])[0] ?? null
+    // Struktur einer Trefferzeile: vom ersten "Listenpreis"/Preis-Element drei Ebenen hoch.
+    let zeileHtml = null
+    const preisEl = Array.from(document.querySelectorAll('body *')).find((e) => e.children.length === 0 && /Listenpreis|€/.test(e.textContent) && !/Warenkorb/.test(e.textContent))
+    if (preisEl) { let z = preisEl; for (let i = 0; i < 4 && z.parentElement && z.textContent.length < 600; i++) z = z.parentElement; zeileHtml = z.outerHTML.replace(/\s+/g, ' ').slice(0, 1500) }
     return {
-      url: location.href, titel: document.title, anzahlText, produktKandidaten, kacheln, linkMuster: muster, blaettern: [...new Set([...blaetter, ...blaetter2])],
+      url: location.href, titel: document.title, anzahlText, produktKandidaten, kacheln, zeileHtml, linkMuster: muster, blaettern: [...new Set([...blaetter, ...blaetter2])],
       preise, text: document.body.innerText.replace(/\s+/g, ' ').slice(0, 700),
     }
   })
