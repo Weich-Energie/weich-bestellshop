@@ -40,9 +40,18 @@ for (const slug of shops) {
     for (const b of begriffe) {
       const zeile = { gesucht: 0, passend: [] }
       try {
-        await suchen(page, pb, b.begriff)
-        const links = await page.evaluate(() => [...new Set(Array.from(document.querySelectorAll('a[href]')).map((a) => a.href))])
-        const urls = links.filter((h) => pb.istProduktUrl(h)).slice(0, max)
+        // Suchvarianten: erst der Begriff selbst, dann ohne Herstellerkuerzel
+        // ("CU-Z25CKE" -> "Z25CKE"), dann ohne Bindestriche. Manche Shops
+        // indexieren die Typbezeichnung nur in einer Schreibweise.
+        const varianten = [...new Set([b.begriff, b.begriff.replace(/^[A-Z]{1,3}-/, ''), b.begriff.replace(/-/g, '')].filter((v) => v.length >= 4))]
+        let urls = []
+        for (const v of varianten) {
+          await suchen(page, pb, v)
+          const links = await page.evaluate(() => [...new Set(Array.from(document.querySelectorAll('a[href]')).map((a) => a.href))])
+          // Varianten-Links (?selectedcolor=…) auf die Produktseite zusammenziehen.
+          urls = [...new Set(links.filter((h) => pb.istProduktUrl(h)).map((h) => h.split('?')[0].split('#')[0]))].slice(0, max)
+          if (urls.length) { zeile.suchbegriff = v; break }
+        }
         zeile.gesucht = urls.length
         for (const u of urls) {
           const d = await produktDaten(page, u, pb)

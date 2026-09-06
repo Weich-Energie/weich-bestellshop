@@ -110,7 +110,8 @@ export const PLAYBOOKS = {
     istProduktUrl: (h) => /linum\.eu\/de\/[a-z0-9-]+\/[a-z0-9-]+\/[a-z0-9-]+\/[a-z0-9-]+\/[a-z0-9-]+(\?|$)/.test(h),
     // Nettopreis steht als eigenes Element (Listenpreis daneben ohne --net).
     netto: { selektor: '.price--net, .product-list-item__price--net', muster: /€\s*([\d.]+,\d{2})/ },
-    sucheUrl: (begriff) => `https://www.linum.eu/de/search?HeaderSearch.Search=${encodeURIComponent(begriff)}`,
+    // /de/search?HeaderSearch.Search= zeigt nur Kategorien; die echte Trefferseite ist suchergebnisse-linum.
+    sucheUrl: (begriff) => `https://www.linum.eu/de/suchergebnisse-linum?search=${encodeURIComponent(begriff)}`,
     seiteUrl(listeUrl, n) {
       if (n === 0) return listeUrl
       return listeUrl + (listeUrl.includes('?') ? '&' : '?') + `page=${n + 1}`
@@ -165,7 +166,7 @@ export const PLAYBOOKS = {
       await page.waitForTimeout(3000)
     },
     // Unser Preis steht als "je 7,93 € /ST", der Listenpreis daneben als "Listenpreis: 20,70 €".
-    netto: { selektor: '.price, .price-total', muster: /je\s*([\d.]+,\d{2})\s*€/, ersatz: /^\s*([\d.]+,\d{2})\s*€/ },
+    netto: { selektor: '.single-price, .list-price, .price, .price-total', muster: /je:?\s*([\d.]+,\d{2})\s*€/, ersatz: /^\s*([\d.]+,\d{2})\s*€/ },
     seiteUrl(listeUrl, n) {
       const basis = listeUrl.replace(/([?&])currentPage=\d+/, '$1').replace(/[?&]$/, '')
       return basis + (basis.includes('?') ? '&' : '?') + `currentPage=${n + 1}`
@@ -194,7 +195,8 @@ export const PLAYBOOKS = {
     },
     // Produktseiten enden auf ~p<Nummer>, Kategorien auf ~c<Nummer>.
     istProduktUrl: (h) => /schiessl-kaelte\.com\/de_DE\/Shop\/.+~p\d+/.test(h),
-    netto: { selektor: '.product-price, [class*="price"]', muster: /([\d.]+,\d{2})\s*EUR\s*netto/ },
+    // Auf der Produktseite steht im .product-price nur "567,36 EUR"; "netto / Stk" ist ein Nachbarelement.
+    netto: { selektor: '.product-price', muster: /([\d.]+,\d{2})\s*EUR/ },
     sucheUrl: (begriff) => `https://www.schiessl-kaelte.com/de_DE/search/result?q=${encodeURIComponent(begriff)}`,
     seiteUrl(listeUrl, n) {
       if (n === 0) return listeUrl
@@ -326,7 +328,8 @@ export async function produktDaten(page, url, pb) {
       titel: text(document.querySelector('h1')) || document.title.split(' | ')[0].split(' / ').pop(),
       seitentitel: document.title,
       artikelnummer: greife(/Artikel-?(?:nummer|Nr\.?)\s*:?\s*(\d[\d.\-\/]{3,}|[A-Z0-9][A-Z0-9.\-\/]{3,}?)(?=\s|[A-Z][a-zä]|$)/i),
-      herstellernummer: greife(/(?:OEM|Hersteller)-?(?:Nummer|Nr\.?)\s*:?\s*([A-Z0-9][A-Z0-9 .\-\/]{2,}?)(?=\s+[A-Z][a-zä]|\s*$|\s{2,})/i),
+      // Frigotechnik "OEM-Nummer: MS257 105", R+F "Werksnummer 2MXM40A9", andere "Hersteller-Nr.: …"
+      herstellernummer: greife(/(?:OEM|Hersteller|Werks)-?(?:Artikel)?-?(?:Nummer|Nr\.?)\s*:?\s*([A-Z0-9][A-Z0-9 .\-\/_]{2,}?)(?=\s+[A-Z][a-zä]|\s*$|\s{2,})/i),
       matchcode: greife(/Matchcode\s*:?\s*([A-Z0-9][A-Z0-9.\-\/]{2,})/i),
       ausgabe_menge: ausgabe ? Number(ausgabe[1].replace(',', '.')) : null,
       ausgabe_einheit: ausgabe ? ausgabe[2] : null,
@@ -348,20 +351,31 @@ export async function produktDaten(page, url, pb) {
     const treffer = await page.evaluate(({ selektor, muster, ersatz }) => {
       const re = new RegExp(muster.source, muster.flags)
       const re2 = ersatz ? new RegExp(ersatz.source, ersatz.flags) : null
-      for (const e of document.querySelectorAll(selektor)) {
-        const t = e.textContent.replace(/\s+/g, ' ').trim()
-        const m = t.match(re) || (re2 && t.match(re2))
-        if (m) return { text: t.slice(0, 80), zahl: m[1] }
+      // Selektoren in der angegebenen Reihenfolge, nicht in DOM-Reihenfolge —
+      // und nichts aus Teasern, Empfehlungen oder Alternativartikeln.
+      const fremd = '[class*="teaser"], [class*="recommend"], [class*="similar"], [class*="alternativ"], [class*="slider"], [class*="carousel"], [class*="cross"], [class*="upsell"]'
+      const debug = []
+      for (const sel of selektor.split(',').map((s) => s.trim()).filter(Boolean)) {
+        for (const e of document.querySelectorAll(sel)) {
+          const t = e.textContent.replace(/\s+/g, ' ').trim()
+          const ausgeschlossen = !!e.closest(fremd)
+          if (debug.length < 6) debug.push(`${sel} | ${ausgeschlossen ? 'AUSGESCHLOSSEN ' : ''}${t.slice(0, 60)}`)
+          if (ausgeschlossen) continue
+          const m = t.match(re) || (re2 && t.match(re2))
+          if (m) return { text: t.slice(0, 80), zahl: m[1] }
+        }
       }
-      return null
+      return { debug }
     }, {
       selektor: pb.netto.selektor,
       muster: { source: pb.netto.muster.source, flags: pb.netto.muster.flags },
       ersatz: pb.netto.ersatz ? { source: pb.netto.ersatz.source, flags: pb.netto.ersatz.flags } : null,
     })
-    if (treffer) {
+    if (treffer?.zahl) {
       daten.netto_preis = Number(treffer.zahl.replace(/\./g, '').replace(',', '.'))
       daten.netto_quelle = treffer.text
+    } else if (treffer?.debug) {
+      daten.netto_debug = treffer.debug
     }
   }
   return { url, ...daten }
@@ -370,11 +384,12 @@ export async function produktDaten(page, url, pb) {
 // Suche ausfuehren: Standard ist die Such-URL, Playbooks koennen eine eigene
 // suchen()-Routine mitbringen (Eingabe ins Suchfeld).
 export async function suchen(page, pb, begriff) {
-  if (pb.suchen) { await pb.suchen(page, begriff); return page.url() }
-  const u = pb.sucheUrl(begriff)
-  await seiteOeffnen(page, u, pb)
+  if (pb.suchen) { await pb.suchen(page, begriff) } else { await seiteOeffnen(page, pb.sucheUrl(begriff), pb) }
+  // Nachgeladene Trefferlisten brauchen einen Moment, manche laden erst beim Scrollen.
+  await page.waitForTimeout(2500)
+  await page.mouse.wheel(0, 1200).catch(() => {})
   await page.waitForTimeout(1500)
-  return u
+  return page.url()
 }
 
 // Alle Produkt-URLs einer Trefferliste (Suche oder Kategorie) ueber alle Seiten.

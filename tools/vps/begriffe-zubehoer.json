@@ -1,0 +1,16 @@
+[
+  {"begriff": "Wandkonsole", "name": "Wandkonsole Außengerät", "quelle": "klimarechner", "ek": 35},
+  {"begriff": "Bodenkonsole", "name": "Bodenkonsole / Aufstellbalken Außengerät", "quelle": "klimarechner", "ek": 19},
+  {"begriff": "Aufstellbalken", "name": "Aufstellbalken Kunststoff", "quelle": "klimarechner", "ek": 19},
+  {"begriff": "Dachkonsole", "name": "Dachkonsole Außengerät", "quelle": "klimarechner", "ek": 70},
+  {"begriff": "Schwingungsdämpfer", "name": "Antivibrationsdämpfer / Gummipuffer", "quelle": "klimarechner", "ek": 7.8},
+  {"begriff": "Kabelkanal", "name": "Leitungskanal Kunststoff", "quelle": "klimarechner", "ek": 6.87},
+  {"begriff": "Kältemittelleitung", "name": "Kältemittelleitung isoliert (Doppelrohr)", "quelle": "klimarechner", "ek": 9.22},
+  {"begriff": "Kondensatschlauch", "name": "Kondensatschlauch / -leitung", "quelle": "klimarechner", "ek": 1.73},
+  {"begriff": "Kondensatpumpe", "name": "Kondensatpumpe", "quelle": "klimarechner", "ek": 102.6},
+  {"begriff": "Reparaturschalter", "name": "Wartungs-/Reparaturschalter außen", "quelle": "klimarechner", "ek": 23.28},
+  {"begriff": "Steuerleitung", "name": "Steuer-/Verbindungsleitung Innen-Außen", "quelle": "klimarechner", "ek": 1.2},
+  {"begriff": "Mauerdurchführung", "name": "Mauerdurchführungshülse", "quelle": "klimarechner", "ek": null},
+  {"begriff": "Armaflex", "name": "Zusatz-Isolierung", "quelle": "klimarechner", "ek": null},
+  {"begriff": "Bördelmutter", "name": "Bördelmuttern / Ersatzverschraubungen", "quelle": "klimarechner", "ek": null}
+]

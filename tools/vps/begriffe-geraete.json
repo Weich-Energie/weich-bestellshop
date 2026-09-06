@@ -1,0 +1,704 @@
+[
+ {
+  "begriff": "RXJ50A9",
+  "name": "Singlesplit Außengerät 5,0kW",
+  "marke": "Daikin - RXJ50A9",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 1334.78,
+  "vk": 1910
+ },
+ {
+  "begriff": "5MXM90A8",
+  "name": "Multisplit Außengerät 9,0kW",
+  "marke": "Daikin - 5MXM90A8/A9",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 2784.26,
+  "vk": 3980
+ },
+ {
+  "begriff": "2MXM40A9",
+  "name": "Multisplit Außengerät 4,0kW",
+  "marke": "Daikin - 2MXM40A9",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 1299.23,
+  "vk": 1860
+ },
+ {
+  "begriff": "3MXM68A8",
+  "name": "Multisplit Außengerät 6,8 kW",
+  "marke": "Daikin - 3MXM68A8",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 2042.64,
+  "vk": 2920
+ },
+ {
+  "begriff": "7733701567",
+  "name": "Klimagerät CL3000i 35 E, Singlesplit Außeneinheit",
+  "marke": "BOSCH",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 1346,
+  "vk": 2080
+ },
+ {
+  "begriff": "RZAG71NV1",
+  "name": "Daikin Außengerät 7,5 kW",
+  "marke": "Daikin",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 1691.19,
+  "vk": 2420
+ },
+ {
+  "begriff": "RXJ25A9",
+  "name": "Singlesplit Außengerät 2,5kW",
+  "marke": "Daikin - RXJ25A9",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 1017.97,
+  "vk": 1460
+ },
+ {
+  "begriff": "3MXM52A8",
+  "name": "Multisplit Außengerät 5,2kW",
+  "marke": "Daikin - 3MXM52A8/A9",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 1671.84,
+  "vk": 2390
+ },
+ {
+  "begriff": "CU-5Z90CBE",
+  "name": "Multisplit-Außengerät - 9,0kW : 5IG",
+  "marke": "Panasonic - CU-5Z90CBE",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 2647,
+  "vk": 3790
+ },
+ {
+  "begriff": "CU-4Z80CBE",
+  "name": "Multisplit-Außengerät - 8,0kW : 4IG",
+  "marke": "Panasonic - CU-4Z80CBE",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 2327,
+  "vk": 3330
+ },
+ {
+  "begriff": "CU-4Z68CBE",
+  "name": "Multisplit-Außengerät - 6,8kW : 4IG",
+  "marke": "Panasonic - CU-4Z68CBE",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 2063,
+  "vk": 2950
+ },
+ {
+  "begriff": "CU-3Z52CBE",
+  "name": "Multisplit-Außengerät - 5,2kW : 3IG",
+  "marke": "Panasonic - CU-3Z52CBE",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 1472,
+  "vk": 2110
+ },
+ {
+  "begriff": "CU-Z50CKE",
+  "name": "Singlesplit Außengerät 5,0 kW - R32 - Förderfähig",
+  "marke": "Panasonic - CU-Z50CKE",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 1043,
+  "vk": 1500
+ },
+ {
+  "begriff": "CU-Z35CKE",
+  "name": "Singlesplit Außengerät 3,5 kW - R32 - Förderfähig",
+  "marke": "Panasonic - CU-Z35CKE",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 872.5,
+  "vk": 1250
+ },
+ {
+  "begriff": "CU-Z25CKE",
+  "name": "Singlesplit Außengerät 2,5 kW - R32 - Förderfähig",
+  "marke": "Panasonic - CU-Z25CKE",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 750,
+  "vk": 1070
+ },
+ {
+  "begriff": "CU-Z20CKE",
+  "name": "Singlesplit Außengerät 2,0 kW - R32 - Förderfähig",
+  "marke": "Panasonic - CU-Z20CKE",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 639,
+  "vk": 910
+ },
+ {
+  "begriff": "WPK-290",
+  "name": "KRONE WPK-290",
+  "marke": "KRONE",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 949,
+  "vk": 1470
+ },
+ {
+  "begriff": "RXM71A",
+  "name": "Perfera Außengerät 7,1kW",
+  "marke": "Daikin - RXM71A",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 1426.58,
+  "vk": 2040
+ },
+ {
+  "begriff": "RXA35A8",
+  "name": "Stylish Außengerät 3,5 kW",
+  "marke": "Daikin - RXA35A8",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 963.07,
+  "vk": 1380
+ },
+ {
+  "begriff": "RZAG100NV1",
+  "name": "Daikin Außengerät 9,5 kW",
+  "marke": "Daikin",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 2255.5,
+  "vk": 3230
+ },
+ {
+  "begriff": "4MXM68A8",
+  "name": "Multisplit Außengerät 6,8kW ",
+  "marke": "Daikin - 4MXM68A8/A9",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 2367.1,
+  "vk": 3390
+ },
+ {
+  "begriff": "7733702577",
+  "name": "Klimagerät CL7000i 35 E, Singlesplit Außeneinheit (Förderfähig)",
+  "marke": "BOSCH",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 1497,
+  "vk": 2300
+ },
+ {
+  "begriff": "7733701938",
+  "name": "Klimagerät CL5000M 125/5 E Multisplit Außeneinheit 12,5kW",
+  "marke": "BOSCH",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 2566,
+  "vk": 3950
+ },
+ {
+  "begriff": "7733701935",
+  "name": "Klimagerät CL5000M 79/3 E Multisplit Außeneinheit 7,9kW",
+  "marke": "BOSCH",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 1986,
+  "vk": 3070
+ },
+ {
+  "begriff": "7733701937",
+  "name": "Klimagerät CL5000M 105/4 E Multisplit Außeneinheit 10,5kW",
+  "marke": "BOSCH",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 2455,
+  "vk": 3800
+ },
+ {
+  "begriff": "7733701933",
+  "name": "Klimagerät CL5000M 53/2 E Multisplit Außeneinheit 5,3kW",
+  "marke": "BOSCH",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 1738,
+  "vk": 2690
+ },
+ {
+  "begriff": "RXM35A9",
+  "name": "Perfera Außengerät 3,5kW",
+  "marke": "Daikin - RXM35A9",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 967.57,
+  "vk": 1390
+ },
+ {
+  "begriff": "RXM50A8",
+  "name": "Perfera Außengerät 5,0kW",
+  "marke": "Daikin - RXM50A8",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 1077.82,
+  "vk": 1540
+ },
+ {
+  "begriff": "4MXM80A8",
+  "name": "Multisplit Außengerät 8kW",
+  "marke": "Daikin - 4MXM80A8/A9",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 2529.11,
+  "vk": 3620
+ },
+ {
+  "begriff": "RZAG71NY1",
+  "name": "Daikin - Sky Air Alpha - Seasonal Smart Außengerät",
+  "marke": "Daikin",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 1741.14,
+  "vk": 2490
+ },
+ {
+  "begriff": "7733701565",
+  "name": "Klimagerät CL3000i 26 E, Singlesplit Außeneinheit",
+  "marke": "BOSCH",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 452,
+  "vk": 645
+ },
+ {
+  "begriff": "CU-3Z68CBE",
+  "name": "Multisplit-Außengerät - 6,8kW : 3IG",
+  "marke": "Panasonic - CU-3Z68CBE",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 1544,
+  "vk": 2210
+ },
+ {
+  "begriff": "CU-3Z75ABEC",
+  "name": "PowerHeat-Außengerät - 7,5kW : 3IG",
+  "marke": "Panasonic",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 2100,
+  "vk": 2800
+ },
+ {
+  "begriff": "CU-2Z41CBE",
+  "name": "Multisplit-Außengerät - 4,1kW : 2IG",
+  "marke": "Panasonic - CU-2Z41CBE",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 1190,
+  "vk": 1700
+ },
+ {
+  "begriff": "CU-2Z50CBE",
+  "name": "Multisplit-Außengerät - 5,0kW : 2IG",
+  "marke": "Panasonic - CU-2Z50CBE",
+  "typ": "airHeatPump",
+  "quelle": "reonic",
+  "ek": 1358,
+  "vk": 1940
+ },
+ {
+  "begriff": "CU-2Z35CBE",
+  "name": "Multisplit-Außengerät - 3,5kW : 2IG",
+  "marke": "Panasonic - CU-2Z35CBE",
+  "typ": "?",
+  "quelle": "reonic",
+  "ek": 1145,
+  "vk": 1635
+ },
+ {
+  "begriff": "FTXA25CW",
+  "name": "Stylish Wandgerät 2,5kW Weiß - FTXA25CW",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 594.06,
+  "vk": 850
+ },
+ {
+  "begriff": "FTXA20CB",
+  "name": "Stylish Wandgerät 2,0kW Mattschwarz - FTXA20CB",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 506.76,
+  "vk": 730
+ },
+ {
+  "begriff": "FTXM60A",
+  "name": "Perfera Wandgerät 6,0kW Weiß - FTXM60A",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 851.02,
+  "vk": 1220
+ },
+ {
+  "begriff": "FTXA25CB",
+  "name": "Stylish Wandgerät 2,5kW Mattschwarz - FTXA25CB",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 594.06,
+  "vk": 850
+ },
+ {
+  "begriff": "FTXM25A",
+  "name": "Perfera Wandgerät 2,5kW Weiß - FTXM25A",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 548.16,
+  "vk": 790
+ },
+ {
+  "begriff": "FTXM42A",
+  "name": "Perfera Wandgerät 4,2kW Weiß - FTXM42A",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 685.86,
+  "vk": 980
+ },
+ {
+  "begriff": "FTXM35A",
+  "name": "Perfera Wandgerät 3,5kW Weiß - FTXM35A",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 658.41,
+  "vk": 950
+ },
+ {
+  "begriff": "FVXM50B",
+  "name": "Perfera Truhengerät FVXM50B R32 - FVXM50B",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 1043.17,
+  "vk": 1500
+ },
+ {
+  "begriff": "FTXJ20AW9",
+  "name": "Emura Wandgerät 2,0kW Weiß - FTXJ20AW9",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 644.46,
+  "vk": 930
+ },
+ {
+  "begriff": "FVXM35B",
+  "name": "Perfera Truhengerät FVXM35B R32 - FVXM35B",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 956.77,
+  "vk": 1370
+ },
+ {
+  "begriff": "FUA100A",
+  "name": "Deckengerät FUA100A 9,5 kW | 4-seitig ausblasend",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 1867.14,
+  "vk": 2670
+ },
+ {
+  "begriff": "7733702578",
+  "name": "Klimagerät CL7000iU W 35 E, Split Inneneinheit, 3,4 kW (Förderfähig)",
+  "marke": "BOSCH",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 734,
+  "vk": 980
+ },
+ {
+  "begriff": "7733701997",
+  "name": "Klimagerät CL3000iU W 20 E, Split Inneneinheit, 2,0 kW",
+  "marke": "BOSCH",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 446,
+  "vk": 600
+ },
+ {
+  "begriff": "CS-Z50CKEW",
+  "name": "Etherea Wandgerät - Mattweiß 5,0kW",
+  "marke": "Panasonic - CS-Z50CKEW",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 606.5,
+  "vk": 870
+ },
+ {
+  "begriff": "FTXA42CW",
+  "name": "Stylish Wandgerät 4,2kW Weiß - FTXA42CW",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 782.17,
+  "vk": 1120
+ },
+ {
+  "begriff": "CS-XZ35CKEW-H",
+  "name": "Etherea Wandgerät - Graphitgrau 3,5kW",
+  "marke": "Panasonic - CS-XZ35CKEW-H",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 541.5,
+  "vk": 780
+ },
+ {
+  "begriff": "CS-XZ20CKEW-H",
+  "name": "Etherea Wandgerät - Graphitgrau 2,0kW",
+  "marke": "Panasonic - CS-XZ20CKEW-H",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 384.5,
+  "vk": 550
+ },
+ {
+  "begriff": "CS-XZ25CKEW-H",
+  "name": "Etherea Wandgerät - Graphitgrau 2,5kW",
+  "marke": "Panasonic - CS-XZ25CKEW-H",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 466.5,
+  "vk": 670
+ },
+ {
+  "begriff": "CS-TZ35CKEW",
+  "name": "Wandgerät - Mattweiß 3,5kW",
+  "marke": "Panasonic - CS-TZ35CKEW",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 432,
+  "vk": 620
+ },
+ {
+  "begriff": "CS-Z25CKEW",
+  "name": "Etherea Wandgerät - Mattweiß 2,5kW",
+  "marke": "Panasonic - CS-Z25CKEW",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 416,
+  "vk": 600
+ },
+ {
+  "begriff": "CS-Z20CKEW",
+  "name": "Etherea Wandgerät - Mattweiß 2,0kW",
+  "marke": "Panasonic - CS-Z20CKEW",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 342.5,
+  "vk": 490
+ },
+ {
+  "begriff": "CS-TZ20CKEW",
+  "name": "Wandgerät - Mattweiß 2,0kW",
+  "marke": "Panasonic - CS-TZ20CKEW",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 308,
+  "vk": 440
+ },
+ {
+  "begriff": "CS-TZ25CKEW",
+  "name": "Wandgerät - Mattweiß 2,5kW",
+  "marke": "Panasonic - CS-TZ25CKEW",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 380,
+  "vk": 540
+ },
+ {
+  "begriff": "CS-Z35CKEW",
+  "name": "Etherea Wandgerät - Mattweiß 3,5kW",
+  "marke": "Panasonic - CS-Z35CKEW",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 483,
+  "vk": 690
+ },
+ {
+  "begriff": "FFA35A9",
+  "name": "Daikin Deckenkassette 3,5 kW",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 1011.22,
+  "vk": 1450
+ },
+ {
+  "begriff": "FFA25A9",
+  "name": "Daikin Deckenkassette 2,5 kW",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 964.42,
+  "vk": 1380
+ },
+ {
+  "begriff": "FVXM25B",
+  "name": "Perfera Truhengerät FVXM25B R32 - FVXM25B",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 725.01,
+  "vk": 1040
+ },
+ {
+  "begriff": "7733701995",
+  "name": "Klimagerät CL5000iU CN 35 E, Multisplit Inneneinheit Bodenkonsole 3,5kW ",
+  "marke": "BOSCH",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 759,
+  "vk": 1012
+ },
+ {
+  "begriff": "7733701568",
+  "name": "Klimagerät CL3000iU W 53 E, Split Inneneinheit, 5,3 kW",
+  "marke": "BOSCH",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 520,
+  "vk": 694
+ },
+ {
+  "begriff": "7739622253",
+  "name": "Klimagerät CL5000iU 4CC 35 E, Split Inneneinheit Deckenkassette 3,5kW",
+  "marke": "BOSCH",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 707,
+  "vk": 943
+ },
+ {
+  "begriff": "7733701566",
+  "name": "Klimagerät CL3000iU W 35 E, Split Inneneinheit, 3,5 kW",
+  "marke": "BOSCH",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 460,
+  "vk": 613
+ },
+ {
+  "begriff": "FTXA50CW",
+  "name": "Stylish Wandgerät 5,0kW Weiß - FTXA50CW",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 873.97,
+  "vk": 1250
+ },
+ {
+  "begriff": "FTXM50A",
+  "name": "Perfera Wandgerät 5,0kW - FTXM50A",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 768.22,
+  "vk": 1100
+ },
+ {
+  "begriff": "FTXA20CW",
+  "name": "Stylish Wandgerät 2,0kW Weiß - FTXA20CW",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 506.76,
+  "vk": 730
+ },
+ {
+  "begriff": "CTXA15CW",
+  "name": "Stylish Wandgerät 1,5kW Weiß - CTXA15CW",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 460.86,
+  "vk": 660
+ },
+ {
+  "begriff": "CTXA15CB",
+  "name": "Stylish Wandgerät 1,5kW Mattschwarz - CTXA15CB",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 460.86,
+  "vk": 660
+ },
+ {
+  "begriff": "CS-Z25CFEAW",
+  "name": "Mini-Standtruhe CFEA 2,5kW",
+  "marke": "Panasonic - CS-Z25CFEAW",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 591,
+  "vk": 845
+ },
+ {
+  "begriff": "FTXJ25AW9",
+  "name": "Emura Wandgerät 2,5kW Weiß - FTXJ25AW9",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 648.96,
+  "vk": 930
+ },
+ {
+  "begriff": "CS-Z35CFEAW",
+  "name": "Mini-Standtruhe CFEA 3,5",
+  "marke": "Panasonic - CS-Z35CFEAW",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 714,
+  "vk": 1020
+ },
+ {
+  "begriff": "CS-Z50CFEAW",
+  "name": "Mini-Standtruhe CFEA 5,0",
+  "marke": "Panasonic - CS-Z50CFEAW",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 835,
+  "vk": 1190
+ },
+ {
+  "begriff": "FTXA50CB",
+  "name": "Stylish Wandgerät 5,0kW Mattschwarz - FTXA50CB",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 873.97,
+  "vk": 1250
+ },
+ {
+  "begriff": "FTXA35CW",
+  "name": "Stylish Wandgerät 3,5kW Weiß - FTXA35CW",
+  "marke": "Daikin",
+  "typ": "indoorUnitAirHeatPump",
+  "quelle": "reonic",
+  "ek": 708.81,
+  "vk": 1020
+ }
+]
