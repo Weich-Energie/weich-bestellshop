@@ -109,7 +109,8 @@ export const PLAYBOOKS = {
     // Produktseiten haben fuenf Pfadteile nach /de/: bereich/gruppe/untergruppe/variante/produkt-slug
     istProduktUrl: (h) => /linum\.eu\/de\/[a-z0-9-]+\/[a-z0-9-]+\/[a-z0-9-]+\/[a-z0-9-]+\/[a-z0-9-]+(\?|$)/.test(h),
     // Nettopreis steht als eigenes Element (Listenpreis daneben ohne --net).
-    netto: { selektor: '.price--net, .product-list-item__price--net', muster: /€\s*([\d.]+,\d{2})/ },
+    // Produktseite: ".product__price" enthaelt "Pro Stk. € 65,40 € 109,00" — erst Netto, dann UVP.
+    netto: { selektor: '.product__price, .price--net, .product-list-item__price--net', muster: /€\s*([\d.]+,\d{2})/ },
     // /de/search?HeaderSearch.Search= zeigt nur Kategorien; die echte Trefferseite ist suchergebnisse-linum.
     sucheUrl: (begriff) => `https://www.linum.eu/de/suchergebnisse-linum?search=${encodeURIComponent(begriff)}`,
     seiteUrl(listeUrl, n) {
@@ -255,11 +256,19 @@ export async function oeffnen(slug, { ohneLogin = false, neuAnmelden = false, br
   const pb = playbook(slug)
   fs.mkdirSync(stateDir, { recursive: true })
   const statePfad = path.join(stateDir, `${slug}.json`)
-  const z = ohneLogin ? {} : await zugang(slug)
-  if (!ohneLogin && (!z.benutzer || !z.passwort)) {
-    throw new Error(`Zugang fehlt fuer ${slug}: ${z.grund ?? 'im Shop unter Lieferanten "Zugang hinterlegen"'} ` +
-      `(oder lokal: bash /opt/weich-browser/lieferant-login-setzen.sh ${slug})`)
+  // Zugangsdaten erst holen, wenn die gespeicherte Sitzung nicht mehr traegt —
+  // sonst haengt jeder Lauf am Shop-Abruf, auch wenn die Sitzung noch gilt
+  // (am 06.09.2026 brach der Schiessl-Lauf an einem 500 der Edge Function ab).
+  const sitzungVorhanden = !ohneLogin && !neuAnmelden && fs.existsSync(statePfad)
+  let z = {}
+  const zugangHolen = async () => {
+    z = await zugang(slug)
+    if (!z.benutzer || !z.passwort) {
+      throw new Error(`Zugang fehlt fuer ${slug}: ${z.grund ?? 'im Shop unter Lieferanten "Zugang hinterlegen"'} ` +
+        `(oder lokal: bash /opt/weich-browser/lieferant-login-setzen.sh ${slug})`)
+    }
   }
+  if (!ohneLogin && !sitzungVorhanden) await zugangHolen()
 
   const browser = await chromium.launch({ headless: true })
   const optionen = {
@@ -280,6 +289,7 @@ export async function oeffnen(slug, { ohneLogin = false, neuAnmelden = false, br
       sitzung = angemeldet ? 'wiederverwendet' : 'abgelaufen'
     }
     if (!angemeldet) {
+      if (!z.benutzer) await zugangHolen()
       angemeldet = await pb.login(page, z.benutzer, z.passwort)
       sitzung = angemeldet ? 'neu' : 'fehlgeschlagen'
       if (angemeldet) await kontext.storageState({ path: statePfad })

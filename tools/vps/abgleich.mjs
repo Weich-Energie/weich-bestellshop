@@ -18,6 +18,10 @@ const begriffeDatei = wert('begriffe', null)
 const shops = wert('shops', 'frigotechnik,schiessl-kaelte,linum,r-f').split(',').map((s) => s.trim()).filter(Boolean)
 const out = wert('out', null)
 const max = Number(wert('max', '3'))
+// --locker: alle Treffer der Suche behalten, auch wenn der Begriff nicht im
+// Titel steht. Fuer Gattungsbegriffe (Kabelkanal, Kondensatpumpe), bei denen
+// der Shop andere Worte benutzt (Leitungskanal, Kondensatfoerderpumpe).
+const locker = args.includes('--locker')
 if (!begriffeDatei) { console.error('--begriffe <datei.json> fehlt'); process.exit(1) }
 const begriffe = JSON.parse(fs.readFileSync(begriffeDatei, 'utf8'))
 
@@ -56,7 +60,7 @@ for (const slug of shops) {
         for (const u of urls) {
           const d = await produktDaten(page, u, pb)
           const heuhaufen = norm(`${d.titel} ${d.artikelnummer} ${d.herstellernummer} ${d.matchcode} ${(d.text || '').slice(0, 1500)}`)
-          const passt = heuhaufen.includes(norm(b.begriff))
+          const passt = locker || heuhaufen.includes(norm(b.begriff))
           if (passt) {
             zeile.passend.push({ url: u, titel: d.titel, artikelnummer: d.artikelnummer, herstellernummer: d.herstellernummer, netto_preis: d.netto_preis ?? null, brutto_preis: d.brutto_preis ?? null, bestand: d.bestand ?? null, einheit: d.ausgabe_einheit ?? null, netto_quelle: d.netto_quelle ?? null })
           }
