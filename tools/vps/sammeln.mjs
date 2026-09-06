@@ -52,7 +52,7 @@ try {
     for (let i = 0; i < auswahl.length; i++) {
       const u = auswahl[i]
       try {
-        const d = await produktDaten(page, u)
+        const d = await produktDaten(page, u, pb)
         delete d.text // im Sammellauf zu gross; produkt.mjs liefert ihn einzeln
         ergebnisse.push(d)
       } catch (e) {

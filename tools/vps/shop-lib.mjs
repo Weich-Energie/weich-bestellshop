@@ -65,6 +65,142 @@ export const PLAYBOOKS = {
       return listeUrl.replace(/\/(\d+\/)?$/, '/') + `${n + 1}/`
     },
   },
+
+  // Linum Europe — Zubehoer-Grosshandel Klima/Kaelte. Login-Formular sitzt im
+  // Seitenkopf jeder Seite (ASP.NET, Ajax-Post an /svc/de/Login/...).
+  linum: {
+    name: 'Linum',
+    basis: 'https://www.linum.eu',
+    loginUrl: 'https://www.linum.eu/de',
+    pruefUrl: 'https://www.linum.eu/de',
+    async login(page, benutzer, passwort) {
+      await page.goto(this.loginUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 })
+      // Cookie-Dialog liegt ueber dem Formular. "Allow selection" nimmt nur die
+      // vorausgewaehlten (notwendigen) Cookies — nicht "Allow all".
+      await page.locator('#js-gdpr-accept').click({ timeout: 5000 }).catch(() => {})
+      await page.waitForTimeout(500)
+      // Zweiter Dialog: Land und Sprache. Voreingestellt ist Belgien — wir
+      // brauchen Deutschland/Deutsch, sonst stimmen Sortiment und Preise nicht.
+      const landDialog = page.locator('#js-modal-websiteselection.show')
+      if (await landDialog.count()) {
+        await page.locator('#Country_79').check({ force: true }).catch(() => {})
+        await page.locator('label.js-websiteselection-language[data-languageid="4"]:has-text("Deutschland")').first().click({ timeout: 3000 }).catch(() => {})
+        await page.locator('#js-websiteselection-save').click({ timeout: 5000 }).catch(() => {})
+        await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {})
+        await page.waitForTimeout(1000)
+        // Nach der Landwahl laedt die Seite neu; der Cookie-Dialog kann erneut da sein.
+        await page.locator('#js-gdpr-accept').click({ timeout: 3000 }).catch(() => {})
+      }
+      await page.fill('#js-login-form-head input[name="LoginViewModel.Login"]', benutzer)
+      await page.fill('#js-login-form-head input[name="LoginViewModel.Password"]', passwort)
+      await page.locator('#js-login-form-head button[type="submit"]').first().click()
+      await page.waitForLoadState('networkidle', { timeout: 45_000 }).catch(() => {})
+      await page.waitForTimeout(2000)
+      return this.istAngemeldet(page)
+    },
+    async istAngemeldet(page) {
+      const pw = await page.locator('#js-login-form-head input[name="LoginViewModel.Password"]').count()
+      const abmelden = await page.locator('a:has-text("Abmelden"), a:has-text("Logout"), a[href*="Logout"], a[href*="logout"]').count()
+      return abmelden > 0 || pw === 0
+    },
+    async dialogeSchliessen(page) {
+      await page.locator('#js-gdpr-accept').click({ timeout: 2000 }).catch(() => {})
+    },
+    // Produktseiten haben fuenf Pfadteile nach /de/: bereich/gruppe/untergruppe/variante/produkt-slug
+    istProduktUrl: (h) => /linum\.eu\/de\/[a-z0-9-]+\/[a-z0-9-]+\/[a-z0-9-]+\/[a-z0-9-]+\/[a-z0-9-]+(\?|$)/.test(h),
+    // Nettopreis steht als eigenes Element (Listenpreis daneben ohne --net).
+    netto: { selektor: '.price--net, .product-list-item__price--net', muster: /€\s*([\d.]+,\d{2})/ },
+    sucheUrl: (begriff) => `https://www.linum.eu/de/search?HeaderSearch.Search=${encodeURIComponent(begriff)}`,
+    seiteUrl(listeUrl, n) {
+      if (n === 0) return listeUrl
+      return listeUrl + (listeUrl.includes('?') ? '&' : '?') + `page=${n + 1}`
+    },
+  },
+
+  // R+F (rf24.de) — SAP Commerce. Alles hinter dem Login, auch die Suche.
+  'r-f': {
+    name: 'R+F',
+    basis: 'https://rf24.de',
+    loginUrl: 'https://rf24.de/login',
+    pruefUrl: 'https://rf24.de/',
+    async login(page, benutzer, passwort) {
+      await page.goto(this.loginUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 })
+      // Angular-App (SAP Spartacus): Formular kommt erst nach dem Rendern.
+      await page.locator('input[name="username"]').waitFor({ timeout: 20_000 })
+      // Usercentrics-Consent: nur Notwendiges, sonst nichts anklicken.
+      await this.dialogeSchliessen(page)
+      await page.fill('input[name="username"]', benutzer)
+      await page.fill('input[name="password"]', passwort)
+      // Enter statt Klick: der Absende-Knopf liegt in der Angular-Form nicht
+      // zuverlaessig im selben DOM-Zweig.
+      await page.press('input[name="password"]', 'Enter')
+      await page.waitForURL((u) => !/\/login/.test(u.pathname), { timeout: 30_000 }).catch(() => {})
+      await page.waitForLoadState('networkidle', { timeout: 45_000 }).catch(() => {})
+      await page.waitForTimeout(2000)
+      return this.istAngemeldet(page)
+    },
+    async istAngemeldet(page) {
+      if (/\/login/.test(page.url())) return false
+      const pw = await page.locator('input[name="password"]').count()
+      return pw === 0
+    },
+    // Usercentrics-Dialog auf jeder Seite, bis er einmal bestaetigt ist:
+    // "Einstellungen speichern" laesst nur Essenzielles zu.
+    async dialogeSchliessen(page) {
+      await page.locator('button:has-text("Einstellungen speichern")').first().click({ timeout: 2500 }).catch(() => {})
+    },
+    // Produktseiten: /produkt/<13-stellige R+F-Nummer> oder /.../p/<Nummer>
+    istProduktUrl: (h) => /rf24\.de\/(produkt\/\d{6,}|.*\/p\/\d{6,})/.test(h),
+    sucheUrl: (begriff) => `https://rf24.de/search?text=${encodeURIComponent(begriff)}`,
+    // Die Such-URL liefert in der Angular-App keine Treffer; nur die Eingabe im
+    // Suchfeld loest die Suche aus.
+    async suchen(page, begriff) {
+      await page.goto('https://rf24.de/', { waitUntil: 'domcontentloaded', timeout: 45_000 })
+      await this.dialogeSchliessen(page)
+      const feld = page.locator('input[placeholder*="suchen" i], input[type="search"]').first()
+      await feld.waitFor({ timeout: 15_000 })
+      await feld.fill(begriff)
+      await feld.press('Enter')
+      await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {})
+      await page.waitForTimeout(3000)
+    },
+    // Unser Preis steht als "je 7,93 € /ST", der Listenpreis daneben als "Listenpreis: 20,70 €".
+    netto: { selektor: '.price, .price-total', muster: /je\s*([\d.]+,\d{2})\s*€/, ersatz: /^\s*([\d.]+,\d{2})\s*€/ },
+    seiteUrl(listeUrl, n) {
+      const basis = listeUrl.replace(/([?&])currentPage=\d+/, '$1').replace(/[?&]$/, '')
+      return basis + (basis.includes('?') ? '&' : '?') + `currentPage=${n + 1}`
+    },
+  },
+
+  // Schiessl Kaeltegesellschaft — Sylius/Symfony-Shop, Login mit E-Mail.
+  'schiessl-kaelte': {
+    name: 'Schiessl Kälte',
+    basis: 'https://www.schiessl-kaelte.com',
+    loginUrl: 'https://www.schiessl-kaelte.com/de_DE/login',
+    pruefUrl: 'https://www.schiessl-kaelte.com/de_DE/',
+    async login(page, benutzer, passwort) {
+      await page.goto(this.loginUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 })
+      await page.fill('input[name="_username"]', benutzer)
+      await page.fill('input[name="_password"]', passwort)
+      await page.locator('form:has(input[name="_password"]) button[type="submit"]').first().click()
+      await page.waitForLoadState('networkidle', { timeout: 45_000 }).catch(() => {})
+      await page.waitForTimeout(2000)
+      return this.istAngemeldet(page)
+    },
+    async istAngemeldet(page) {
+      const abmelden = await page.locator('a:has-text("Abmelden"), a[href*="logout"]').count()
+      const pw = await page.locator('input[name="_password"]').count()
+      return abmelden > 0 || (pw === 0 && !/\/login/.test(page.url()))
+    },
+    // Produktseiten enden auf ~p<Nummer>, Kategorien auf ~c<Nummer>.
+    istProduktUrl: (h) => /schiessl-kaelte\.com\/de_DE\/Shop\/.+~p\d+/.test(h),
+    netto: { selektor: '.product-price, [class*="price"]', muster: /([\d.]+,\d{2})\s*EUR\s*netto/ },
+    sucheUrl: (begriff) => `https://www.schiessl-kaelte.com/de_DE/search/result?q=${encodeURIComponent(begriff)}`,
+    seiteUrl(listeUrl, n) {
+      if (n === 0) return listeUrl
+      return listeUrl + (listeUrl.includes('?') ? '&' : '?') + `page=${n + 1}`
+    },
+  },
 }
 
 export function playbook(slug) {
@@ -156,9 +292,15 @@ export async function oeffnen(slug, { ohneLogin = false, neuAnmelden = false, br
 
 // Produktseite auslesen. Liefert die Rohdaten; die Deutung (Preis als Zahl,
 // Einheit) macht der Abnehmer, weil sie je Shop verschieden ist.
-export async function produktDaten(page, url) {
+// Seite laden und shop-eigene Dialoge (Cookies, Landwahl) wegklicken.
+export async function seiteOeffnen(page, url, pb) {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45_000 })
   await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {})
+  if (pb?.dialogeSchliessen) await pb.dialogeSchliessen(page)
+}
+
+export async function produktDaten(page, url, pb) {
+  await seiteOeffnen(page, url, pb)
   const daten = await page.evaluate(() => {
     const text = (el) => (el ? el.textContent.replace(/\s+/g, ' ').trim() : null)
     const blaetter = Array.from(document.querySelectorAll('body *')).filter((e) => e.children.length === 0 && e.textContent.trim())
@@ -200,7 +342,39 @@ export async function produktDaten(page, url) {
       text: haupt.innerText.replace(/\s+/g, ' ').slice(0, 4000),
     }
   })
+  // Shop-spezifischer Nettopreis, wenn das Playbook einen Selektor kennt und
+  // die allgemeine Erkennung (Frigotechnik-Muster) nichts gefunden hat.
+  if (daten.netto_preis == null && pb?.netto) {
+    const treffer = await page.evaluate(({ selektor, muster, ersatz }) => {
+      const re = new RegExp(muster.source, muster.flags)
+      const re2 = ersatz ? new RegExp(ersatz.source, ersatz.flags) : null
+      for (const e of document.querySelectorAll(selektor)) {
+        const t = e.textContent.replace(/\s+/g, ' ').trim()
+        const m = t.match(re) || (re2 && t.match(re2))
+        if (m) return { text: t.slice(0, 80), zahl: m[1] }
+      }
+      return null
+    }, {
+      selektor: pb.netto.selektor,
+      muster: { source: pb.netto.muster.source, flags: pb.netto.muster.flags },
+      ersatz: pb.netto.ersatz ? { source: pb.netto.ersatz.source, flags: pb.netto.ersatz.flags } : null,
+    })
+    if (treffer) {
+      daten.netto_preis = Number(treffer.zahl.replace(/\./g, '').replace(',', '.'))
+      daten.netto_quelle = treffer.text
+    }
+  }
   return { url, ...daten }
+}
+
+// Suche ausfuehren: Standard ist die Such-URL, Playbooks koennen eine eigene
+// suchen()-Routine mitbringen (Eingabe ins Suchfeld).
+export async function suchen(page, pb, begriff) {
+  if (pb.suchen) { await pb.suchen(page, begriff); return page.url() }
+  const u = pb.sucheUrl(begriff)
+  await seiteOeffnen(page, u, pb)
+  await page.waitForTimeout(1500)
+  return u
 }
 
 // Alle Produkt-URLs einer Trefferliste (Suche oder Kategorie) ueber alle Seiten.
@@ -211,6 +385,9 @@ export async function produktUrlsSammeln(page, pb, listeUrl, { maxSeiten = 40, f
     const antwort = await page.goto(u, { waitUntil: 'domcontentloaded', timeout: 45_000 })
     if (antwort && antwort.status() >= 400) break
     await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {})
+    if (pb.dialogeSchliessen) await pb.dialogeSchliessen(page)
+    // Nachgeladene Listen (Angular, Infinite Scroll) brauchen einen Moment.
+    await page.waitForTimeout(1500)
     const links = await page.evaluate(() => [...new Set(Array.from(document.querySelectorAll('a[href]')).map((a) => a.href))])
     const neu = links.filter((h) => pb.istProduktUrl(h) && !gefunden.has(h))
     fortschritt({ seite: n, url: u, neu: neu.length, gesamt: gefunden.size + neu.length })

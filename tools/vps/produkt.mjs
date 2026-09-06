@@ -41,7 +41,7 @@ try {
   } else {
     const fehler = []
     page.on('pageerror', (e) => fehler.push(String(e.message).slice(0, 200)))
-    Object.assign(ergebnis, await produktDaten(page, url), { seitenfehler: fehler.slice(0, 5) })
+    Object.assign(ergebnis, await produktDaten(page, url, sitzung.pb), { seitenfehler: fehler.slice(0, 5) })
     if (shotPfad) {
       await page.screenshot({ path: shotPfad, fullPage: true })
       ergebnis.screenshot = shotPfad

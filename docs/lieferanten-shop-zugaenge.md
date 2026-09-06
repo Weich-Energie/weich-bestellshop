@@ -94,6 +94,18 @@ node artikel-import.mjs eingaben/<datum>-frigotechnik-<gruppe>.json --schreiben
    `quelle: frigotechnik-shop`.
 4. Trockenlauf, dann `--schreiben`. Die Preishistorie führt der Trigger.
 
+## Playbooks Linum, R+F, Schiessl (06.09.2026)
+
+| Shop | Login | Suche / Kategorien | Produkt-URL | Nettopreis |
+|---|---|---|---|---|
+| **Linum** (`linum`, linum.eu, ASP.NET) | Formular im Seitenkopf `#js-login-form-head` (`LoginViewModel.Login/Password`), davor Cookie-Dialog `#js-gdpr-accept` („Allow selection") und Land/Sprache-Dialog (`#Country_79` Deutschland, Sprache `data-languageid=4`, `#js-websiteselection-save`) | Kategorien `/de/hvac/<gruppe>/<untergruppe>`; Suche `/de/search?HeaderSearch.Search=` zeigt nur Kategorien | fünf Pfadteile nach `/de/`, z. B. `/de/hvac/kuehlleitungen-zubehoer/kupferleitungen-doppelleitung-inoac/1-4-3-8-isoliert/inoac-...` | `.price--net` bzw. `.product-list-item__price--net` („€ 151,20"); daneben Listenpreis ohne `--net` |
+| **R+F** (`r-f`, rf24.de, SAP Commerce/Angular) | `/login`, `username`/`password`, Enter statt Klick; Usercentrics-Dialog „Einstellungen speichern" (nur Essenzielles) | Such-URL liefert keine Treffer; Suche nur über Eingabe ins Suchfeld (`suchen()` im Playbook). Kategorien `/Alle-Kategorien/c/14?currentPage=N` | `/produkt/<13-stellige Nummer>` oder `/…/p/<Nummer>` | `.price` „je 7,93 € /ST" ist unser Preis, „Listenpreis: 20,70 €" daneben |
+| **Schiessl** (`schiessl-kaelte`, schiessl-kaelte.com, Symfony) | `/de_DE/login`, `_username` (E-Mail), `_password` | `/de_DE/search/result?q=` → `/de_DE/Shop?q=`; Kategorien `/de_DE/Shop/<Name>~c<id>` (Pfad ohne `~c` gibt 404) | `/de_DE/Shop/…/<slug>~p<id>` | `.product-price` „53,50 EUR netto / Stk" |
+
+Alle drei am 06.09.2026 angemeldet getestet. Werkzeuge: `erkunden.mjs` (Seite
+angemeldet ansehen, `--tippen` fuer Suchfeld), `abgleich.mjs` (dieselben
+Begriffe in mehreren Shops suchen, Nettopreise nebeneinander).
+
 ## Neuen Lieferanten anbinden
 
 1. Shop im Browser anschauen: Login-Seite, Formularfelder, Produkt-URL-Muster,
