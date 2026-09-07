@@ -91,6 +91,18 @@ nennen — automatisch ist das nicht sauber zuzuordnen, und zu raten wäre gegen
 die Vorgabe des Ziels. Erst mit den Auftrags-UUIDs lässt sich über
 `/vorgang/listrechnungen` prüfen, ob abgerechnet.
 
+**Abrechnungsstatus Klügl (geprüft 08.09.2026, `pds_getListRechnungen`):**
+Auftrag `2025-10348` („WP Panasonic", Gewerk SHK, Projektakte
+`ac73500c-6d09-415a-a677-bd8f23699e70`) hat die Rechnung `202630115`
+(Rechnungsart „Rechnung", Status „Abgerechnet", externe Nummer „bezahlt").
+Damit ist NK Klügl die erste **PDS-bestätigt abgeschlossene** Baustelle im
+Vergleich. Der Auftrag selbst steht in PDS weiter auf „Offen" — der
+Vorgangsstatus taugt also nicht als Abschlusskriterium, der Rechnungsstatus
+schon. Rechnungssuche nach der Auftragsnummer liefert nichts; gesucht wird
+über den Kundennamen, dann über `projektakteUUID` dem Auftrag zugeordnet.
+Die drei weiteren Klügl-Rechnungen (202630013, 202630174, 202630366) sind
+PV-Abschläge einer anderen Projektakte und gehören nicht zum Korb.
+
 **Vor einer Entscheidung Richtung R+F als neuer Lieferant sollte dieser
 Preisunterschied mit Patrick besprochen werden** — die Umstellung wuerde nach
 aktuellem (unvollstaendigem) Stand die Materialkosten fuer Formteile spuerbar
@@ -178,6 +190,24 @@ reicht eine vereinfachte Erfassung mit nur der Hauptgröße und einem
 groben Mittelwert über alle Anschlussvarianten? Die feine Aufschlüsselung
 ist jetzt in den Daten vorhanden — die Entscheidung betrifft nur die
 Vereinfachung in der Erfassungs-UI (Ziel-Schritt 4).
+
+## Verbrauchsanteil je Kategorie (Stand 08.09.2026, alle 106 Körbe)
+
+| Kategorie | Artikel | EK gesamt | Anteil |
+|---|---|---|---|
+| Formteil (in die Mittelwertbildung) | 285 | 102.795 € | 68,3 % |
+| Ventil (Einzelartikel) | 37 | 25.959 € | 17,3 % |
+| Dämmung (Einzelartikel) | 20 | 13.757 € | 9,1 % |
+| Rohr (Einzelartikel) | 12 | 3.952 € | 2,6 % |
+| ungeklärt | 22 | 1.589 € | 1,1 % |
+| Schelle/Zubehör | 14 | 1.537 € | 1,0 % |
+| Sonstiges | 3 | 854 € | 0,6 % |
+
+Folgerung für die offene Rohrmeter-Frage: Rohre sind 2,6 % des Verbrauchs —
+ob sie einen eigenen Kunstartikel je System bekommen oder als bestehende
+Katalogartikel referenziert werden, ist finanziell nachrangig. Ventile und
+Dämmung wiegen deutlich mehr; sie bleiben laut Ziel Einzelartikel und brauchen
+in der App perspektivisch eine Artikelbindung statt Freitext.
 
 ## Der Mittelwert selbst
 
