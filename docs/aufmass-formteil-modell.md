@@ -80,6 +80,17 @@ Ursachen, noch nicht abschließend geklärt:
   Vergleich kann sich noch verschieben, sobald die Pruefliste weiter bearbeitet
   ist.
 
+**PDS-Verknüpfung der fünf Körbe (Versuch 07.09.2026 über den lokalen
+MCP-Weg):** Die Korbnamen tragen nur Nachnamen, und die sind in PDS
+mehrdeutig — „Schmidt" 25 Projektakten, „Kohl" 23, „Richter" 6, „Peschk" keine
+(vermutlich anders geschrieben). Einzig „Klügl" ist eindeutig: zwei
+Projektakten an derselben Adresse (Kolpingstraße 1, Ammerthal); Auftrag
+`2025-10348` (Belegdatum 27.11.2025, ohne PV-Module) dürfte der SHK-Auftrag
+zum Korb „NK Klügl" sein. Für die anderen vier muss Patrick den Auftrag
+nennen — automatisch ist das nicht sauber zuzuordnen, und zu raten wäre gegen
+die Vorgabe des Ziels. Erst mit den Auftrags-UUIDs lässt sich über
+`/vorgang/listrechnungen` prüfen, ob abgerechnet.
+
 **Vor einer Entscheidung Richtung R+F als neuer Lieferant sollte dieser
 Preisunterschied mit Patrick besprochen werden** — die Umstellung wuerde nach
 aktuellem (unvollstaendigem) Stand die Materialkosten fuer Formteile spuerbar
