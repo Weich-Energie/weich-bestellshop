@@ -140,6 +140,16 @@ Preisunterschied mit Patrick besprochen werden** — die Umstellung wuerde nach
 aktuellem (unvollstaendigem) Stand die Materialkosten fuer Formteile spuerbar
 erhoehen, nicht nur die Erfassung vereinfachen.
 
+## Warum die Herstellernummer nicht weiterhilft (geprüft 08.09.2026)
+
+Das Ziel nennt „Herstellernummer bzw. Bezeichnung" als Suchweg. Alle 260
+noch offenen Artikel tragen im GUT-Export eine `herstellernummer` — aber
+das Feld ist ein **Herstellerkürzel** (VIAT01 = Viega, BAGI01, UNHA02 =
+Uponor, KAOS01, DEGL01), keine Werks- oder Herstellerartikelnummer. Ein
+exakter Abgleich gegen die R+F-„Werks-Nr." ist damit unmöglich. Es bleibt
+bei Text-Zuordnung (51,1 % sicher) plus manueller Prüfliste; die offenen
+260 Artikel entsprechen 73.506,47 € (48,9 % des Verbrauchswerts).
+
 ## Ursprüngliche Beschreibung des Vorgehens
 
 `tools/vps/rf-zuordnung.mjs` sucht jeden der 393 Artikel per Volltext
