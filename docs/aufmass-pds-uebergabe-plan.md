@@ -21,12 +21,40 @@ echten Testauftrag prüfen.
   Datenquelle wechselt von `shop_nachkalkulation_positionen` zu den drei
   `aufmass_*`-Tabellen.
 
+## Befund 07.09.2026: Trockenlauf des Katalog-Syncs
+
+Die bestehende Edge Function `pds-katalog-sync` lässt sich direkt über das
+Supabase-Functions-Gateway aufrufen (User-JWT eines Shop-Admins + anon-Key) —
+sie spricht PDS serverseitig mit dem Schlüssel aus `integration_secrets` an
+und ist damit **unabhängig von der MCP-Verbindung einer Claude-Sitzung**. Das
+ist der verlässlichere Weg für Automatisierung als der MCP-Server.
+
+Trockenlauf für den Kunstartikel „Formteil b-press-kupfer 15mm" (Standard
+`dry_run: true`, sendet nichts an PDS, prüft nur das Mapping) ergab genau zwei
+Lücken, die für **alle 57 Kunstartikel** gleich gelten:
+
+1. **Keine Shop-Kategorie.** Im Shop gibt es nur zwei Kategorien, und nur
+   „Klima" trägt beide PDS-UUIDs (Warengruppe + Katalogkategorie). Formteile
+   für Heizung/Sanitär unter „Klima" einzuhängen wäre fachlich falsch.
+   Warengruppen/Kategorien kann die PDS-API nicht anlegen — eine Warengruppe
+   „Formteile Heizung/Sanitär" (o. ä.) muss **von Hand in PDS** entstehen,
+   danach eine `shop_kategorien`-Zeile mit beiden UUIDs. **Entscheidung
+   Patrick.**
+2. **Kein Lieferanten-Bezug.** `shop_lieferanten` kennt R+F (slug `r-f`) und
+   GUT, beide ohne `pds_person_uuid`. R+F muss in PDS als Lieferant (Person)
+   existieren, die UUID gehört in `shop_lieferanten.pds_person_uuid` (Admin →
+   Lieferanten). **Braucht PDS-Zugriff oder Patricks Angabe.** Danach
+   `shop_artikel.lieferant_id` der Kunstartikel auf R+F setzen.
+
+Einheit „Stück" → PDS „Stck" ist zugeordnet, das passt bereits.
+
 ## Schritte, in Reihenfolge
 
-1. **Kunstartikel nach PDS synchronisieren.** `pds-katalog-sync` (bestehende
-   Function) um `formteil_aufmass`-Artikel erweitern oder eine eigene,
-   kleinere Sync-Function schreiben — die 57 Artikel müssen einen
-   `pds_katalog_uuid` bekommen, bevor irgendetwas übertragen werden kann.
+1. **Kunstartikel nach PDS synchronisieren.** Sobald die beiden Lücken oben
+   geschlossen sind: `pds-katalog-sync` je Kunstartikel (57 Aufrufe, erst
+   `dry_run: true`, dann `dry_run: false`) über das Functions-Gateway — die
+   Function braucht dafür keine Änderung, `formteil_aufmass`-Artikel sind
+   normale `shop_artikel`. Danach haben alle 57 einen `pds_katalog_uuid`.
 2. **Baustelle mit PDS-Auftrag verknüpfen.** `aufmass_erfassung.pds_vorgang_uuid`
    ist im Schema vorbereitet, aber die App setzt es noch nicht — `baustelle_text`
    ist reiner Freitext. Braucht in der App eine Suche gegen
