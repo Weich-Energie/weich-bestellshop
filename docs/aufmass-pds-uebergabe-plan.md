@@ -83,6 +83,26 @@ EK setzen. Für Formteile, die im Montagematerial aufgehen, ist das vertretbar
 (gleiche Begründung wie in `pds-katalog-sync` selbst); sonst vorher
 `aufschlagsklasse` an den Kunstartikeln setzen.
 
+## Edge Function `aufmass-pds-uebergabe` — deployt, nur Vorschau (07.09.2026)
+
+`supabase/functions/aufmass-pds-uebergabe/index.ts`, Kopie des Ablaufs aus
+`pds-auftrag-material` mit den `aufmass_*`-Tabellen als Quelle. Schreibende
+Aktionen antworten 501 (`SCHREIBEN_FREIGEGEBEN = false`, Pfad-Positivliste nur
+`/vorgang/details`), bis Kunstartikel in PDS stehen und Patrick den
+Schreibweg freigibt. Getestet gegen die Testerfassung
+`c60d59ff-7d68-4a30-bcbe-c1f76468833f` („QA Vorschau Kluegl", QA-Konto) mit
+Auftrag **2025-10348** (Klügl, Ammerthal): 37 Positionen, 29 mit Katalog-UUID,
+Ebenen u. a. „Rohre und Zubehör" — ein Wärmepumpen-/SHK-Auftrag, passt zum
+Korb „NK Klügl". Ergebnis wie erwartet: Formteile „noch nicht in PDS",
+Rohrmeter „Zielartikel offen", nichts geschrieben.
+
+Schreibweg freischalten = drei Änderungen in der Function: `SCHREIBEN_FREIGEGEBEN`,
+`/vorgang/updateposition` und `/vorgang/create` in die Positivliste, und die
+beiden Schreibzweige aus `pds-auftrag-material` (mengen_setzen /
+transport_anlegen) übernehmen — inkl. Protokoll in `shop_pds_sync_log` und
+Markierung der übertragenen Positionen (Spalte `pds_transport_at` an
+`aufmass_formteile` fehlt noch, Migration nötig).
+
 ## Schritte, in Reihenfolge
 
 1. **Kunstartikel nach PDS synchronisieren.** Sobald die beiden Lücken oben
