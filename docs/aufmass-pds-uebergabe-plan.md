@@ -103,6 +103,18 @@ transport_anlegen) übernehmen — inkl. Protokoll in `shop_pds_sync_log` und
 Markierung der übertragenen Positionen (Spalte `pds_transport_at` an
 `aufmass_formteile` fehlt noch, Migration nötig).
 
+## Edge Function `aufmass-auftrag-suche` — deployt, rein lesend (07.09.2026)
+
+Schliesst Schritt 2 der Liste unten: die App sucht über
+`/projektakte/listprojektakten` (Suchwort, `suchfelder: ["ALLES"]`) und je
+Akte `/vorgang/listvorgaengebyprojektakte` (`vorgangstyp: "AUFTRAG"`), zeigt
+Kandidaten und setzt bei Auswahl `pds_vorgang_uuid` + `pds_vorgangs_nummer`
+(neue Spalte, Migration `20260907230000` im Repo `weich-aufmass`). Zugang für
+jeden mit `app_access.aufmass`. Getestet: „Haberstumpf" → Projektakte 2025-1107
+→ Auftrag 2025-10133 („WP Panasonic"). Bei mehr als 10 Projektakten wird
+abgeschnitten und um Eingrenzung gebeten — häufige Nachnamen (Schmidt,
+Richter) sind ohne Vorname/Ort nicht eindeutig, siehe Baustellen-Vergleich.
+
 ## Schritte, in Reihenfolge
 
 1. **Kunstartikel nach PDS synchronisieren.** Sobald die beiden Lücken oben
