@@ -49,14 +49,46 @@ Restschleife mit lauter „kein_treffer" durchlaufen (der Fehler wird pro
 Artikel abgefangen, nicht als Abbruch erkannt) — beim Zusammenführen von
 Ergebnisdateien Einträge mit gesetztem `fehler`-Feld immer ausschließen.
 
-## Baustellen-Vergleich (Stand 07.09.2026, vorläufig)
+## Baustellen-Vergleich auf PDS-bestätigt abgeschlossenen Baustellen (Stand 08.09.2026)
 
-PDS-Verbindung war beim Erstellen dieses Vergleichs nicht erreichbar
-(Sitzungsfehler, siehe unten) — deshalb **keine PDS-bestätigten „abgeschlossenen"
-Baustellen**, sondern die fünf GUT-Körbe mit der besten Formteil-Preisabdeckung
-(meiste Positionen, deren Materialsystem+Dimension bereits einen
-R+F-Mittelwert hat). Sobald PDS wieder erreichbar ist, gegen echten
-Auftragsstatus prüfen und ggf. ersetzen.
+Am 08.09.2026 wurden alle 106 Korbnamen lesend gegen PDS abgeglichen
+(`tools/vps/korb-pds-abgleich.mjs`, Details und vollständige Tabelle in
+[gut-korb-pds-zuordnung.md](gut-korb-pds-zuordnung.md)). 74 Körbe treffen
+genau eine Projektakte mit SHK-Auftrag, **58 davon haben eine Schlussrechnung
+mit Status „Abgerechnet"** und gelten als abgeschlossen. Die fünf
+abgeschlossenen Baustellen mit der größten vergleichbaren Datenbasis:
+
+| Korb | PDS-Auftrag | Formteil-Pos. mit Preis | Alt (GUT) | Neu (Formteil-Mittel) | Abweichung |
+|---|---|---|---|---|---|
+| Nachkalk Bandl | 2025-10030 | 22/42 | 1.548,95 € | 1.870,68 € | +20,8 % |
+| NK Görlich | 2025-10180 | 27/46 | 1.382,31 € | 1.793,72 € | +29,8 % |
+| NK Klügl | 2025-10348 | 31/53 | 1.348,97 € | 1.828,30 € | +35,5 % |
+| Nachkalk Mäschl | 2025-10023 | 22/38 | 1.292,79 € | 1.571,35 € | +21,5 % |
+| Nachkalk Danzl | 2025-10017 | 18/32 | 1.256,50 € | 1.435,47 € | +14,2 % |
+| **Summe fünf** | | **120/211** | **6.829,52 €** | **8.499,52 €** | **+24,5 %** |
+
+Über alle 58 abgeschlossenen Körbe: 1097/2001 Formteil-Positionen
+vergleichbar (55 %), alt 44.969,39 € → neu 54.770,66 € (**+21,8 %**). Median
+je Korb +20,8 %; 45 Körbe werden teurer, 13 günstiger.
+
+**Erklärung der Abweichung** (gilt weiter, aber breiter belegt): Der
+Mittelwert je System+Dimension glättet innerhalb einer Gruppe — teure
+Formteile (T-Stücke, Übergänge) und billige (Muffen, Kappen) bekommen
+denselben Preis. Körbe mit vielen billigen Teilen werden im Modell teurer,
+Körbe mit vielen teuren günstiger (z. B. NK Mühleisen −6 %, NK Kührlings
+−14 %). Der systematische Aufschlag von rund einem Fünftel kommt aus dem
+Preisniveau der R+F-Treffer gegenüber der alten GUT-Kondition und aus der
+Markenlastigkeit der bisher „sicher" zugeordneten Artikel (51 % des
+Verbrauchswerts). Er ist damit eine Aussage über die Datenbasis, nicht über
+die Baustellen — er wird sich bewegen, wenn die Prüfliste abgearbeitet ist.
+
+### Ursprünglicher Vergleich vom 07.09.2026 (vor dem PDS-Abgleich)
+
+Damals war PDS in der Sitzung nicht erreichbar; genommen wurden die fünf
+Körbe mit der besten Preisabdeckung, ohne Abschlussnachweis. Von diesen
+fünf sind inzwischen NK Klügl (2025-10348) und NK Richter (2025-10212)
+PDS-bestätigt abgerechnet; NK Schmidt, NK Bauer Peschk und NK Kohl Auto
+bleiben mehrdeutig (Nachnamen mit 23–29 Projektakten).
 
 | Korb | Positionen mit Preis | Alt (GUT) | Neu (Formteil-Mittel) | Abweichung |
 |---|---|---|---|---|

@@ -111,6 +111,7 @@ Neue Edge Function `shop-ai` mit taskbasiertem Routing:
 - [docs/lieferanten-shop-zugaenge.md](docs/lieferanten-shop-zugaenge.md) — Abruf hinter dem Login (VPS), Playbook Frigotechnik, neue Shops anbinden
 - [docs/pds-montagematerial-platzhalter.md](docs/pds-montagematerial-platzhalter.md) — Platzhalter-Ebene fuer die Auftragsanlage (an Megh)
 - [docs/aufmass-formteil-modell.md](docs/aufmass-formteil-modell.md) — GUT-Export, R+F-Zuordnung, Formteil-Mittelwert je System+Dimension (Ziel-Schritte 1-3)
+- [docs/gut-korb-pds-zuordnung.md](docs/gut-korb-pds-zuordnung.md) — GUT-Koerbe → PDS-Auftraege (lesend, `tools/vps/korb-pds-abgleich.mjs`), Abrechnungsstatus, Vergleich alt/neu auf 58 abgerechneten Baustellen
 - [docs/aufmass-app-entwurf.md](docs/aufmass-app-entwurf.md) — Entwurf der Aufmass-App (Repo `weich-aufmass`, Ziel-Schritt 4)
 - [docs/aufmass-pds-uebergabe-plan.md](docs/aufmass-pds-uebergabe-plan.md) — PDS-Uebergabe aus der Aufmass-App: Function `aufmass-pds-uebergabe`, Katalog-Sync der Kunstartikel, erster Lauf (Ziel-Schritt 5)
 - [docs/pds-formteil-platzhalter.md](docs/pds-formteil-platzhalter.md) — Platzhalter-Ebene "Formteile (Aufmass)" fuer neue SHK-Auftraege (an Megh), Sicht `shop_pds_formteil_platzhalter`
