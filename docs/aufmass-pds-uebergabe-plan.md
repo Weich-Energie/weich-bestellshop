@@ -83,7 +83,30 @@ EK setzen. Für Formteile, die im Montagematerial aufgehen, ist das vertretbar
 (gleiche Begründung wie in `pds-katalog-sync` selbst); sonst vorher
 `aufschlagsklasse` an den Kunstartikeln setzen.
 
-## Edge Function `aufmass-pds-uebergabe` — deployt, nur Vorschau (07.09.2026)
+## Freigabe und echter Sync (07.09.2026, Patrick: „GO")
+
+- `pds-katalog-sync` mit `dry_run: false` für alle 57 Kunstartikel: 57×
+  `uebertragen`, alle haben jetzt `pds_katalog_uuid`. Kategorie SHK-
+  Installationsmaterial und Lieferant R+F wie oben. Keine Aufschlagsklasse →
+  in PDS steht VK = EK.
+- `aufmass-pds-uebergabe`: Schreibweg freigeschaltet (`SCHREIBEN_FREIGEGEBEN =
+  true`, Positivliste `/vorgang/details`, `/vorgang/updateposition`,
+  `/vorgang/create`). Markierung `pds_transport_at` an `aufmass_formteile`,
+  Angebotsbezug `pds_transport_*` an `aufmass_erfassung` (Migration
+  `20260907235000` im Repo `weich-aufmass`).
+- **Erster echter Lauf:** Testerfassung „QA Vorschau Kluegl" → Auftrag
+  2025-10348 hat keine Formteil-Platzhalter → Transportangebot **2026-292**
+  (Kunde Weich GmbH, 2 Positionen: 4× Formteil b-press-kupfer 15mm à 7,19 €,
+  6× Formteil prestabo-stahl 35mm à 8,01 €, Summe 76,82 € EK). Angebot im
+  PDS-Client prüfen und **löschen**, sobald gesehen — es ist ein Test, nicht
+  Klügls echtes Aufmaß. Rohrmeter blieben wie geplant in der App (Zielartikel
+  offen).
+- Damit ist Ziel-Schritt 5 technisch durchgängig: Erfassung → Auftrag suchen
+  → Übergabe → Vorgang in PDS. Für neue SHK-Aufträge mit einer Platzhalter-
+  Ebene „Formteile (Aufmaß)" (analog Klima, an Megh) ginge derselbe Aufruf
+  ohne Umweg direkt in den Auftrag (`mengen_setzen`).
+
+## Edge Function `aufmass-pds-uebergabe` — deployt, Schreibweg frei (07.09.2026)
 
 `supabase/functions/aufmass-pds-uebergabe/index.ts`, Kopie des Ablaufs aus
 `pds-auftrag-material` mit den `aufmass_*`-Tabellen als Quelle. Schreibende

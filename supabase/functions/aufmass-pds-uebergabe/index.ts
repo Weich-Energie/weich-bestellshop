@@ -16,8 +16,14 @@
 import { createClient } from "jsr:@supabase/supabase-js@2"
 
 const CORS = { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-const ERLAUBTE_PFADE = new Set(["/vorgang/details"]) // schreibende Pfade kommen mit der Freigabe dazu
-const SCHREIBEN_FREIGEGEBEN = false
+// Positivliste: lesen, Menge an vorhandenen Positionen aendern, Angebot anlegen.
+// Nie Preise/Texte anderer Positionen, nie loeschen. Schreibweg freigegeben am
+// 07.09.2026 (Patrick: "GO").
+const ERLAUBTE_PFADE = new Set(["/vorgang/details", "/vorgang/updateposition", "/vorgang/create"])
+const SCHREIBEN_FREIGEGEBEN = true
+// Die Weich GmbH ist in PDS auch Kunde (Kundennummer 10039); Transportangebote
+// haengen an ihr — wie in pds-auftrag-material.
+const EIGENE_FIRMA_ALS_KUNDE = "6139e897-1a04-48fa-bdd5-b9ac2e47ebd2"
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: CORS })
@@ -79,8 +85,8 @@ Deno.serve(async (req: Request) => {
     const { data: erf, error: erfErr } = await sb
       .from("aufmass_erfassung")
       .select(`
-        id, baustelle_text, pds_vorgang_uuid, status,
-        aufmass_formteile ( id, formteil_system, dimension, anzahl ),
+        id, baustelle_text, pds_vorgang_uuid, pds_vorgangs_nummer, status,
+        aufmass_formteile ( id, formteil_system, dimension, anzahl, pds_transport_at ),
         aufmass_rohrmeter ( id, formteil_system, dimension, meter ),
         aufmass_einzelartikel ( id, bezeichnung, menge, einheit )
       `)
@@ -132,24 +138,37 @@ Deno.serve(async (req: Request) => {
     }
 
     // ─── Formteile einsortieren ────────────────────────────────────────────
-    const mengen: any[] = []
-    const transport: any[] = []
+    // Je Katalog-UUID buendeln (mehrere Aufmass-Zeilen derselben Gruppe addieren
+    // sich), Zeilen-IDs merken fuer die Markierung pds_transport_at.
+    const mengenJeKatalog = new Map<string, any>()
+    const transportJeKatalog = new Map<string, any>()
     const nichtUebertragbar: Array<{ name: string; menge: number; grund: string }> = []
+    let bereitsUebertragen = 0
 
     for (const f of (erf.aufmass_formteile ?? []) as any[]) {
+      if (f.pds_transport_at) { bereitsUebertragen++; continue }
       const k = kunstJeSchluessel.get(`${f.formteil_system}|${f.dimension}`)
       const name = k?.name ?? `Formteil ${f.formteil_system} ${f.dimension}`
-      if (!k) { nichtUebertragbar.push({ name, menge: f.anzahl, grund: "Kein Kunstartikel fuer System+Dimension" }); continue }
-      if (!k.pds_katalog_uuid) { nichtUebertragbar.push({ name, menge: f.anzahl, grund: "Kunstartikel noch nicht in PDS (pds-katalog-sync ausstehend)" }); continue }
+      const anzahl = Number(f.anzahl)
+      if (!k) { nichtUebertragbar.push({ name, menge: anzahl, grund: "Kein Kunstartikel fuer System+Dimension" }); continue }
+      if (!k.pds_katalog_uuid) { nichtUebertragbar.push({ name, menge: anzahl, grund: "Kunstartikel noch nicht in PDS (pds-katalog-sync ausstehend)" }); continue }
       const platz = platzhalterJeKatalog.get(k.pds_katalog_uuid)
       if (platz) {
-        const aktuell = Number(platz.menge ?? 0)
-        mengen.push({ position_uuid: platz.uuid, ebene: platz.ebene, name: platz.kurztext ?? name, menge_aktuell: aktuell, menge_plus: f.anzahl, menge_neu: runde(aktuell + f.anzahl) })
+        const z = mengenJeKatalog.get(k.pds_katalog_uuid)
+        if (z) { z.menge_plus = runde(z.menge_plus + anzahl); z.menge_neu = runde(z.menge_aktuell + z.menge_plus); z.positions_ids.push(f.id) }
+        else {
+          const aktuell = Number(platz.menge ?? 0)
+          mengenJeKatalog.set(k.pds_katalog_uuid, { position_uuid: platz.uuid, ebene: platz.ebene, name: platz.kurztext ?? name, menge_aktuell: aktuell, menge_plus: anzahl, menge_neu: runde(aktuell + anzahl), positions_ids: [f.id] })
+        }
       } else {
         const ek = k.preis_netto != null ? Number(k.preis_netto) : 0
-        transport.push({ katalog_uuid: k.pds_katalog_uuid, name, menge: f.anzahl, ek_einzel: runde(ek), ek_gesamt: runde(ek * f.anzahl) })
+        const t = transportJeKatalog.get(k.pds_katalog_uuid)
+        if (t) { t.menge = runde(t.menge + anzahl); t.ek_gesamt = runde(t.ek_einzel * t.menge); t.positions_ids.push(f.id) }
+        else transportJeKatalog.set(k.pds_katalog_uuid, { katalog_uuid: k.pds_katalog_uuid, name, menge: anzahl, ek_einzel: runde(ek), ek_gesamt: runde(ek * anzahl), positions_ids: [f.id] })
       }
     }
+    const mengen = [...mengenJeKatalog.values()]
+    const transport = [...transportJeKatalog.values()]
     for (const r of (erf.aufmass_rohrmeter ?? []) as any[]) {
       nichtUebertragbar.push({ name: `Rohr ${r.formteil_system} ${r.dimension}`, menge: Number(r.meter), grund: "Rohrmeter: Zielartikel noch nicht festgelegt (siehe Plan, offene Frage)" })
     }
@@ -160,11 +179,11 @@ Deno.serve(async (req: Request) => {
     const teile: string[] = []
     if (mengen.length) teile.push(`${mengen.length} Formteil-Gruppe(n) haben einen Platzhalter im Auftrag — Menge wuerde direkt gesetzt.`)
     if (transport.length) teile.push(`${transport.length} Formteil-Gruppe(n) ohne Platzhalter — wuerden als Transportangebot gehen.`)
+    if (bereitsUebertragen) teile.push(`${bereitsUebertragen} Formteil-Gruppe(n) sind schon uebertragen.`)
     if (nichtUebertragbar.length) teile.push(`${nichtUebertragbar.length} Position(en) bleiben in der Aufmass-App.`)
     if (!teile.length) teile.push("Nichts zu uebertragen.")
 
-    return json({
-      status: "vorschau",
+    const vorschau = {
       schreiben_freigegeben: SCHREIBEN_FREIGEGEBEN,
       auftrag: {
         uuid: erf.pds_vorgang_uuid,
@@ -174,10 +193,88 @@ Deno.serve(async (req: Request) => {
         ebenen: [...new Set(pdsPositionen.map((p) => p.ebene))],
       },
       erfassung: { id: erf.id, baustelle: erf.baustelle_text, status: erf.status },
-      mengen, transport,
+      mengen: mengen.map(({ positions_ids: _i, ...m }) => m),
+      transport: transport.map(({ positions_ids: _i, ...t }) => t),
       transport_summe_ek: runde(transport.reduce((s, p) => s + p.ek_gesamt, 0)),
+      bereits_uebertragen: bereitsUebertragen,
       nicht_uebertragbar: nichtUebertragbar,
       hinweis: teile.join(" "),
+    }
+    if (aktion === "vorschau") return json({ status: "vorschau", ...vorschau })
+
+    // ─── Schreibweg (nur erreichbar, wenn SCHREIBEN_FREIGEGEBEN) ────────────
+    // 1:1 das Muster aus pds-auftrag-material: Mengen an Platzhaltern setzen,
+    // sonst Transportangebot bei der Weich GmbH. Protokoll in shop_pds_sync_log,
+    // Markierung pds_transport_at an den Formteil-Zeilen.
+    const jetzt = new Date().toISOString()
+    const vorgangsNummer = det.daten.vorgangsNummer ?? erf.pds_vorgangs_nummer ?? erf.pds_vorgang_uuid
+    async function protokoll(operation: string, request: unknown, antwort: { ok: boolean; status: number; daten: any; text: string }) {
+      await sb.from("shop_pds_sync_log").insert({
+        artikel_id: null, operation, dry_run: false,
+        request: { erfassung_id: erfassungId, zweck: "aufmass", ...(request as object) },
+        response: antwort.daten ? { uuid: antwort.daten.uuid, vorgangsNummer: antwort.daten.vorgangsNummer } : { text: antwort.text.slice(0, 2000) },
+        http_status: antwort.status, erfolg: antwort.ok, fehler: antwort.ok ? null : antwort.text.slice(0, 500),
+        created_by: userData.user.id,
+      })
+    }
+
+    if (aktion === "mengen_setzen") {
+      if (!mengen.length) return json({ error: "Keine Formteil-Gruppe mit Platzhalter im Auftrag.", ...vorschau }, 400)
+      const anfrage = {
+        context: { vorgangstyp: "AUFTRAG" },
+        vorgangsDaten: { uuid: erf.pds_vorgang_uuid, positionsDaten: mengen.map((m) => ({ uuid: m.position_uuid, menge: m.menge_neu })) },
+      }
+      const antwort = await pdsRoh("/vorgang/updateposition", anfrage)
+      await protokoll("/vorgang/updateposition", anfrage, antwort)
+      if (!antwort.ok) return json({ error: `PDS ${antwort.status} @ /vorgang/updateposition: ${antwort.text.slice(0, 500)}` }, 502)
+      const ids = mengen.flatMap((m) => m.positions_ids)
+      const { error: markErr } = await sb.from("aufmass_formteile").update({ pds_transport_at: jetzt }).in("id", ids)
+      if (erf.status !== "uebertragen" && !transport.length) await sb.from("aufmass_erfassung").update({ status: "uebertragen" }).eq("id", erfassungId)
+      return json({
+        status: "mengen_gesetzt", anzahl: mengen.length, mengen: vorschau.mengen, offen_transport: transport.length,
+        anleitung: `Die Mengen stehen in Auftrag ${vorgangsNummer}. Im PDS-Client nur noch Kundenpreise pruefen und Platzhalter mit Menge 0 loeschen, falls sie stoeren.`,
+        warnung: markErr ? `Mengen stehen in PDS, die Markierung im Aufmass scheiterte: ${markErr.message}. Nicht erneut setzen.` : undefined,
+      })
+    }
+
+    // transport_anlegen
+    if (!transport.length) return json({ error: "Keine Formteil-Gruppe fuer ein Transportangebot.", ...vorschau }, 400)
+    const heute = (() => { const d = new Date(); const p = (n: number) => String(n).padStart(2, "0"); return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}` })()
+    const angebotBezeichnung = `ZZ-TRANSPORT Aufmass fuer Auftrag ${vorgangsNummer} — nach Kopieren loeschen`
+    const anfrage = {
+      context: { vorgangstyp: "ANGEBOT" },
+      vorgangsdaten: {
+        personUUID: EIGENE_FIRMA_ALS_KUNDE,
+        bezeichnung: angebotBezeichnung,
+        selektionskriterien: [{ bezeichnung: "Gewerk", wert: "SHK" }],
+        rootEbene: {
+          bezeichnung: "Leistungsverzeichnis",
+          ebenen: [{
+            bezeichnung: `Formteile Aufmass fuer ${vorgangsNummer} — Aufmass-App ${heute}`,
+            ebeneArt: "NORMAL",
+            positionen: transport.map((p) => ({
+              positionsTyp: "ARTIKEL", positionsArt: "NORMAL", katalogUUID: p.katalog_uuid, menge: p.menge,
+              ekPreis: { einzelPreis: p.ek_einzel },
+            })),
+          }],
+        },
+      },
+    }
+    const antwort = await pdsRoh("/vorgang/create", anfrage)
+    await protokoll("/vorgang/create", anfrage, antwort)
+    if (!antwort.ok) return json({ error: `PDS ${antwort.status} @ /vorgang/create: ${antwort.text.slice(0, 500)}` }, 502)
+    const angebotUUID = String(antwort.daten?.uuid ?? "")
+    const angebotNummer = String(antwort.daten?.vorgangsNummer ?? "")
+    const ids = transport.flatMap((p) => p.positions_ids)
+    const { error: markErr } = await sb.from("aufmass_formteile").update({ pds_transport_at: jetzt }).in("id", ids)
+    const { error: erfErr2 } = await sb.from("aufmass_erfassung").update({
+      pds_transport_uuid: angebotUUID || null, pds_transport_nummer: angebotNummer || null, pds_transport_at: jetzt, status: "uebertragen",
+    }).eq("id", erfassungId)
+    return json({
+      status: "transport_angelegt",
+      angebot: { uuid: angebotUUID, vorgangs_nummer: angebotNummer, positionen: transport.length, ek_summe: vorschau.transport_summe_ek },
+      anleitung: `Angebot ${angebotNummer} im PDS-Client oeffnen (Kunde Weich GmbH), die Ebene in Auftrag ${vorgangsNummer} kopieren, Kundenpreise anpassen, Angebot loeschen.`,
+      warnung: (markErr ?? erfErr2) ? `Angebot ${angebotNummer} steht in PDS, die Markierung im Aufmass scheiterte: ${(markErr ?? erfErr2)!.message}. Nicht erneut anlegen.` : undefined,
     })
   } catch (e) {
     return json({ error: String(e instanceof Error ? e.message : e) }, 502)
