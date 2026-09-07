@@ -48,6 +48,31 @@ Lücken, die für **alle 57 Kunstartikel** gleich gelten:
 
 Einheit „Stück" → PDS „Stck" ist zugeordnet, das passt bereits.
 
+### Beide Lücken geschlossen (07.09.2026, später am Tag)
+
+Über den MCP-Server **lokal auf dem VPS** (`tools/vps/mcp-lokal.mjs`,
+Streamable HTTP an `localhost:3000/mcp`, Token aus `/opt/weich-api/.env`)
+liessen sich die nötigen PDS-Daten lesen — unabhängig von der gestörten
+MCP-Verbindung der Claude-Sitzung:
+
+| Was | PDS-Objekt | UUID |
+|---|---|---|
+| Lieferant R+F | Person „Richter+Frenzel Nürnberg GmbH", Lieferantennr. 70077 | `ef164291-89b3-463e-a0e2-d2cbe72d70bb` |
+| Katalogkategorie | SHK › Handelsware › `8-SHK-Installationsmaterial` | `4e84d95e-3881-4733-8444-56eea6f6f71c` |
+| Warengruppe | `(SHK)Installationsmaterial` | `dca773ae-4c27-4195-8243-a7c1252f4efb` |
+
+Shop-seitig gesetzt: `shop_lieferanten.pds_person_uuid` für `r-f`, neue
+`shop_kategorien`-Zeile „SHK-Installationsmaterial (Formteile)" mit beiden
+UUIDs, und bei allen 57 Kunstartikeln `lieferant_id` (R+F) und
+`kategorie_id`. **Nichts davon hat PDS verändert.** Beide Zuordnungen sind
+fachlich naheliegend (die Formteile sind SHK-Installationsmaterial), aber eine
+Wahl — Patrick kann sie vor dem echten Sync noch umhängen.
+
+**Nächster Schritt braucht Freigabe:** `pds-katalog-sync` mit `dry_run: false`
+legt 57 Katalogeinträge in PDS an. Die sind per API nicht löschbar („eine
+Dublette bleibt für immer stehen", CLAUDE.md). Deshalb erst der Trockenlauf
+für alle 57, dann Patricks Go.
+
 ## Schritte, in Reihenfolge
 
 1. **Kunstartikel nach PDS synchronisieren.** Sobald die beiden Lücken oben
