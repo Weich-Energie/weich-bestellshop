@@ -106,6 +106,57 @@ Alle drei am 06.09.2026 angemeldet getestet. Werkzeuge: `erkunden.mjs` (Seite
 angemeldet ansehen, `--tippen` fuer Suchfeld), `abgleich.mjs` (dieselben
 Begriffe in mehreren Shops suchen, Nettopreise nebeneinander).
 
+## GUT Online Plus (`gut`, gutonlineplus.de) — Warenkörbe ansehen (06.09.2026)
+
+Der Shop ist eine jQuery-Mobile-Einseiten-App der G.U.T.-Gruppe (Kreiner &
+Lindner KG). Eigenheiten, die das Playbook braucht:
+
+- Usercentrics-Consent im Shadow-DOM (`#usercentrics-root`); „Services
+  speichern" (`button[data-testid="uc-save-button"]`) lässt nur Notwendiges zu.
+  Playwright-Selektoren durchdringen das Shadow-DOM, `document.querySelector` nicht.
+- Das Login-Formular (`#a3_inputName`, `#a3_inputPass`, `#a3_btnSubmit`) liegt
+  im ausgeblendeten Seitenmenü. Sichtbar wird es erst nach Klick auf
+  `#menuButton` (Hamburger links oben). Unter 1000 px Breite bricht die App
+  beim Start mit `clientWidth`-Fehlern ab — Viewport mindestens 1280 px.
+- Angemeldet erkennt man am eingeblendeten `#UlUserMenu` (Logout-Knopf
+  `#a2_btnLogout`); als Gast steht `#UlMenuLogin` auf `display:block`.
+- Warenkorb-Übersicht: `https://www.gutonlineplus.de/p/carts`. Kacheln je Korb
+  mit Name, Vorgangsart, „Anzahl Positionen", „Zuletzt zugefügt". Der Knopf
+  „Alle Warenkörbe laden" lädt den Rest nach; jede Kachel steckt zweimal im DOM.
+  Das Badge im Kopf („106 / 4893") ist Körbe / Positionen gesamt.
+
+`gut-warenkoerbe.mjs` (rein lesend) meldet sich an, lädt alle Körbe nach und
+gibt sie als JSON aus (`--shot <png>` für einen Screenshot, `--korb <Name>`
+öffnet einen Korb und liest die Positionen). Stand 06.09.2026: 106 Körbe, alle
+vom Typ Lieferauftrag, 4893 Positionen, Namen meist `NK <Kunde>`.
+
+## R+F Suchtreffer-Struktur (06.09.2026, für die GUT→R+F-Zuordnung)
+
+Für die Formteil-Umstellung (siehe Ziel „Digitales Aufmaß") muss jeder
+GUT-Artikel einem R+F-Artikel zugeordnet werden. Volltextsuche über
+`suchen(page, pb, begriff)` mit der GUT-Beschreibung (`beschreibung1 +
+beschreibung2`) liefert brauchbare Kandidaten. Trefferkachel im DOM:
+`div.position__container`, Beispieltext:
+
+```
+VIEGA PROFIPRESS Kreuzungs-T-Stück a. Rotguss 22x15x22 mm, m.Isolierbox Modell 2249.3
+Artikel-Nr.: 1012109202015
+Werks-Nr.: 493356
+Matchcode: VIE-22493221522
+Sofort verfügbar
+41,35 € je 41,35 € /ST Listenpreis: 108,00 € /ST
+```
+
+Extrahierbar: Hersteller+Bezeichnung (erste Zeile), R+F-Artikelnummer
+(`Artikel-Nr.`), Herstellernummer (`Werks-Nr.` — nicht identisch mit GUTs
+internen Lieferantencodes wie `BAGI01`/`VIAT01`, die SAP-intern sind, nicht
+herstellerbezogen), Matchcode, Verfügbarkeit, Nettopreis („je X,XX € /ST"),
+Listenpreis. Link (`href`) führt zur Produktseite `/produkt/<Artikel-Nr.>`.
+
+Die Session (`state/r-f.json`) verfällt nach wenigen Stunden — bei
+`locator.waitFor`-Timeout auf dem Suchfeld `oeffnen('r-f', { neuAnmelden: true
+})` erzwingen.
+
 ## Neuen Lieferanten anbinden
 
 1. Shop im Browser anschauen: Login-Seite, Formularfelder, Produkt-URL-Muster,

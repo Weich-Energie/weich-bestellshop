@@ -110,6 +110,15 @@ Neue Edge Function `shop-ai` mit taskbasiertem Routing:
 - [docs/artikelpflege-lieferantendaten.md](docs/artikelpflege-lieferantendaten.md) — Shop als aktuelle Wahrheit fuer C-Teile, Import-Skript, PDS-Abgleich
 - [docs/lieferanten-shop-zugaenge.md](docs/lieferanten-shop-zugaenge.md) — Abruf hinter dem Login (VPS), Playbook Frigotechnik, neue Shops anbinden
 - [docs/pds-montagematerial-platzhalter.md](docs/pds-montagematerial-platzhalter.md) — Platzhalter-Ebene fuer die Auftragsanlage (an Megh)
+- [docs/aufmass-formteil-modell.md](docs/aufmass-formteil-modell.md) — GUT-Export, R+F-Zuordnung, Formteil-Mittelwert je System+Dimension (Ziel-Schritte 1-3)
+- [docs/aufmass-app-entwurf.md](docs/aufmass-app-entwurf.md) — Entwurf der Aufmass-App (Repo `weich-aufmass`, Ziel-Schritt 4)
+- [docs/aufmass-pds-uebergabe-plan.md](docs/aufmass-pds-uebergabe-plan.md) — Bauplan fuer die PDS-Uebergabe, noch nicht umgesetzt (Ziel-Schritt 5)
+
+## Formteil-Kunstartikel (07.09.2026)
+`shop_artikel.formteil_aufmass = true` markiert 57 Kunstartikel „Formteil
+<System> <Dimension>" mit dem mengengewichteten R+F-Mittelwert als Preis —
+nie `bestellbar`, kein echter Lieferant. Grundlage der kuenftigen
+PDS-Uebergabe aus der Aufmass-App. Siehe docs/aufmass-formteil-modell.md.
 
 ## Doku-Regel
 Wenn sich eine Kern-Entscheidung aendert: ADR schreiben, CLAUDE.md updaten, CONTEXT.md pflegen.

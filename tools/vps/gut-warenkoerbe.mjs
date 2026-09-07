@@ -35,24 +35,49 @@ try {
   }
   await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {})
   await page.waitForTimeout(3000)
-  // Die Uebersicht (/p/carts) zeigt zunaechst nur einen Teil; der Knopf laedt den Rest.
-  const alleLaden = page.locator('a:has-text("Alle Warenkörbe laden"), button:has-text("Alle Warenkörbe laden")').first()
-  if (await alleLaden.count()) {
+  // Die Uebersicht (/p/carts) zeigt zunaechst nur einen Teil; der Knopf laedt den
+  // Rest nach — so oft klicken, bis er verschwindet.
+  for (let i = 0; i < 15; i++) {
+    const alleLaden = page.getByText('Alle Warenkörbe laden', { exact: false }).last()
+    if (!(await alleLaden.count()) || !(await alleLaden.isVisible().catch(() => false))) break
+    await alleLaden.scrollIntoViewIfNeeded().catch(() => {})
     await alleLaden.click({ timeout: 5000 }).catch(() => {})
     await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {})
-    await page.waitForTimeout(3000)
+    await page.waitForTimeout(2500)
   }
 
-  // Jeder Korb ist ein jQuery-Mobile-Collapsible: Kopfzeile = Name, Inhalt = Details.
+  // Jede Kachel: Name, Vorgangsart, "Anzahl Positionen: N", "Zuletzt zugefuegt: ART (n Stueck) Beschreibung".
+  // Die Kachel ist der kleinste Vorfahr des "Anzahl Positionen"-Blatts, der nur eine solche Zeile enthaelt.
   const koerbe = () => page.evaluate(() => {
-    const txt = (e) => (e ? e.innerText.replace(/\s+/g, ' ').replace(/click to (collapse|expand) contents/g, '').trim() : '')
-    return Array.from(document.querySelectorAll('.ui-collapsible, [data-role="collapsible"]'))
-      .filter((c) => c.getBoundingClientRect().height > 0)
-      .map((c) => ({
-        name: txt(c.querySelector('.ui-collapsible-heading, h1, h2, h3, h4')),
-        offen: !c.classList.contains('ui-collapsible-collapsed'),
-        inhalt: txt(c.querySelector('.ui-collapsible-content')).slice(0, 1500),
-      }))
+    // Elemente, die "Anzahl Positionen" in einem eigenen Textknoten tragen (nicht nur geerbt).
+    const blaetter = Array.from(document.querySelectorAll('body *')).filter((e) =>
+      Array.from(e.childNodes).some((n) => n.nodeType === 3 && /Anzahl Positionen/.test(n.textContent)))
+    const anzahl = (e) => (e.innerText.match(/Anzahl Positionen/g) || []).length
+    const kacheln = []
+    for (const b of blaetter) {
+      let k = b
+      while (k.parentElement && k.parentElement !== document.body && anzahl(k.parentElement) < 2) k = k.parentElement
+      if (kacheln.includes(k)) continue
+      kacheln.push(k)
+    }
+    if (!kacheln.length) {
+      return [{ debug: true, blaetter: blaetter.length, beispiel: document.body.innerHTML.match(/.{0,600}Anzahl Positionen.{0,300}/)?.[0] ?? null }]
+    }
+    // Jede Kachel steckt zweimal im DOM (zwei Layout-Varianten, Beschreibung
+    // einmal gekuerzt) — nach Name, Positionszahl und letztem Artikel deduplizieren.
+    const gesehen = new Set()
+    const ergebnis = []
+    for (const k of kacheln) {
+      const text = k.innerText.replace(/\s+/g, ' ').trim()
+      const m = text.match(/^(.*?)\s*(Lieferauftrag|Angebot|Bestellung|Kommission|Abholauftrag|Auftrag)\s*Anzahl Positionen:\s*(\d+)\s*Zuletzt zugefügt:\s*(\S+)\s*\((\d+)\s*([^)]*)\)\s*(.*)$/)
+      const schluessel = m ? `${m[1].trim()}|${m[3]}|${m[4]}` : text
+      if (gesehen.has(schluessel)) continue
+      gesehen.add(schluessel)
+      ergebnis.push(m
+        ? { name: m[1].trim(), art: m[2], positionen: Number(m[3]), zuletzt: { artikel: m[4], menge: Number(m[5]), einheit: m[6], bezeichnung: m[7].trim() } }
+        : { name: null, text })
+    }
+    return ergebnis
   })
 
   const lesen = () => page.evaluate(() => {
