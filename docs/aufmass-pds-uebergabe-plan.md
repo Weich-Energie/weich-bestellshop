@@ -68,10 +68,20 @@ UUIDs, und bei allen 57 Kunstartikeln `lieferant_id` (R+F) und
 fachlich naheliegend (die Formteile sind SHK-Installationsmaterial), aber eine
 Wahl — Patrick kann sie vor dem echten Sync noch umhängen.
 
+**Trockenlauf für alle 57 Kunstartikel: grün** (07.09.2026, über das
+Functions-Gateway mit dem Testkonto als temporärem Shop-Admin, danach wieder
+entzogen). Alle 57 antworten `200 trockenlauf`, keine Mapping-Lücke mehr;
+`pds_sync_status` steht auf `bereit`. Skript: `sync-trockenlauf.mjs`
+(Scratchpad; bei Bedarf nach `tools/` übernehmen).
+
 **Nächster Schritt braucht Freigabe:** `pds-katalog-sync` mit `dry_run: false`
 legt 57 Katalogeinträge in PDS an. Die sind per API nicht löschbar („eine
-Dublette bleibt für immer stehen", CLAUDE.md). Deshalb erst der Trockenlauf
-für alle 57, dann Patricks Go.
+Dublette bleibt für immer stehen", CLAUDE.md). Vorher ggf. Kategorie/
+Warengruppe umhängen, falls SHK-Installationsmaterial nicht gewünscht ist.
+Hinweis aus dem Trockenlauf: keine Aufschlagsklasse gesetzt — PDS würde VK =
+EK setzen. Für Formteile, die im Montagematerial aufgehen, ist das vertretbar
+(gleiche Begründung wie in `pds-katalog-sync` selbst); sonst vorher
+`aufschlagsklasse` an den Kunstartikeln setzen.
 
 ## Schritte, in Reihenfolge
 
