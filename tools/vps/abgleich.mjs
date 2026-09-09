@@ -22,6 +22,10 @@ const max = Number(wert('max', '3'))
 // Titel steht. Fuer Gattungsbegriffe (Kabelkanal, Kondensatpumpe), bei denen
 // der Shop andere Worte benutzt (Leitungskanal, Kondensatfoerderpumpe).
 const locker = args.includes('--locker')
+// --varianten: bei Shops, die Dimensionen als Ausfuehrungen eines Produkts
+// fuehren (R+F), zu jedem Treffer auch die Geschwister lesen. Ohne das
+// vergleicht man die Nachbardimension mit einem fremden Produkt.
+const mitVarianten = args.includes('--varianten')
 if (!begriffeDatei) { console.error('--begriffe <datei.json> fehlt'); process.exit(1) }
 const begriffe = JSON.parse(fs.readFileSync(begriffeDatei, 'utf8'))
 
@@ -79,14 +83,22 @@ for (const slug of shops) {
           const heuhaufen = norm(`${d.titel} ${d.artikelnummer} ${d.herstellernummer} ${d.matchcode} ${(d.text || '').slice(0, 1500)}`)
           const passt = locker || heuhaufen.includes(norm(b.begriff))
           if (passt) {
-            zeile.passend.push({ url: u, titel: d.titel, artikelnummer: d.artikelnummer, herstellernummer: d.herstellernummer, netto_preis: d.netto_preis ?? null, brutto_preis: d.brutto_preis ?? null, bestand: d.bestand ?? null, einheit: d.ausgabe_einheit ?? null, netto_quelle: d.netto_quelle ?? null })
+            const eintrag = { url: u, titel: d.titel, artikelnummer: d.artikelnummer, herstellernummer: d.herstellernummer, netto_preis: d.netto_preis ?? null, brutto_preis: d.brutto_preis ?? null, bestand: d.bestand ?? null, einheit: d.ausgabe_einheit ?? null, netto_quelle: d.netto_quelle ?? null }
+            if (mitVarianten && pb.varianten) {
+              // Die Produktseite ist noch offen — Ausfuehrungen direkt mitlesen.
+              const v = await pb.varianten(page).catch((e) => ({ fehler: e.message.slice(0, 120), zeilen: [] }))
+              if (v.zeilen?.length) eintrag.ausfuehrungen = v.zeilen
+              if (v.fehler) eintrag.varianten_fehler = v.fehler
+            }
+            zeile.passend.push(eintrag)
           }
         }
       } catch (e) {
         zeile.fehler = e.message.slice(0, 200)
       }
       treffer[b.begriff] = zeile
-      console.error(`[${slug}] ${b.begriff}: ${zeile.gesucht} geprueft, ${zeile.passend.length} passend${zeile.fehler ? ' — ' + zeile.fehler : ''}`)
+      const anzVar = zeile.passend.reduce((n, p) => n + (p.ausfuehrungen?.length ?? 0), 0)
+      console.error(`[${slug}] ${b.begriff}: ${zeile.gesucht} geprueft, ${zeile.passend.length} passend${anzVar ? `, ${anzVar} Ausfuehrungen` : ''}${zeile.fehler ? ' — ' + zeile.fehler : ''}`)
     }
   } finally {
     await browser.close()

@@ -157,6 +157,54 @@ Die Session (`state/r-f.json`) verfällt nach wenigen Stunden — bei
 `locator.waitFor`-Timeout auf dem Suchfeld `oeffnen('r-f', { neuAnmelden: true
 })` erzwingen.
 
+## R+F Varianten statt Einzelprodukte (09.09.2026, bestätigt)
+
+R+F führt Dimensionen und Größen **nicht als eigene Produkte**, sondern als
+Ausführungen eines Produkts. Die Shop-Suche liefert davon nur **eine**. Wer je
+Dimension neu sucht, landet bei fremden Produkten anderer Hersteller und
+vergleicht Äpfel mit Birnen.
+
+**Der Schaden im ersten Leitungsvergleich (07.09.2026):** Gefunden war der
+ECUTHERM II Twin 1/4"+3/8" zu 6,31 €/m. Für die Nachbardimensionen trug der
+Lauf fremde R+F-Rollenware zu 14 bis 20 €/m ein — R+F stand dadurch als teuer
+da, obwohl die Twin-Serie in **allen vier** zölligen Doppeldimensionen die
+günstigste am Markt ist:
+
+| Dimension | Artikelnummer | Werksnr. | je Meter | 20-m-Ring |
+|---|---|---|---|---|
+| 1/4" + 3/8" | 2029835143820 | 880018 | 6,31 € | 126,20 € |
+| 1/4" + 1/2" | 2029835141220 | 880019 | 7,66 € | 153,14 € |
+| 1/4" + 5/8" | 2029835145820 | — | 10,44 € | 208,80 € |
+| 3/8" + 5/8" | 2029835385820 | — | 11,72 € | 234,40 € |
+
+**Artikelnummern-Muster:** Nur ein Teil wechselt je Dimension —
+`2029835` + `1438` / `1412` / `1458` / `3858` + `20` (Ringlänge). Die Ziffern
+kodieren die Zollmaße: 14 = 1/4", 38 = 3/8", 12 = 1/2", 58 = 5/8".
+
+**So liest man die Ausführungen (DOM-Struktur):** Der Abschnitt steht als
+`div.alternative-variations` **direkt auf der Produktseite**, ein Klick ist
+nicht nötig — Angular füllt ihn, sobald er sichtbar wird
+(`scrollIntoViewIfNeeded`). Zeilen sind `div.alternative` mit `.name`,
+`.price` (unser Preis) und `.list-price` (Listenpreis). Die Artikelnummer
+steht nur im Link der Zeile. `MEHR ANZEIGEN` (`.toggle-visibility`) klappt
+weitere Zeilen auf, deshalb so lange drücken, bis die Zeilenzahl stehen
+bleibt. Achtung: Reiter und Links sind **`div`-Elemente ohne Rolle**
+(`div.anchor` „Weitere Ausführungen“, `div.altivernative-variation-link`
+„Alle Ausführungen“, Tippfehler im Klassennamen ist echt) — Selektoren auf
+`a`, `button` oder `[role=tab]` greifen ins Leere.
+
+**Werkzeuge:** `pb.varianten(page)` im R+F-Playbook liefert
+`{ gefunden, zeilen }`. `rf-varianten.mjs <produkt-url> [--neu]` fragt einzelne
+Produkte ab und meldet sich bei abgelaufener Sitzung selbst neu an.
+`abgleich.mjs --varianten` hängt die Ausführungen an jeden Treffer.
+`varianten-nachlauf.sh` holt Leitungen und Zubehör in einem Lauf.
+`leitungen-auswertung.mjs` in `~/.weich-db` liest `var-leitungen.json` mit.
+
+**Dieselbe Lücke beim Zubehör:** VARIO II Wandkonsole hat acht Größen von
+DN 80 bis DN 200 (169,77 bis 215,77 €, DN 130 ist die günstigste), POLL III-FU
+Dachkonsole drei (52,45 bis 59,99 €). Der Zubehörvergleich vom 06.09.2026
+zeigt davon je drei zufällige.
+
 ## Neuen Lieferanten anbinden
 
 1. Shop im Browser anschauen: Login-Seite, Formularfelder, Produkt-URL-Muster,

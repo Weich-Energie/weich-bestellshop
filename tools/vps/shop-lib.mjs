@@ -166,6 +166,68 @@ export const PLAYBOOKS = {
       await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {})
       await page.waitForTimeout(3000)
     },
+    // R+F fuehrt Dimensionen nicht als eigene Produkte, sondern als Ausfuehrungen
+    // eines Produkts. Die Suche liefert nur eine davon — wer je Dimension neu
+    // sucht, landet bei fremden Produkten anderer Hersteller.
+    // Der Abschnitt steht als div.alternative-variations direkt auf der
+    // Produktseite (Angular, faellt erst beim Sichtbarwerden), Zeilen sind
+    // div.alternative mit .name, .price ("7,66 €") und .list-price
+    // ("Listenpreis: 23,03 €"). "MEHR ANZEIGEN" klappt weitere Zeilen auf.
+    // Die Artikelnummer steht nur im Link der Zeile.
+    async varianten(page) {
+      const box = page.locator('.alternative-variations').first()
+      if (!(await box.count())) return { gefunden: false, zeilen: [] }
+      await box.scrollIntoViewIfNeeded({ timeout: 6000 }).catch(() => {})
+      await page.waitForTimeout(1800)
+      // "MEHR ANZEIGEN" so lange druecken, bis die Zeilenzahl stehen bleibt.
+      let vorher = -1
+      for (let runde = 0; runde < 8; runde++) {
+        const jetzt = await page.locator('.alternative-variations .alternative').count()
+        if (jetzt === vorher) break
+        vorher = jetzt
+        const mehr = page.locator('.alternative-variations .toggle-visibility, .alternative-variations button:has-text("MEHR ANZEIGEN")').first()
+        if (!(await mehr.count())) break
+        if (!(await mehr.click({ timeout: 2500 }).then(() => true).catch(() => false))) break
+        await page.waitForTimeout(1500)
+      }
+      const zeilen = await page.evaluate(() => {
+        const norm = (s) => (s || '').replace(/\s+/g, ' ').trim()
+        const zahl = (t) => (t ? Number(t.replace(/\./g, '').replace(',', '.')) : null)
+        const preisAus = (t) => {
+          const m = norm(t).match(/(\d{1,3}(?:\.\d{3})*,\d{2})\s*€/)
+          return m ? zahl(m[1]) : null
+        }
+        const kasten = document.querySelector('.alternative-variations')
+        if (!kasten) return []
+        const roh = Array.from(kasten.querySelectorAll('.alternative'))
+        const gesehen = new Set()
+        const raus = []
+        for (const e of roh) {
+          const name = norm(e.querySelector('.name')?.textContent) || norm(e.textContent).slice(0, 140)
+          // .price traegt unseren Preis, .list-price den Listenpreis daneben.
+          const preisEl = e.querySelector('.price-container .price, .price')
+          const listeEl = e.querySelector('.list-price')
+          const netto = preisAus(preisEl?.textContent)
+          const liste = preisAus(listeEl?.textContent)
+          const href = e.querySelector('a[href]')?.getAttribute('href') ?? null
+          const nummer = href ? (href.match(/(\d{8,})/) || [])[1] ?? null : null
+          const schluessel = nummer ?? name
+          if (!name || gesehen.has(schluessel)) continue
+          gesehen.add(schluessel)
+          raus.push({
+            titel: name,
+            artikelnummer: nummer,
+            netto_preis: netto,
+            listenpreis: liste,
+            je_ausgewiesen: /je:?\s/i.test(norm(preisEl?.textContent)),
+            url: href ? new URL(href, location.origin).href : null,
+            text: norm(e.textContent).slice(0, 220),
+          })
+        }
+        return raus
+      })
+      return { gefunden: true, zeilen }
+    },
     // Unser Preis steht als "je 7,93 € /ST", der Listenpreis daneben als "Listenpreis: 20,70 €".
     netto: { selektor: '.single-price, .list-price, .price, .price-total', muster: /je:?\s*([\d.]+,\d{2})\s*€/, ersatz: /^\s*([\d.]+,\d{2})\s*€/ },
     seiteUrl(listeUrl, n) {
