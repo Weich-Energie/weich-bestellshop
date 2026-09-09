@@ -108,6 +108,44 @@ Median-Rabatt auf den Listenpreis im Lagerauszug: 61,9 %.
 4. **Der Baustellen-Vergleich alt gegen neu** ist erst nach der Erfassung
    aussagekräftig. Bis dahin gilt die Zahl aus der Textsuche als überzeichnet.
 
+## Weg zur 90-Prozent-Schwelle (Stand 09.09.2026)
+
+| Größe | Wert |
+|---|---|
+| Verbrauch gesamt | 150.443 € |
+| zugeordnet (automatisch + vermutet) | 123.336 € = 82,0 % |
+| Ziel 90 % | 135.399 € |
+| **fehlt** | **12.063 €** |
+| offen insgesamt | 27.107 € (79 Artikel) |
+
+Die 32 Lager-Zuordnungen heben die Quote **nicht** um ihren vollen
+Verbrauchswert: 28 davon korrigieren nur den Preis bereits zugeordneter
+Artikel. Neu hinzu kommen die vier Ventile, die vorher gar keinen Preis
+hatten (KFR-Ventil DN 15 und DN 20, Freistromventil DN 15 und DN 20,
+zusammen 2.835 €). Damit steigt die Quote von 82,0 auf **83,9 %**.
+
+Wo die restlichen offenen 27.107 € liegen:
+
+| Bereich | Artikel | Wert | Kommt aus welchem Auszug |
+|---|---|---|---|
+| Uponor MLC, Formteile | 13 | 7.599 € | Uponor-Regal |
+| Kupfer b-press, Formteile | 9 | 7.192 € | Profipress T-Stücke und Übergänge |
+| Ventile ohne System | 14 | 4.888 € | Armaturen-Regal |
+| C-Stahl Prestabo, Formteile | 10 | 2.909 € | Reserve, niedrige Priorität |
+| Rohre | 5 | 1.956 € | Rohrlager |
+| Schellen und Zubehör | 4 | 1.080 € | Befestigungsregal |
+| ungeklärt | 8 | 909 € | beim Erfassen klären |
+| Rest (Inox, Rotguss, Megapress, Gewinde) | 15 | 474 € | — |
+
+**Folgerung:** Allein der Uponor-Auszug und die Profipress-T-Stücke und
+-Übergangsstücke bringen zusammen 14.791 € und damit mehr als die fehlenden
+12.063 €. Die 90-Prozent-Schwelle ist mit Patricks kommenden Auszügen
+erreichbar, ohne eine einzige weitere Textsuche. Die größten Einzelposten
+sind T-Stücke mit Innengewinde-Abgang (BPT3515I 3.197 €, POVT3515I 967 €,
+BPT2815I 941 €), Uponor-Übergangsnippel (UCPA2525N 2.888 €, UCPA2520N
+1.215 €, UCPA2020N 983 €), das reduzierte Uponor-T-Stück UCPT2515IN
+(1.095 €) und das Kupfer-Übergangsstück BPUS3532 (1.784 €).
+
 ## Erfassung
 
 Arbeitsmappe `Lagerliste-Erfassung.xlsx` (an Patrick 09.09.2026):
