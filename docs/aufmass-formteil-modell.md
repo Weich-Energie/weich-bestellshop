@@ -43,6 +43,41 @@ Gewinde/falsche Dimension) in die Preisbildung einzuspeisen — das wäre
 schlimmer als eine unvollständige Automatik. Der Rest ist die geforderte
 manuelle Prüfliste (259 Artikel, CSV mit bis zu 5 Kandidaten je Artikel).
 
+## Schritt 2 — Stand 09.09.2026: Quelle „vermutet"
+
+Patrick hat am 08.09.2026 entschieden, für die als „unsicher" bewerteten
+Artikel den bestplatzierten R+F-Kandidaten zu übernehmen — sichtbar getrennt
+als dritte Quelle `rf_zuordnung_quelle = 'vermutet'` (Migration
+`20260908090000_rf_zuordnung_vermutet.sql`). Nicht übernommen wurden 21
+Kandidaten ohne Preis oder ohne eine einzige passende Zahl aus der
+GUT-Beschreibung (`vermutet-ausgeschlossen.csv`).
+
+| Quelle | Artikel | Anteil am Verbrauchswert |
+|---|---|---|
+| automatisch (alle Prüfregeln bestanden) | 133 | 51,1 % |
+| vermutet (bestplatzierter Kandidat) | 181 | 30,8 % |
+| offen | 79 | 18,0 % (27.107 €) |
+
+Zusammen **82 % des Verbrauchswerts** zugeordnet; die 79 offenen Artikel sind
+die Restliste (Ziel: 90 %, Rest als Liste). Die größten offenen Posten sind
+T-Stücke mit IG-Abgang (BPT3515I 3.197 €, POVT3515I, BPT2815I) und
+Uponor-Übergangsnippel (UCPA2525N 2.888 €) — Bauarten, die R+F unter anderem
+Text führt. Mit den Vermutungen haben 125 statt 57 Formteil-Gruppen einen
+Preis; Kunstartikel gibt es weiter nur für die 57 (26 davon im Preis
+nachgezogen). Ob für die 68 neuen Gruppen Kunstartikel angelegt und nach PDS
+übertragen werden, ist offen — PDS-Katalogeinträge sind nicht löschbar.
+
+**Warnung — die Vermutungen treiben den Mittelwert:** Der Baustellen-Vergleich
+auf den 58 abgerechneten Baustellen springt von +21,8 % (nur automatisch) auf
+**+50,1 %** (alt 54.399 € → neu 81.631 €, Median +46,5 %, alle 58 Körbe
+teurer). Ein Teil davon sind Fehltreffer mit absurdem Preis (z. B. Uponor
+Übergangsnippel 32 mm → Wipex-Presskupplung 86,76 € statt ~9 €). Die Blätter
+„R+F-Zuordnung" und „Formteil-Mittelwerte" der Arbeitsmappe
+`Aufmass-Formteil-Projekt.xlsx` (an Patrick 09.09.) zeigen je Artikel die
+Abweichung R+F/GUT; Vermutungen mit Faktor > 2,5 sollten vor einer
+Lieferantenentscheidung geprüft werden. Die PDS-Katalogpreise der 57
+Kunstartikel stehen bis dahin bewusst auf dem Stand vom 07.09.
+
 **Fund zur Session-Stabilität:** Die R+F-Sitzung verfällt nach 1–2 Stunden
 Dauerbetrieb. Ein Abbruch per `kill` mitten im Lauf lässt das Skript die
 Restschleife mit lauter „kein_treffer" durchlaufen (der Fehler wird pro

@@ -21,6 +21,10 @@ Ressourcenplanung, Service-Ticket und Betriebsradar.
   (fail-closed) — Pattern uebernommen aus Ressourcenplanung Phase 11/AAC-04
 - Shop-Admin-Flag: `berechtigungen.app_access.bestellshop_admin === true` ODER
   `berechtigungen.rolle === 'admin'`
+- SQL ausfuehren, wenn Port 5432 gesperrt ist (Fremdnetz, `db query` meldet
+  `LegacyDbConfigConnectTempRoleError`): `tools/supabase-sql-https.ps1 -SqlFile x.sql`
+  geht ueber die Management-API (HTTPS) mit dem CLI-Token aus dem
+  Windows-Anmeldeinformationsspeicher; kann auch DDL. Token wird nie ausgegeben.
 
 ## Deploy
 - **Auto-Deploy ist aktiv** (Stand 21.08.2026). Das Vercel-Projekt ist mit
@@ -121,6 +125,10 @@ Neue Edge Function `shop-ai` mit taskbasiertem Routing:
 <System> <Dimension>" mit dem mengengewichteten R+F-Mittelwert als Preis —
 nie `bestellbar`, kein echter Lieferant. Grundlage der kuenftigen
 PDS-Uebergabe aus der Aufmass-App. Siehe docs/aufmass-formteil-modell.md.
+`shop_gut_positionen.rf_zuordnung_quelle` kennt seit 09.09.2026 drei Stufen:
+`automatisch` (Pruefregeln bestanden), `vermutet` (bestplatzierter Kandidat,
+Entscheidung Patrick 08.09.) und `manuell`. Auswertungen sollen `vermutet`
+herausfiltern koennen — der Mittelwert liegt damit deutlich hoeher.
 
 ## Doku-Regel
 Wenn sich eine Kern-Entscheidung aendert: ADR schreiben, CLAUDE.md updaten, CONTEXT.md pflegen.
