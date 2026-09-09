@@ -86,8 +86,8 @@ Deno.serve(async (req: Request) => {
       .from("aufmass_erfassung")
       .select(`
         id, baustelle_text, pds_vorgang_uuid, pds_vorgangs_nummer, status,
-        aufmass_formteile ( id, formteil_system, dimension, anzahl, pds_transport_at ),
-        aufmass_rohrmeter ( id, formteil_system, dimension, meter ),
+        aufmass_formteile ( id, formteil_system, dimension, dimensionsgruppe, preisklasse, anzahl, pds_transport_at ),
+        aufmass_rohrmeter ( id, formteil_system, dimension, dimensionsgruppe, meter ),
         aufmass_einzelartikel ( id, bezeichnung, menge, einheit )
       `)
       .eq("id", erfassungId)
@@ -97,13 +97,39 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Erfassung ist mit keinem PDS-Auftrag verknuepft (pds_vorgang_uuid fehlt)." }, 422)
     }
 
-    // ─── Kunstartikel je System+Dimension ──────────────────────────────────
+    // ─── Kunstartikel: erst je Strichlisten-Gruppe, dann je Einzeldimension ──
+    // Seit dem Umbau der Erfassung (09.09.2026) liefert die App
+    // System + Dimensionsgruppe + Preisklasse. Erfassungen von davor tragen
+    // nur die feine Dimension; fuer sie greift die zweite Karte.
     const { data: kunst } = await sb
       .from("shop_artikel")
-      .select("id, name, einheit, preis_netto, pds_katalog_uuid, formteil_system, formteil_dimension")
+      .select(
+        "id, name, einheit, preis_netto, pds_katalog_uuid, formteil_system, " +
+        "formteil_dimension, formteil_dimensionsgruppe, formteil_preisklasse")
       .eq("formteil_aufmass", true)
-    const kunstJeSchluessel = new Map<string, any>()
-    for (const k of kunst ?? []) kunstJeSchluessel.set(`${k.formteil_system}|${k.formteil_dimension}`, k)
+    const kunstJeGruppe = new Map<string, any>()
+    const kunstJeDimension = new Map<string, any>()
+    for (const k of kunst ?? []) {
+      if (k.formteil_dimensionsgruppe && k.formteil_preisklasse) {
+        kunstJeGruppe.set(
+          `${k.formteil_system}|${k.formteil_dimensionsgruppe}|${k.formteil_preisklasse}`, k)
+      }
+      if (k.formteil_dimension) {
+        kunstJeDimension.set(`${k.formteil_system}|${k.formteil_dimension}`, k)
+      }
+    }
+    // Findet den Kunstartikel zu einer Aufmass-Zeile.
+    function kunstartikelFuer(f: any) {
+      if (f.dimensionsgruppe && f.preisklasse) {
+        const g = kunstJeGruppe.get(`${f.formteil_system}|${f.dimensionsgruppe}|${f.preisklasse}`)
+        if (g) return g
+      }
+      return kunstJeDimension.get(`${f.formteil_system}|${f.dimension}`)
+    }
+    function zeilenName(f: any) {
+      const mass = f.dimensionsgruppe ?? f.dimension
+      return `Formteil ${f.formteil_system} ${mass}${f.preisklasse ? " " + f.preisklasse : ""}`
+    }
 
     // ─── PDS-Auftrag lesen ─────────────────────────────────────────────────
     const { data: secret } = await sb.from("integration_secrets").select("value").eq("key", "pds").maybeSingle()
@@ -147,10 +173,10 @@ Deno.serve(async (req: Request) => {
 
     for (const f of (erf.aufmass_formteile ?? []) as any[]) {
       if (f.pds_transport_at) { bereitsUebertragen++; continue }
-      const k = kunstJeSchluessel.get(`${f.formteil_system}|${f.dimension}`)
-      const name = k?.name ?? `Formteil ${f.formteil_system} ${f.dimension}`
+      const k = kunstartikelFuer(f)
+      const name = k?.name ?? zeilenName(f)
       const anzahl = Number(f.anzahl)
-      if (!k) { nichtUebertragbar.push({ name, menge: anzahl, grund: "Kein Kunstartikel fuer System+Dimension" }); continue }
+      if (!k) { nichtUebertragbar.push({ name, menge: anzahl, grund: "Kein Kunstartikel fuer diese Gruppe" }); continue }
       if (!k.pds_katalog_uuid) { nichtUebertragbar.push({ name, menge: anzahl, grund: "Kunstartikel noch nicht in PDS (pds-katalog-sync ausstehend)" }); continue }
       const platz = platzhalterJeKatalog.get(k.pds_katalog_uuid)
       if (platz) {
@@ -170,7 +196,7 @@ Deno.serve(async (req: Request) => {
     const mengen = [...mengenJeKatalog.values()]
     const transport = [...transportJeKatalog.values()]
     for (const r of (erf.aufmass_rohrmeter ?? []) as any[]) {
-      nichtUebertragbar.push({ name: `Rohr ${r.formteil_system} ${r.dimension}`, menge: Number(r.meter), grund: "Rohrmeter: Zielartikel noch nicht festgelegt (siehe Plan, offene Frage)" })
+      nichtUebertragbar.push({ name: `Rohr ${r.formteil_system} ${r.dimensionsgruppe ?? r.dimension}`, menge: Number(r.meter), grund: "Rohrmeter: Zielartikel noch nicht festgelegt (siehe Plan, offene Frage)" })
     }
     for (const e of (erf.aufmass_einzelartikel ?? []) as any[]) {
       nichtUebertragbar.push({ name: e.bezeichnung, menge: Number(e.menge), grund: "Einzelartikel ohne Artikelbindung (Freitext)" })
