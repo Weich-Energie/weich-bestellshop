@@ -121,6 +121,7 @@ Neue Edge Function `shop-ai` mit taskbasiertem Routing:
 - [docs/pds-formteil-platzhalter.md](docs/pds-formteil-platzhalter.md) — Platzhalter-Ebene "Formteile (Aufmass)" fuer neue SHK-Auftraege (an Megh), Sicht `shop_pds_formteil_platzhalter`
 - [docs/rf-lagerliste-echte-preise.md](docs/rf-lagerliste-echte-preise.md) — **Richtungswechsel 09.09.2026:** GUT-Koerbe sind nur Kalkulationsbasis, verbaut wurde R+F. Preise kommen aus dem Lagerauszug, Gewichte aus der Historie; Leseskript `tools/lager-auszug-lesen.py`. Abdeckung damit 91,2 %, Baustellen-Vergleich +23,3 %
 - [docs/formteil-preisklassen.md](docs/formteil-preisklassen.md) — warum ein Mittelwert je Dimension zu grob ist: Gewindeteile sind 41,7 % der Menge und kosten 1,7x, Vorschlag zwei Preisklassen (`presse` / `gewinde`)
+- [docs/systemwechsel-35mm-edelstahl.md](docs/systemwechsel-35mm-edelstahl.md) — **zentrale Kennzahl:** 35 mm+ Kupfer/C-Stahl ist 48 % des Verbrauchs und wird auf Heizungsedelstahl umgestellt; damit wird das Material 14,6 % guenstiger statt 16,4 % teurer
 
 ## Formteil-Kunstartikel (07.09.2026)
 `shop_artikel.formteil_aufmass = true` markiert 57 Kunstartikel „Formteil
