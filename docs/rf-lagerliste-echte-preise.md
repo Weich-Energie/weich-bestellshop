@@ -108,7 +108,57 @@ Median-Rabatt auf den Listenpreis im Lagerauszug: 61,9 %.
 4. **Der Baustellen-Vergleich alt gegen neu** ist erst nach der Erfassung
    aussagekräftig. Bis dahin gilt die Zahl aus der Textsuche als überzeichnet.
 
-## Weg zur 90-Prozent-Schwelle (Stand 09.09.2026)
+## Ergebnis nach dem zweiten Auszug: 91,2 % (09.09.2026)
+
+Patrick lieferte am 09.09.2026 einen zweiten Regalauszug mit 193 Zeilen —
+darunter das komplette Heizungsedelstahl-Programm (OptiSteel simplesta 22/28/35
+mm), Uponor S-Press PLUS 16 bis 32 mm, die Rotguss- und
+Schwarz-Gewinde-Formteile sowie die fehlenden Profipress-T-Stücke und
+-Übergangsstücke. Zusammen mit dem ersten Auszug: **233 eindeutige Artikel**.
+
+Strukturelles Matching über System + Dimension + Formteil-Art (`match2.py` im
+Sitzungs-Scratchpad, Systemabbildung OptiSteel → `connect-inox`):
+
+| Schritt | Artikel | Verbrauchswert |
+|---|---|---|
+| Formteile über System+Dimension+Art | 148 | 45.125 € |
+| Armaturen und Schellen über Bauart+Nennweite | 8 | 6.578 € |
+| Nachtrag (nackte Zollangaben, geprüft) | 5 | 1.924 € |
+
+| Quelle | Anteil am Verbrauchswert |
+|---|---|
+| **lager** (echter Preis) | **35,6 %** |
+| automatisch (rf24-Suche) | 34,3 % |
+| vermutet | 21,3 % |
+| **zusammen zugeordnet** | **91,2 %** |
+| offen | 8,8 % (13.290 €, 55 Artikel) |
+
+Damit ist das Erfolgskriterium „mindestens 90 % des Verbrauchswerts
+zugeordnet" erfüllt. 94 der Zuordnungen korrigierten einen um mehr als 10 %
+falschen Preis, 15 Artikel hatten vorher gar keinen.
+
+**Baustellen-Vergleich mit echten Preisen** (58 PDS-bestätigt abgerechnete
+Baustellen, 1.769 von 2.001 Formteil-Positionen bepreist = 88 %):
+
+| | Alt (GUT-Kalkulationsbasis) | Neu (echte R+F-Preise) | Abweichung |
+|---|---|---|---|
+| alle 58 Baustellen | 59.613 € | 73.510 € | **+23,3 %** |
+| die fünf größten | 7.990 € | 9.453 € | +18,3 % |
+| Median je Baustelle | | | +18,4 % |
+
+53 Baustellen werden teurer, 5 günstiger. Die frühere Zahl von +50 % war ein
+Artefakt der Textsuche und ist damit vom Tisch. Der verbleibende Aufschlag von
+rund 20 % ist echt und gehört in die Lieferantenentscheidung.
+
+**Zwei Fehltreffer-Fallen beim Nachtrag** (beide erkannt und zurückgenommen):
+Ein Muffenpreis ist kein Bogenpreis — wo das Lager für eine Dimension nur die
+Muffe führt, darf der Bogen keinen Preis bekommen (traf die 35-mm-Bögen von
+Kupfer und C-Stahl, die nicht mehr geführt werden). Und Messtechnik hat zwei
+Maße: das Lager führt ein Bimetall-Thermometer mit 63 mm Gehäuse und 100 mm
+Tauchlänge; BZT160100 (Gehäuse 160 mm, GUT-EK 20,12 €) hätte damit 4,36 €
+bekommen.
+
+## Weg zur 90-Prozent-Schwelle (Stand vor dem zweiten Auszug)
 
 | Größe | Wert |
 |---|---|
