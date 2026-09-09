@@ -119,6 +119,7 @@ Neue Edge Function `shop-ai` mit taskbasiertem Routing:
 - [docs/aufmass-app-entwurf.md](docs/aufmass-app-entwurf.md) — Entwurf der Aufmass-App (Repo `weich-aufmass`, Ziel-Schritt 4)
 - [docs/aufmass-pds-uebergabe-plan.md](docs/aufmass-pds-uebergabe-plan.md) — PDS-Uebergabe aus der Aufmass-App: Function `aufmass-pds-uebergabe`, Katalog-Sync der Kunstartikel, erster Lauf (Ziel-Schritt 5)
 - [docs/pds-formteil-platzhalter.md](docs/pds-formteil-platzhalter.md) — Platzhalter-Ebene "Formteile (Aufmass)" fuer neue SHK-Auftraege (an Megh), Sicht `shop_pds_formteil_platzhalter`
+- [docs/rf-lagerliste-echte-preise.md](docs/rf-lagerliste-echte-preise.md) — **Richtungswechsel 09.09.2026:** GUT-Koerbe sind nur Kalkulationsbasis, verbaut wurde R+F. Preise kommen aus dem Lagerauszug, Gewichte aus der Historie; Leseskript `tools/lager-auszug-lesen.py`
 
 ## Formteil-Kunstartikel (07.09.2026)
 `shop_artikel.formteil_aufmass = true` markiert 57 Kunstartikel „Formteil
@@ -129,6 +130,12 @@ PDS-Uebergabe aus der Aufmass-App. Siehe docs/aufmass-formteil-modell.md.
 `automatisch` (Pruefregeln bestanden), `vermutet` (bestplatzierter Kandidat,
 Entscheidung Patrick 08.09.) und `manuell`. Auswertungen sollen `vermutet`
 herausfiltern koennen — der Mittelwert liegt damit deutlich hoeher.
+
+**Wichtig (09.09.2026):** Die GUT-Warenkoerbe sind **keine Liste des verbauten
+Materials**, sondern nur die Kalkulationsbasis — verbaut wurden R+F-Artikel,
+erfasst per Strichliste auf GUT-Vordrucken. Preise gehoeren deshalb aus
+Patricks R+F-Lagerauszug, nicht aus einer Textsuche; die Historie liefert nur
+noch die Mengengewichte. Siehe docs/rf-lagerliste-echte-preise.md.
 
 ## Doku-Regel
 Wenn sich eine Kern-Entscheidung aendert: ADR schreiben, CLAUDE.md updaten, CONTEXT.md pflegen.

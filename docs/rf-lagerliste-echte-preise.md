@@ -1,0 +1,132 @@
+# R+F-Lagerliste als echte Preisquelle — Richtungswechsel im Formteil-Modell
+
+Stand 09.09.2026. Ergänzt und korrigiert
+[aufmass-formteil-modell.md](aufmass-formteil-modell.md), Schritt 2 und 3.
+
+## Was Patrick am 09.09.2026 klargestellt hat
+
+Die GUT-Warenkörbe sind **keine Liste des tatsächlich verbauten Materials**.
+Auf der Baustelle wurde per Strichliste auf Vordrucken erfasst, die
+GUT-Artikel mit QR-Code und Bild zeigten — weil sich im R+F-Shop keine
+solchen Vordrucke erzeugen ließen. Verbaut wurden aber R+F-Artikel. Der
+GUT-Warenwert war nur die **Kalkulationsbasis**, das Pendant zum echten
+Material. Genau das soll das neue Modell abstellen.
+
+Materialgeschichte der letzten 18 Monate:
+
+| Zeitraum | System | Heute |
+|---|---|---|
+| anfangs | Kupfer Profipress, viel 35 mm | nur noch kleine Dimensionen als Übergang im Bestand |
+| zwischenzeitlich | C-Stahl Prestabo | abgelöst |
+| aktuell | **R+F-Heizungsedelstahl** | Hauptsystem |
+
+Große Dimensionen (ab 35 mm) bleiben in Kalkulation und Nachkalkulation
+stehen, falls sie doch gebraucht werden.
+
+## Warum das den Kern des Modells trifft
+
+Der Verbrauch der Historie liegt zu **48 % auf Systemen und Dimensionen, die
+heute nicht mehr verbaut werden**:
+
+| System und Dimensionsklasse | Anteil am Formteil-Verbrauch |
+|---|---|
+| Kupfer b-press, ab 35 mm | 34,4 % |
+| Uponor MLC, bis 28 mm | 19,2 % |
+| C-Stahl Prestabo, ab 35 mm | 13,8 % |
+| Rotguss/Gewinde | 12,3 % |
+| Kupfer b-press, bis 28 mm | 10,0 % |
+| **Heizungsedelstahl (connect-inox)** | **2,2 %** |
+
+Das aktuelle Hauptsystem hat also fast keine Historie. Eine reine
+Mengengewichtung über die Vergangenheit bepreist damit das falsche Material.
+
+## Die Lösung: Preise aus dem Lager, Gewichte aus der Historie
+
+Patricks Lagerauszug (Regalcodes mit R+F-Artikelnummer, Listenpreis und EK)
+liefert **echte Preise des heute geführten Materials**. Die GUT-Historie
+liefert weiterhin das **Mengenverhältnis der Formteil-Arten je Dimension** —
+und das ist ein Installationsmuster, kein Materialmerkmal. Nachweis aus 106
+Baustellen (Sicht in der Arbeitsmappe, Blatt „Mischung"):
+
+| Bogenart | Anteil innerhalb der Dimension |
+|---|---|
+| 90 Grad innen/innen | 60–82 % |
+| 90 Grad innen/außen | 12–47 % |
+| 45 Grad (beide) | 6–12 % |
+
+Die Aufteilung ist bei Kupfer und C-Stahl praktisch gleich, über alle
+Dimensionen von 15 bis 35 mm. Sie lässt sich deshalb auf Heizungsedelstahl
+übertragen, für das keine Verbrauchshistorie existiert.
+
+## Befund: die Textsuche war der Fehler, nicht der Preis
+
+Von 48 Lagerartikeln hatte die R+F-Textsuche 8 ebenfalls gefunden. Bei allen
+acht stimmt der Preis **auf den Cent** mit dem Lagerauszug überein. Die Suche
+liefert also korrekte Preise, wenn sie den richtigen Artikel trifft; das
+Problem sind ausschließlich die Fehltreffer.
+
+Bögen Profipress, echter Lagerpreis mit der Mischung aus der Historie
+gegenüber dem alten GUT-Kalkulationspreis:
+
+| Dimension | Menge | GUT alt | R+F echt | Abweichung |
+|---|---|---|---|---|
+| 15 mm | 50 | 1,89 € | 2,19 € | +15,9 % |
+| 18 mm | 39 | 1,54 € | 2,76 € | +78,7 % |
+| 22 mm | 168 | 3,00 € | 3,49 € | +16,4 % |
+| 28 mm | 351 | 6,78 € | 7,62 € | +12,4 % |
+| **gewichtet** | **608** | **3.037 €** | **3.477 €** | **+14,5 %** |
+
+Dieselben Bögen mit meiner Textsuche: +115 % bis +470 %. Der im
+Baustellen-Vergleich gemeldete Sprung auf +50 % ist damit als **Messfehler
+der Textsuche** erklärt, nicht als Preisunterschied. Der Ausreißer bei 18 mm
+deutet auf einen alten GUT-Sonderpreis hin (1,54 € für einen 18-mm-Bogen).
+
+Bei Armaturen ist R+F sogar deutlich günstiger als die alte GUT-Basis:
+
+| Artikel | R+F echt | GUT alt | Abweichung | Verbrauch |
+|---|---|---|---|---|
+| WESA-Kugelhahn 1 × 1 1/4 Zoll | 17,57 € | 37,80 € | −53,5 % | 3.440 € |
+| WESA-Kugelhahn 1 × 1 Zoll | 12,73 € | 15,83 € | −19,6 % | 2.628 € |
+| Rückflussverhinderer DN 25 | 22,52 € | 38,92 € | −42,1 % | 739 € |
+| KFR-Vollflutventil DN 25 | 32,30 € | 38,91 € | −17,0 % | 739 € |
+
+Median-Rabatt auf den Listenpreis im Lagerauszug: 61,9 %.
+
+## Konsequenz für das Modell
+
+1. **Quelle `vermutet` verliert ihre Rolle.** Sie war die Notlösung für
+   fehlende Preise. Wo ein Lagerpreis vorliegt, ersetzt er sie; die
+   PDS-Katalogpreise der Kunstartikel bleiben deshalb weiter auf dem Stand
+   vom 07.09., bis die Erfassung durch ist.
+2. **Der Mittelwert wird zweistufig:** Preis je Formteil-Art aus der
+   Lagerliste, Gewicht je Art aus der Historie, Summe je System und
+   Dimension.
+3. **Neue Zielsysteme** sind Heizungsedelstahl (Hauptsystem), Uponor MLC
+   (Fußbodenheizung, läuft weiter), Rotguss/Gewinde, Kupfer Profipress klein
+   (Bestandsübergänge). Kupfer und C-Stahl ab 35 mm bleiben als Reserve
+   führbar, gehören aber nicht in den Mittelwert des heutigen Systems.
+4. **Der Baustellen-Vergleich alt gegen neu** ist erst nach der Erfassung
+   aussagekräftig. Bis dahin gilt die Zahl aus der Textsuche als überzeichnet.
+
+## Erfassung
+
+Arbeitsmappe `Lagerliste-Erfassung.xlsx` (an Patrick 09.09.2026):
+
+- Blatt **Erfassen** — 166 Kombinationen System × Dimension × Formteil-Art aus
+  der Historie, priorisiert. 74 Zeilen Priorität 1 (heute verbaut), 12
+  Priorität 2 (hoher Historienanteil), 80 Priorität 3 (Reserve ab 35 mm).
+  Eingabespalten für R+F-Nummer und EK.
+- Blatt **Einzelartikel** — 36 Ventile, Dämmungen, Rohre und Schellen ab 150 €
+  Verbrauchswert; bleiben laut Ziel ungemittelt und brauchen je Artikel eine
+  echte Nummer.
+- Blatt **Schon belegt** — die 48 Artikel des ersten Auszugs (nach der
+  Klassifikation des Repo-Skripts: 20 Formteile, 19 Armaturen, 8 Teile
+  Befestigung, 1 Pumpenverschraubung; alle Formteile Profipress Kupfer
+  15/18/22/28 mm, nur Bogen und Muffe).
+- Blatt **Validierung** — die 8 Treffer als Nachweis.
+- Blatt **Mischung** — die Bogen-Aufteilung aus 106 Baustellen.
+
+Benötigt werden je Artikel nur **Artikelnummer, Bezeichnung und EK**. Das
+Format des ersten Auszugs (Semikolon, deutsche Dezimalkommas,
+`Nr;Menge;Einheit;Text;Liste;EK`) wird von
+`tools/lager-auszug-lesen.py` direkt gelesen.
