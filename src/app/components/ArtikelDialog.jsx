@@ -54,6 +54,11 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
   // mit PDS-UUID zum Platzhalter (Menge 0) in jedem neuen Klima-Auftrag — ADR 0007.
   const [bestellbar, setBestellbar] = useState(true)
   const [nachkalkulationKlima, setNachkalkulationKlima] = useState(false)
+  // Dritte Sicht (10.09.2026): der Artikel steht der Aufmass-App als
+  // Katalogartikel zur Verfuegung — Monteure koennen ihn auf der Baustelle
+  // suchen, und der Aufmass-Admin kann ihn in eine Kategorie legen. Der Shop
+  // ist der Artikelstamm; gepflegt wird die Sichtbarkeit deshalb hier.
+  const [sichtbarAufmass, setSichtbarAufmass] = useState(false)
   const [tagsRaw, setTagsRaw] = useState('')
   const [bildExternUrl, setBildExternUrl] = useState('')
   const [bildDatei, setBildDatei] = useState(null)
@@ -94,6 +99,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       setAktiv(artikel.aktiv !== false)
       setBestellbar(artikel.bestellbar !== false)
       setNachkalkulationKlima(artikel.nachkalkulation_klima === true)
+      setSichtbarAufmass(artikel.sichtbar_aufmass === true)
       setTagsRaw((artikel.tags || []).map((t) => t.name).join(', '))
       setBildExternUrl(artikel.bild_ist_extern ? (artikel.bild_url || '') : '')
       setVarianten((artikel.varianten || []).map((v) => ({ name: v.name })))
@@ -111,6 +117,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       setAktiv(true)
       setBestellbar(prefill.bestellbar !== false)
       setNachkalkulationKlima(prefill.nachkalkulation_klima === true)
+      setSichtbarAufmass(prefill.sichtbar_aufmass === true)
       setTagsRaw(prefill.tags || '')
       setBildExternUrl(prefill.bild_extern_url || '')
       setVarianten([]); setGebinde([])
@@ -119,6 +126,9 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
       setLieferant(''); setLieferantUrl(''); setArtikelnr(''); setPreis(''); setEinheit('Stück')
       setAufschlagsklasse('')
       setAktiv(true); setPdsPlatzhalter(false); setTagsRaw(''); setBildExternUrl('')
+      // Sichtbarkeiten zuruecksetzen: ohne das trug ein neuer Artikel die
+      // Haken des zuletzt bearbeiteten (Fund 10.09.2026).
+      setBestellbar(true); setNachkalkulationKlima(false); setSichtbarAufmass(false)
       setVarianten([]); setGebinde([])
     }
     setBildDatei(null); setError(null); setAiError(null); setBildsucheQuery('')
@@ -245,6 +255,7 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
         aktiv,
         bestellbar,
         nachkalkulation_klima: nachkalkulationKlima,
+        sichtbar_aufmass: sichtbarAufmass,
       }
       if (bildExternUrl && !bildDatei) {
         fields.bild_url = bildExternUrl.trim()
@@ -570,11 +581,21 @@ export default function ArtikelDialog({ open, onClose, artikel, prefill, kategor
                         <Text fontSize="sm">Sichtbar in der Nachkalkulation Klima</Text>
                       </label>
                     </HStack>
+                    <HStack>
+                      <input type="checkbox" checked={sichtbarAufmass}
+                        onChange={(e) => setSichtbarAufmass(e.target.checked)} id="aufmass-cb" />
+                      <label htmlFor="aufmass-cb">
+                        <Text fontSize="sm">Sichtbar in Aufmaß</Text>
+                      </label>
+                    </HStack>
                   </VStack>
                   <Text fontSize="xs" color="fg.muted" mt={1}>
                     Ein Artikel kann nur kalkuliert werden (z. B. Geräte, die über den Großhandel kommen)
                     oder nur bestellt werden. „Nachkalkulation Klima" macht ihn, sobald er in PDS steht,
                     zum Platzhalter in der Montagematerial‑Ebene jedes neuen Klima‑Auftrags.
+                    „Sichtbar in Aufmaß" stellt ihn der Aufmaß-App zur Verfügung: der Monteur findet
+                    ihn dort in der Artikelsuche, ein Aufmaß-Admin kann ihn in eine Kategorie legen.
+                    Preise gehen dabei nie mit.
                   </Text>
                 </Box>
 

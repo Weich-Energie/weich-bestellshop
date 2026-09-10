@@ -150,9 +150,23 @@ export default function AdminKatalogPage() {
                   </Table.Cell>
                   <Table.Cell><Text fontSize="sm">{a.preis_netto != null ? `${Number(a.preis_netto).toFixed(2)} €` : '—'}</Text></Table.Cell>
                   <Table.Cell>
-                    <Badge colorPalette={a.aktiv ? 'green' : 'gray'} size="sm">
-                      {a.aktiv ? 'aktiv' : 'inaktiv'}
-                    </Badge>
+                    <HStack gap={1} flexWrap="wrap">
+                      <Badge colorPalette={a.aktiv ? 'green' : 'gray'} size="sm">
+                        {a.aktiv ? 'aktiv' : 'inaktiv'}
+                      </Badge>
+                      {/* Die drei Sichten auf einen Blick — sonst muesste
+                          Patrick jeden Artikel oeffnen, um zu sehen, wo er
+                          erscheint. */}
+                      {a.bestellbar === false && (
+                        <Badge colorPalette="gray" size="sm" variant="outline">nicht bestellbar</Badge>
+                      )}
+                      {a.nachkalkulation_klima && (
+                        <Badge colorPalette="purple" size="sm" variant="subtle">Klima</Badge>
+                      )}
+                      {a.sichtbar_aufmass && (
+                        <Badge colorPalette="blue" size="sm" variant="subtle">Aufmaß</Badge>
+                      )}
+                    </HStack>
                   </Table.Cell>
                   <Table.Cell>
                     <IconButton size="sm" variant="ghost" onClick={() => { setEditArtikel(a); setDialogOpen(true) }}>

@@ -48,12 +48,16 @@ Ressourcenplanung, Service-Ticket und Betriebsradar.
 - Realtime-Sync fuer Bestellwuensche & Sammelbestellungen: kommt in Phase 4
 
 ## Wichtige Regeln
-- Artikel haben zwei Sichtbarkeiten (Migration 014): `bestellbar` (Shop-Katalog)
-  und `nachkalkulation_klima` (Nachkalkulation, Aufmass, Platzhalter in neuen
-  Klima-Auftraegen). Der Katalog filtert auf `bestellbar`, die Nachkalkulation
-  auf `nachkalkulation_klima`. Der Shop ist der **Artikelstamm fuer das Aufmass**
-  auf der Baustelle; die Aufmass-App wird eine eigene App mit eigener Optik, die
-  auf diesen Stamm zugreift.
+- Artikel haben **drei** Sichtbarkeiten: `bestellbar` (Shop-Katalog) und
+  `nachkalkulation_klima` (Nachkalkulation, Platzhalter in neuen
+  Klima-Auftraegen) aus Migration 014, seit 10.09.2026 dazu `sichtbar_aufmass`
+  (Artikelkatalog der Aufmass-App). Der Katalog filtert auf `bestellbar`, die
+  Nachkalkulation auf `nachkalkulation_klima`. Gepflegt werden alle drei im
+  Artikeldialog unter „Sichtbarkeit"; die Admin-Katalogliste zeigt sie als
+  Abzeichen. Der Shop ist der **Artikelstamm fuer das Aufmass** auf der
+  Baustelle — die Aufmass-App (Repo `weich-aufmass`) liest nie `shop_artikel`
+  direkt, sondern die preisfreie Sicht `aufmass_artikel_katalog`, weil Monteure
+  kein `has_shop_access()` haben.
 - Immer auf Deutsch (UI, Kommentare, KI-Output)
 - Chakra v3 Syntax: `Dialog.Root`, `Tabs.Root`, `Select` mit `createListCollection`
 - Fail-closed Auth-Check: KEIN `?? true` — nicht gesetzt = kein Zugriff
