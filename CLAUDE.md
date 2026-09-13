@@ -144,5 +144,21 @@ erfasst per Strichliste auf GUT-Vordrucken. Preise gehoeren deshalb aus
 Patricks R+F-Lagerauszug, nicht aus einer Textsuche; die Historie liefert nur
 noch die Mengengewichte. Siehe docs/rf-lagerliste-echte-preise.md.
 
+## Mischsaetze: gemessen oder uebertragen (13.09.2026)
+`shop_formteil_gruppenpreis` ist die **gemessene Historie** und bleibt es.
+`shop_formteil_gruppenpreis_uebertragen` haelt Saetze, deren Mengengeruest von
+einem anderen System kommt, weil die eigene Historie zu duenn ist — seit
+13.09.2026 die vier Heizungsedelstahl-Gruppen mit dem Teile-Mix von C-Stahl.
+**Gerechnet wird mit `shop_formteil_gruppenpreis_effektiv`**, das beides
+uebereinanderlegt; `herkunft` sagt, woher der Satz kommt. Herleitung und
+Rueckbau-Regel: `docs/mengengeruest-uebertragen.md`.
+
+Wer einen Mischsatz prueft, misst den **Hebel**: um wie viel aendert sich der
+Satz, wenn genau dieser Artikel aus der Gruppe faellt. Ein teures Teil mit einem
+Stueck bewegt nichts, ein mittelteures mit 200 Stueck viel. Besonders zu pruefen
+sind `vermutet`-Zuordnungen auf R+F-Artikel, die **nicht im Lagerauszug stehen**
+— deren Preis laesst sich an nichts abgleichen. Genau dort lag die
+Megapress-Fehlzuordnung mit 11 389 EUR.
+
 ## Doku-Regel
 Wenn sich eine Kern-Entscheidung aendert: ADR schreiben, CLAUDE.md updaten, CONTEXT.md pflegen.
