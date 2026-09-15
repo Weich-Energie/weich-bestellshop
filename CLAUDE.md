@@ -198,5 +198,44 @@ Historie. Die Spalten `shop_artikel.formteil_system` /
 `formteil_dimensionsgruppe` / `formteil_preisklasse` sind bei diesen Artikeln
 noch leer und muessten daraus gefuellt werden.
 
+## Mischsaetze gegenpruefen (15.09.2026)
+Patricks Vorhaben: die Sammelansicht der Aufmass-App fuer einige Wochen
+sperren, Projekte ueber die Zaehlliste erfassen lassen und danach pruefen, ob
+die Mischkostensaetze stimmen. Gesperrt ist seit 15.09.2026
+(`aufmass_einstellungen.ansicht_erlaubt = 'detail'`).
+
+- **`shop_mischsatz_ist`** rechnet aus abgeschlossenen Detail-Aufmassen den
+  mengengewichteten Ist-Satz je Formteil-Gruppe — dieselbe Formel wie der
+  Soll-Satz, nur mit dem Mengengeruest der Stichprobe.
+- **`shop_mischsatz_vergleich`** stellt Soll und Ist nebeneinander, mit
+  `soll_herkunft` (gemessen oder uebertragen), Abweichung in EUR und Prozent
+  und einem `befund`. Der Befund schweigt unter 30 Stueck Stichprobe und nennt
+  alles innerhalb von 10 Prozent `bestaetigt`.
+- **Am wichtigsten bei `uebertragen`**: die vier Heizungsedelstahl-Gruppen
+  tragen das C-Stahl-Mengengeruest, also eine Annahme. Hier wird sie erstmals
+  gemessen.
+- Nachgestellt mit einem bewusst bogenlastigen Aufmass (294 Stueck, 12 Artikel):
+  Edelstahl 22-28 presse kam auf Ist 3,0394 gegen Soll 4,1210 EUR, −26,2 %,
+  Befund „Satz zu hoch". Die Probe-Erfassung wurde danach geloescht.
+
+**Voraussetzung war die Formteil-Gruppe an den R+F-Artikeln**
+(`shop_artikel.formteil_system` / `formteil_dimensionsgruppe` /
+`formteil_preisklasse`, Migrationen `20260915140000` und `20260915150000`).
+Sie stand vorher nur an den GUT-Artikeln. 207 der 323 Zaehllisten-Artikel
+tragen jetzt eine Gruppe; 60 sind Ventil, Rohr, Daemmung oder Schelle und
+gehoeren in keine; 50 sind Regal-Artikel ohne Historie. Fuenf bleiben bewusst
+gruppenlos — vier Systemrohre und die Verschraubung Nr. 330, die am 11.09.2026
+absichtlich aus den Gruppenpreisen genommen wurde (eine Gruppe waere dort eine
+Doppelzaehlung).
+
+**Zwei Fehlzuordnungen dabei gefunden**, beide noch offen:
+- `POVT35` (Prestabo-T-Stueck 35 mm, **1 655 EUR / 148 Stueck**) zeigt auf
+  `7020900558932` — einen Artikel *mit* Innengewinde. Ein reines T-Stueck ist
+  guenstiger, der Satz prestabo-stahl / 35mm+ / presse ist also zu hoch.
+- `COCIUS3525ANL` (Uebergangsstueck **35** mm x 1", **486 EUR / 56 Stueck**)
+  zeigt auf `7085472283000` — ein Uebergangsstueck in **d = 28**.
+Beide brauchen den richtigen R+F-Artikel aus dem Shop; die falsche Nummer
+einfach zu loeschen wuerde den Verbrauch unbewertet lassen.
+
 ## Doku-Regel
 Wenn sich eine Kern-Entscheidung aendert: ADR schreiben, CLAUDE.md updaten, CONTEXT.md pflegen.
