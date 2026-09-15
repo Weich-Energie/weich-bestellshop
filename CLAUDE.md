@@ -160,5 +160,43 @@ sind `vermutet`-Zuordnungen auf R+F-Artikel, die **nicht im Lagerauszug stehen**
 — deren Preis laesst sich an nichts abgleichen. Genau dort lag die
 Megapress-Fehlzuordnung mit 11 389 EUR.
 
+## Artikelstruktur: wer ist Master (15.09.2026)
+**Der Bestellshop ist der Master.** `shop_artikel` ist der Stamm, gepflegt ueber
+die Admin-Katalogseite und den Artikeldialog; die drei Sichtbarkeiten
+(`bestellbar`, `nachkalkulation_klima`, `sichtbar_aufmass`) entscheiden, wo ein
+Artikel auftaucht. Die Aufmass-App liest nur `aufmass_artikel_katalog`. Ein
+neuer Nachkalkulationsartikel wird hier angelegt — der Stamm waechst also im
+Shop, nicht in Migrationen.
+
+**Die Zuordnung GUT -> R+F ist seit 15.09.2026 ein eigenes Stammdatum:**
+`shop_gut_rf_zuordnung` (Migration `20260915120000`). Vorher lebte sie nur in
+`shop_gut_positionen.rf_artikelnummer`, also an den Verbrauchszeilen der
+Warenkoerbe — und damit nirgends fuer einen Artikel ohne Verbrauch. Das hat
+zugeschlagen: von Patricks 36 Zuordnungen liessen sich nur 9 dort schreiben,
+27 fielen stillschweigend durch. Die Zaehllisten-Zeilen entstanden trotzdem,
+aber ein Neuaufbau haette die Entscheidungen verloren.
+
+- `entscheidung`: `zugeordnet` | `entfaellt` | `offen`. `entfaellt` haelt fest,
+  dass ein Artikel bewusst nicht mehr gefuehrt wird (13 Stueck aus Patricks
+  Durchsicht) — damit taucht er in Lueckenlisten nicht wieder auf.
+- Stand: 399 zugeordnet, 13 entfaellt.
+- Bewusst **ohne Fremdschluessel** auf `shop_artikel.artikelnr`: eine Zuordnung
+  darf einer Nummer vorausgehen, die noch nicht im Katalog steht.
+- **Zuordnungen gehoeren ab jetzt hierhin**, nicht (nur) an die Positionen.
+  `shop_gut_positionen.rf_artikelnummer` bleibt fuer die Bewertung der
+  Historie, ist aber nicht mehr der Ort der Entscheidung.
+
+Diese Tabelle ist die Voraussetzung fuer die **Mischsatz-Ueberwachung** aus
+Einzelaufmassen (Patricks Vorhaben vom 15.09.2026): um aus einer gezaehlten
+R+F-Position den Ist-Mischsatz zu rechnen, braucht man ihre Formteil-Gruppe,
+und die steht an den GUT-Artikeln in `shop_gut_artikel_klassifikation`. Ueber
+die Zuordnung ist sie fuer **182 der 323 Detail-Artikel ableitbar** — genau die
+Formteile, um die es bei den Mischsaetzen geht. 61 sind als Ventil, Rohr,
+Daemmung oder Schelle klassifiziert (Einzelartikel, brauchen keine Gruppe),
+30 haben ein GUT-Gegenstueck ohne Klassifikation, 50 sind Regal-Artikel ohne
+Historie. Die Spalten `shop_artikel.formteil_system` /
+`formteil_dimensionsgruppe` / `formteil_preisklasse` sind bei diesen Artikeln
+noch leer und muessten daraus gefuellt werden.
+
 ## Doku-Regel
 Wenn sich eine Kern-Entscheidung aendert: ADR schreiben, CLAUDE.md updaten, CONTEXT.md pflegen.
