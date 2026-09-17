@@ -237,5 +237,41 @@ Doppelzaehlung).
 Beide brauchen den richtigen R+F-Artikel aus dem Shop; die falsche Nummer
 einfach zu loeschen wuerde den Verbrauch unbewertet lassen.
 
+## Geteilte Zuordnungen: ein Teil, ein Artikel (17.09.2026)
+Patricks Vorgabe: „Ne brauchen schon einzeln". In der Zaehlliste standen Artikel
+doppelt, weil mehrere GUT-Artikel auf denselben R+F-Artikel zeigten --
+42 R+F-Artikel waren von 86 GUT-Artikeln belegt.
+
+**Der Befund dahinter: B-press und Profipress sind zwei Hersteller**, nicht zwei
+Namen fuer dasselbe Teil. B-press heisst bei R+F „Sudo-Press-Fitting",
+Profipress ist Viega. Die GUT-Paare `BP*`/`PP*` waren deshalb keine harmlosen
+Doppelnummern, sondern falsch zusammengelegt.
+
+- Aufgeloest ueber die Nummernsuche plus merkmalsgebundenen Abgleich der
+  Treffer (Teileart, Anschluss I/I oder I/A, Winkel, AG oder IG, Dimension,
+  Gewindegroesse). Uebernommen nur, wo **genau ein** Kandidat widerspruchsfrei
+  passt: 25 von 86, dazu 5 ueber den Ausfuehrungs-Reiter. 15 Artikel bleiben
+  geteilt (`daten/geteilte-zuordnungen-offen.csv`, 13 288 EUR).
+- Groesster Einzelfall: `BPB35` („Bogen B-press 35mm 90 Grad", also **I/I**)
+  zeigte auf den Bogen **I/A** -- den mit Einsteckende, der seinem eigenen
+  Gegenstueck `BPB35A` gehoert. 8 990 EUR auf 691 Stueck falsch bepreist.
+- Fuer CONNECT INOX findet die Nummernsuche **nichts**: R+F hat die
+  CONEL-Nummern nicht als Wettbewerbsnummern hinterlegt. Dort fuehrt nur der
+  Ausfuehrungs-Reiter derselben Produktseite zum Ziel.
+- **Nicht gefunden:** der Bogen 45 I/A (`COCIB2245ELKNL`, `COCIB3545ELNL`). Die
+  OptiSteel-Reihe fuehrt 45-Grad-Boegen offenbar nur als I/I.
+
+**Reihenfolge-Falle in Migrationen:** Migration `20260915170000` setzte die
+Stueckpreise per Subselect, legte die betroffenen Artikel aber erst im Schritt
+danach an -- der Subselect fand sie nicht und schrieb NULL. Vier Positionen mit
+1 715 EUR fielen damit aus jeder Bewertung, darunter POVT35 mit 1 655 EUR.
+`20260917130000` traegt sie nach. **Artikel immer VOR dem Preis-Update anlegen**,
+und danach `rf_ek_netto_stueck is null` gegenpruefen.
+
+Wirkung aller Korrekturen des 17.09. auf die Mischsaetze: elf Saetze zwischen
+−0,5 und +7,3 % (b-press 22-28 gewinde 8,46 -> 9,08, prestabo 35mm+ presse
+7,09 -> 7,41). Die B-press-Gewindesaetze steigen, weil die Sudo-Press-Teile
+teurer sind als die PROFIPRESS-Gegenstuecke, auf die sie zeigten.
+
 ## Doku-Regel
 Wenn sich eine Kern-Entscheidung aendert: ADR schreiben, CLAUDE.md updaten, CONTEXT.md pflegen.
