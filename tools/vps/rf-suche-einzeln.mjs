@@ -14,10 +14,11 @@
 // Zusätzlich wird bei einer 13-stelligen Zahl die Produktseite direkt versucht:
 // sie liefert Preis und Bild verlässlicher als die Trefferliste.
 //
-// Aufruf: node rf-suche-einzeln.mjs "<begriff>" [--treffer 8]
-// Ausgabe (stdout, JSON): { begriff, gesamt, treffer: [{ artikelnr, name,
-//   preis_netto, bild_url, matchcode, lieferantennr }], quelle }
-// Protokoll geht auf stderr, damit stdout reines JSON bleibt.
+// Zwei Modi, weil die Suchantwort KEINEN Preis enthält:
+//   node rf-suche-einzeln.mjs "<begriff>" [--treffer 8]   -> Trefferliste
+//   node rf-suche-einzeln.mjs <13-stellige Nr> --detail    -> Preis, VPE, Bild
+// Der Ablauf in der App ist deshalb zweistufig: suchen, auswählen, Detail
+// nachladen. Ausgabe auf stdout als JSON, Protokoll auf stderr.
 
 import { oeffnen, seiteOeffnen } from './shop-lib.mjs'
 
@@ -25,6 +26,7 @@ const args = process.argv.slice(2)
 const begriff = (args.find((a) => !a.startsWith('--')) ?? '').trim()
 const wert = (n, s) => { const i = args.indexOf(`--${n}`); return i >= 0 && args[i + 1] ? args[i + 1] : s }
 const maxTreffer = Math.min(Number(wert('treffer', 8)) || 8, 20)
+const detail = args.includes('--detail')
 const log = (...a) => console.error(new Date().toISOString().slice(11, 19), ...a)
 
 const raus = (obj, code = 0) => {
@@ -83,34 +85,57 @@ page.on('response', async (r) => {
 })
 
 try {
-  // 1. Eine 13-stellige Zahl ist eine R+F-Artikelnummer: Produktseite direkt.
-  if (/^\d{13}$/.test(begriff)) {
-    await seiteOeffnen(page, `https://rf24.de/produkt/${begriff}`, pb)
-    const da = await page.locator('h1').first().count().catch(() => 0)
-    const titel = da ? glatt(await page.locator('h1').first().innerText().catch(() => '')) : ''
-    if (titel && !/^Oh oh|nicht gefunden|Seite nicht/i.test(titel)) {
-      const rumpf = glatt(await page.locator('body').innerText().catch(() => ''))
-      // Bild nach der alt-Steckbrief-Regel: das Bild, dessen alt zum Titel
-      // passt — auf einer rf24-Seite liegen auch die Nachbar-Ausfuehrungen.
-      let bild = null
-      for (const b of await page.locator('img').all()) {
-        const alt = glatt(await b.getAttribute('alt').catch(() => ''))
-        const src = await b.getAttribute('src').catch(() => null)
-        if (!src || !alt) continue
-        if (alt.toLowerCase() === titel.toLowerCase()) { bild = src; break }
-      }
+  // 1. Detail einer bekannten Nummer: Preis, VPE und Bild von der Produktseite.
+  //    Bewusst über page.evaluate und nicht über Locators — mit Locators hat
+  //    die Erkennung der Produktseite nicht angeschlagen (Fund 17.09.2026),
+  //    die Seite baut ihren Inhalt nach. Dieselbe Logik wie in
+  //    rf-artikel-holen.mjs, die sich über 45 Artikel bewährt hat.
+  if (detail) {
+    if (!/^\d{13}$/.test(begriff)) {
       await browser.close()
-      raus({
-        begriff, gesamt: 1, quelle: 'produktseite',
-        treffer: [{
-          artikelnr: begriff, name: titel,
-          preis_netto: preisLesen(rumpf),
-          bild_url: bild && bild.startsWith('http') ? bild : (bild ? `https://rf24.de${bild}` : null),
-          matchcode: null, lieferantennr: null,
-        }],
-      })
+      raus({ fehler: 'Detail braucht eine 13-stellige R+F-Nummer' }, 1)
     }
-    log(`Produktseite ${begriff} gibt es nicht — weiter mit der Suche`)
+    await seiteOeffnen(page, `https://rf24.de/produkt/${begriff}`, pb)
+    await page.waitForTimeout(900)
+    const d = await page.evaluate(() => ({
+      url: location.href,
+      titel: (document.querySelector('h1')?.textContent || document.title || '')
+        .replace(/\s*\|\s*Alle Kategorien\s*$/, '').replace(/\s+/g, ' ').trim(),
+      preisText: [...document.querySelectorAll('[class*="price" i]')]
+        .map((e) => (e.textContent || '').replace(/\s+/g, ' ').trim())
+        .find((x) => /je:\s*[\d.,]+\s*€|^[\d.,]+\s*€/.test(x)) || '',
+      text: (document.body.innerText || '').replace(/\s+/g, ' ').slice(0, 1200),
+      bilder: [...document.images]
+        .filter((x) => /\/medias\//.test(x.src) && !/\.svg($|\?)/.test(x.src))
+        .map((x) => ({ src: x.src, alt: x.alt || '' })),
+    }))
+    if (/\/login/.test(d.url)) {
+      await browser.close()
+      raus({ fehler: 'R+F-Sitzung abgelaufen', sitzung_abgelaufen: true }, 3)
+    }
+    if (!d.titel || /^Oh oh|nicht gefunden|Seite nicht/i.test(d.titel)) {
+      await browser.close()
+      raus({ fehler: `Artikel ${begriff} gibt es nicht`, nicht_gefunden: true }, 4)
+    }
+    const mVpe = d.text.match(/\b(?:VPE|Verpackungseinheit)\b[^\d]{0,10}(\d+)/i)
+    // alt-Steckbrief: das Bild, dessen alt zum Titel passt — auf einer
+    // rf24-Seite liegen auch die Bilder der Nachbar-Ausführungen.
+    const norm = (s) => glatt(s).toLowerCase()
+    const bild = d.bilder.find((b) => norm(b.alt) === norm(d.titel))
+      ?? d.bilder.find((b) => norm(b.alt).startsWith(norm(d.titel).slice(0, 30)))
+      ?? null
+    await browser.close()
+    raus({
+      begriff, gesamt: 1, quelle: 'produktseite',
+      treffer: [{
+        artikelnr: begriff, name: d.titel,
+        preis_netto: preisLesen(d.preisText) ?? preisLesen(d.text),
+        vpe: mVpe ? Number(mVpe[1]) : null,
+        bild_url: bild?.src ?? null,
+        bild_alt: glatt(bild?.alt).slice(0, 120) || null,
+        matchcode: null, lieferantennr: null,
+      }],
+    })
   }
 
   // 2. Suche. Findet R+F-Nummern, GUT-Nummern und Bezeichnungen.
