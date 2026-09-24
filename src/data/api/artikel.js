@@ -158,3 +158,95 @@ export async function replaceGebinde(artikelId, gebinde) {
     if (error) throw error
   }
 }
+
+// ─── Aufraeumen: pruefen, deaktivieren, loeschen ───────────────────────────
+//
+// Loeschen ist hier kein "weg und gut". An shop_artikel haengen dreizehn
+// Fremdschluessel mit drei verschiedenen Folgen, und die muss Patrick sehen
+// BEVOR er klickt — nicht als Datenbankfehler danach:
+//
+//   RESTRICT  Bestellwunsch, Nachkalkulations-Position  -> Loeschen scheitert
+//   CASCADE   Zaehllisten-Zeile, Preishistorie, Favorit -> geht stillschweigend mit
+//   SET NULL  Bedarfsmeldung, Belegposition, Sync-Log   -> Verweis wird geleert
+//
+// Deshalb: erst pruefen, dann die Folgen im Klartext zeigen, dann handeln.
+// Ausblenden (aktiv = false) ist der umkehrbare Weg und steht gleichberechtigt
+// daneben — dieselbe Regel wie in der Aufmass-Einrichtung.
+
+// Supabase filtert mit .in() ueber die URL. Bei mehreren hundert UUIDs wird die
+// zu lang, deshalb in Haeppchen.
+function haeppchen(liste, groesse = 80) {
+  const raus = []
+  for (let i = 0; i < liste.length; i += groesse) raus.push(liste.slice(i, i + groesse))
+  return raus
+}
+
+async function zaehleJeArtikel(tabelle, spalte, ids) {
+  const zaehler = new Map()
+  try {
+    for (const teil of haeppchen(ids)) {
+      const { data, error } = await supabase.from(tabelle).select(spalte).in(spalte, teil)
+      if (error) throw error
+      for (const r of data || []) zaehler.set(r[spalte], (zaehler.get(r[spalte]) || 0) + 1)
+    }
+    return { zaehler, lesbar: true }
+  } catch {
+    // Kein Leserecht oder Tabelle fehlt: lieber "unbekannt" melden als so tun,
+    // als haenge nichts dran.
+    return { zaehler, lesbar: false }
+  }
+}
+
+// Liefert je Artikel-Id, was einem Loeschen im Weg steht und was mitginge.
+export async function pruefeArtikelVerwendung(ids) {
+  if (!ids?.length) return { je: new Map(), unlesbar: [] }
+
+  const quellen = [
+    { schluessel: 'bestellwuensche', tabelle: 'shop_order_requests', spalte: 'artikel_id', blockiert: true, text: 'Bestellwunsch' },
+    { schluessel: 'nachkalkulation', tabelle: 'shop_nachkalkulation_positionen', spalte: 'artikel_id', blockiert: true, text: 'Nachkalkulations-Position' },
+    { schluessel: 'zaehlliste', tabelle: 'aufmass_kategorie_position', spalte: 'artikel_id', blockiert: false, text: 'Zeile in der Aufmaß-Strichliste' },
+    { schluessel: 'preishistorie', tabelle: 'shop_artikel_preise', spalte: 'artikel_id', blockiert: false, text: 'Eintrag in der Preishistorie' },
+  ]
+
+  const je = new Map(ids.map((id) => [id, { blockiert: [], mitgeloescht: [] }]))
+  const unlesbar = []
+  for (const q of quellen) {
+    const { zaehler, lesbar } = await zaehleJeArtikel(q.tabelle, q.spalte, ids)
+    if (!lesbar) { unlesbar.push(q.text); continue }
+    for (const [id, anzahl] of zaehler) {
+      const eintrag = je.get(id)
+      if (!eintrag) continue
+      ;(q.blockiert ? eintrag.blockiert : eintrag.mitgeloescht).push({ was: q.text, anzahl })
+    }
+  }
+  return { je, unlesbar }
+}
+
+// Ausblenden statt loeschen — umkehrbar, nichts geht verloren.
+export async function setzeArtikelAktiv(ids, aktiv) {
+  for (const teil of haeppchen(ids)) {
+    const { error } = await supabase
+      .from('shop_artikel')
+      .update({ aktiv, updated_at: new Date().toISOString() })
+      .in('id', teil)
+    if (error) throw error
+  }
+}
+
+// Loescht mehrere Artikel. Faellt ein Haeppchen wegen einer RESTRICT-Regel um,
+// wird es einzeln wiederholt, damit ein einziger blockierter Artikel nicht die
+// ganze Auswahl verhindert.
+export async function deleteArtikelMehrere(ids) {
+  const geloescht = []
+  const gescheitert = []
+  for (const teil of haeppchen(ids, 40)) {
+    const { error } = await supabase.from('shop_artikel').delete().in('id', teil)
+    if (!error) { geloescht.push(...teil); continue }
+    for (const id of teil) {
+      const { error: e } = await supabase.from('shop_artikel').delete().eq('id', id)
+      if (e) gescheitert.push({ id, fehler: e.message })
+      else geloescht.push(id)
+    }
+  }
+  return { geloescht, gescheitert }
+}
