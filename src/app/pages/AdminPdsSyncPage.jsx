@@ -1,13 +1,16 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Box, Heading, Text, HStack, VStack, Button, Input, Table, Badge, Spinner, Flex, Spacer, Code,
 } from '@chakra-ui/react'
-import { Search, Upload, CheckCircle2, AlertTriangle, FlaskConical } from 'lucide-react'
+import {
+  Search, Upload, CheckCircle2, AlertTriangle, FlaskConical, Layers,
+} from 'lucide-react'
 import {
   pruefeArtikel, uebertrageArtikel, listKategorienMitPds, listEinheitenMapping,
   listArtikelMitPdsStatus,
 } from '../../data/api/pdsSync.js'
+import { SammelAnzeige } from './PdsSammelAnzeige.jsx'
 
 const STATUS_FARBE = { offen: 'gray', bereit: 'blue', gesynct: 'green', fehler: 'red' }
 
@@ -17,6 +20,11 @@ export default function AdminPdsSyncPage() {
   const [nurOffene, setNurOffene] = useState(true)
   const [laufend, setLaufend] = useState(null)
   const [ergebnis, setErgebnis] = useState(null)
+  // Sammellauf: ein Artikel nach dem anderen, nicht parallel. Jeder Aufruf geht
+  // bis zu PDS durch; gleichzeitige Anfragen wuerden dort nur Last erzeugen und
+  // die Reihenfolge im Protokoll unbrauchbar machen.
+  const [sammel, setSammel] = useState(null)
+  const abbruch = useRef(false)
 
   const { data: artikelListe = [], isLoading, error: ladeFehler } = useQuery({
     queryKey: ['shop-artikel-pds'],
@@ -73,6 +81,51 @@ export default function AdminPdsSyncPage() {
     handle(artikel, true)
   }
 
+  // Alle noch nicht uebertragenen Artikel der aktuellen Filterung, in der
+  // angezeigten Reihenfolge. Die Suche wirkt also auch auf den Sammellauf.
+  const sammelListe = useMemo(
+    () => gefiltert.filter((a) => !a.pds_katalog_uuid),
+    [gefiltert],
+  )
+  // Ein Musterangebot entsteht je Artikel mit Preis — und kostet danach zwei
+  // Handgriffe im PDS-Client. Bei einem Sammellauf ist das die eigentliche
+  // Folge, deshalb steht die Zahl vor dem Klick und nicht erst hinterher.
+  const anzahlMusterangebote = sammelListe.filter((a) => Number(a.preis_netto) > 0).length
+
+  async function sammellauf(echt) {
+    if (!sammelListe.length) return
+    if (echt) {
+      const frage =
+        `${sammelListe.length} Artikel wirklich in PDS anlegen?\n\n` +
+        `Dabei entstehen ${anzahlMusterangebote} Musterangebote, die im PDS-Client ` +
+        'je zwei Handgriffe brauchen (Position in Katalog uebernehmen, Angebot loeschen).\n\n' +
+        'Angelegte Katalogeintraege lassen sich nicht zurueckholen.'
+      if (!window.confirm(frage)) return
+    }
+    abbruch.current = false
+    setErgebnis(null)
+    const ergebnisse = []
+    setSammel({ echt, gesamt: sammelListe.length, index: 0, aktuell: null, ergebnisse, laeuft: true })
+    for (let i = 0; i < sammelListe.length; i++) {
+      if (abbruch.current) break
+      const a = sammelListe[i]
+      setSammel((s) => ({ ...s, index: i + 1, aktuell: a.name }))
+      try {
+        // 422 mit Luecken kommt als Antwort zurueck, nicht als Ausnahme — siehe
+        // invoke() in pdsSync.js. Deshalb hier nur echte Fehler im catch.
+        const antwort = echt ? await uebertrageArtikel(a.id) : await pruefeArtikel(a.id)
+        ergebnisse.push({ artikel: a, antwort })
+      } catch (e) {
+        ergebnisse.push({ artikel: a, fehler: e.message })
+      }
+      setSammel((s) => ({ ...s, ergebnisse: [...ergebnisse] }))
+      // Kurze Pause, damit die PDS-Seite nicht im Sekundentakt getroffen wird.
+      if (i < sammelListe.length - 1) await new Promise((r) => setTimeout(r, 250))
+    }
+    setSammel((s) => ({ ...s, laeuft: false, aktuell: null, abgebrochen: abbruch.current }))
+    qc.invalidateQueries({ queryKey: ['shop-artikel-pds'] })
+  }
+
   return (
     <Box>
       <Flex mb={4} align="center" flexWrap="wrap" gap={2}>
@@ -122,9 +175,23 @@ export default function AdminPdsSyncPage() {
           <Button size="sm" variant={nurOffene ? 'solid' : 'outline'} onClick={() => setNurOffene((v) => !v)}>
             {nurOffene ? 'Nur noch nicht übertragene' : 'Alle Artikel'}
           </Button>
+          <Button size="sm" variant="outline"
+            disabled={!sammelListe.length || sammel?.laeuft}
+            onClick={() => sammellauf(false)}>
+            <FlaskConical size={14} /> Probe für alle ({sammelListe.length})
+          </Button>
+          <Button size="sm" colorPalette="blue"
+            disabled={!sammelListe.length || sammel?.laeuft}
+            onClick={() => sammellauf(true)}>
+            <Layers size={14} /> Alle übertragen ({sammelListe.length})
+          </Button>
           <Spacer />
           <Text fontSize="sm" color="fg.muted">{gefiltert.length} Artikel</Text>
         </HStack>
+
+        {sammel && <SammelAnzeige sammel={sammel}
+          onAbbrechen={() => { abbruch.current = true }}
+          onSchliessen={() => setSammel(null)} />}
 
         {isLoading ? (
           <Flex justify="center" p={8}><Spinner /></Flex>
