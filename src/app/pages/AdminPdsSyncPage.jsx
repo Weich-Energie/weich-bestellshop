@@ -4,20 +4,30 @@ import {
   Box, Heading, Text, HStack, VStack, Button, Input, Table, Badge, Spinner, Flex, Spacer, Code,
 } from '@chakra-ui/react'
 import {
-  Search, Upload, CheckCircle2, AlertTriangle, FlaskConical, Layers,
+  Upload, CheckCircle2, AlertTriangle, FlaskConical, Layers,
 } from 'lucide-react'
 import {
   pruefeArtikel, uebertrageArtikel, listKategorienMitPds, listEinheitenMapping,
   listArtikelMitPdsStatus,
 } from '../../data/api/pdsSync.js'
+import {
+  pruefeArtikelVerwendung, setzeArtikelAktiv, deleteArtikelMehrere,
+} from '../../data/api/artikel.js'
 import { SammelAnzeige } from './PdsSammelAnzeige.jsx'
+import ArtikelLoeschDialog from '../components/ArtikelLoeschDialog.jsx'
+import ArtikelFilter, {
+  LEERER_FILTER, artikelFiltern, lieferantenAus, AuswahlLeiste,
+} from '../components/ArtikelFilter.jsx'
 
 const STATUS_FARBE = { offen: 'gray', bereit: 'blue', gesynct: 'green', fehler: 'red' }
 
 export default function AdminPdsSyncPage() {
   const qc = useQueryClient()
-  const [suche, setSuche] = useState('')
+  const [filter, setFilter] = useState(LEERER_FILTER)
   const [nurOffene, setNurOffene] = useState(true)
+  const [auswahl, setAuswahl] = useState(() => new Set())
+  const [loeschDialog, setLoeschDialog] = useState(null)
+  const [arbeitet, setArbeitet] = useState(false)
   const [laufend, setLaufend] = useState(null)
   const [ergebnis, setErgebnis] = useState(null)
   // Sammellauf: ein Artikel nach dem anderen, nicht parallel. Jeder Aufruf geht
@@ -47,14 +57,85 @@ export default function AdminPdsSyncPage() {
   // als Warnung und nicht erst beim Klick.
   const ohneWarengruppe = kategorien.filter((k) => !k.pds_warengruppe_uuid)
 
+  const lieferanten = useMemo(() => lieferantenAus(artikelListe), [artikelListe])
   const gefiltert = useMemo(() => {
-    const s = suche.trim().toLowerCase()
-    return artikelListe.filter((a) => {
-      if (nurOffene && a.pds_katalog_uuid) return false
-      if (!s) return true
-      return [a.name, a.artikelnr, a.lieferant].filter(Boolean).join(' ').toLowerCase().includes(s)
+    const roh = nurOffene ? artikelListe.filter((a) => !a.pds_katalog_uuid) : artikelListe
+    return artikelFiltern(roh, filter)
+  }, [artikelListe, filter, nurOffene])
+
+  const ausgewaehlt = useMemo(() => gefiltert.filter((a) => auswahl.has(a.id)), [gefiltert, auswahl])
+  const alleGewaehlt = gefiltert.length > 0 && ausgewaehlt.length === gefiltert.length
+
+  function umschalten(id) {
+    setAuswahl((alt) => {
+      const neu = new Set(alt)
+      if (neu.has(id)) neu.delete(id); else neu.add(id)
+      return neu
     })
-  }, [artikelListe, suche, nurOffene])
+  }
+  function alleUmschalten() {
+    setAuswahl((alt) => {
+      const neu = new Set(alt)
+      if (alleGewaehlt) gefiltert.forEach((a) => neu.delete(a.id))
+      else gefiltert.forEach((a) => neu.add(a.id))
+      return neu
+    })
+  }
+
+  // Aufraeumen direkt hier: wer sieht, dass ein Artikel gar nicht nach PDS
+  // gehoert, soll ihn nicht erst im Katalog suchen muessen.
+  async function handleSichtbarkeit(aktiv) {
+    const ids = ausgewaehlt.map((a) => a.id)
+    if (!ids.length) return
+    setArbeitet(true)
+    try {
+      await setzeArtikelAktiv(ids, aktiv)
+      setAuswahl(new Set())
+      qc.invalidateQueries({ queryKey: ['shop-artikel-pds'] })
+    } catch (e) {
+      window.alert(`Konnte nicht ${aktiv ? 'einblenden' : 'ausblenden'}: ${e.message}`)
+    } finally {
+      setArbeitet(false)
+    }
+  }
+
+  async function handleLoeschenVorbereiten(liste) {
+    if (!liste.length) return
+    setArbeitet(true)
+    try {
+      const { je, unlesbar } = await pruefeArtikelVerwendung(liste.map((a) => a.id))
+      setLoeschDialog({ liste, je, unlesbar })
+    } catch (e) {
+      window.alert(`Prüfung fehlgeschlagen: ${e.message}`)
+    } finally {
+      setArbeitet(false)
+    }
+  }
+
+  async function handleLoeschenAusfuehren(ids) {
+    if (!ids.length) return
+    setArbeitet(true)
+    try {
+      const { geloescht, gescheitert } = await deleteArtikelMehrere(ids)
+      setAuswahl((alt) => {
+        const neu = new Set(alt)
+        geloescht.forEach((id) => neu.delete(id))
+        return neu
+      })
+      setLoeschDialog(null)
+      qc.invalidateQueries({ queryKey: ['shop-artikel-pds'] })
+      if (gescheitert.length) {
+        window.alert(
+          `${geloescht.length} gelöscht, ${gescheitert.length} nicht.\n\n` +
+          gescheitert.slice(0, 8).map((g) => g.fehler).join('\n'),
+        )
+      }
+    } catch (e) {
+      window.alert(`Löschen fehlgeschlagen: ${e.message}`)
+    } finally {
+      setArbeitet(false)
+    }
+  }
 
   const anzahlGesynct = artikelListe.filter((a) => a.pds_katalog_uuid).length
 
@@ -166,12 +247,9 @@ export default function AdminPdsSyncPage() {
       )}
 
       <Box borderWidth="1px" borderRadius="lg" p={4} mb={4} bg="white">
-        <HStack mb={3} gap={2} flexWrap="wrap">
-          <HStack borderWidth="1px" borderRadius="md" px={2} bg="gray.50">
-            <Search size={14} />
-            <Input variant="flushed" size="sm" placeholder="Suche..." value={suche}
-              onChange={(e) => setSuche(e.target.value)} border="none" />
-          </HStack>
+        <ArtikelFilter filter={filter} setFilter={setFilter}
+          kategorien={kategorien} lieferanten={lieferanten}
+          rechts={<Text fontSize="sm" color="fg.muted">{gefiltert.length} Artikel</Text>}>
           <Button size="sm" variant={nurOffene ? 'solid' : 'outline'} onClick={() => setNurOffene((v) => !v)}>
             {nurOffene ? 'Nur noch nicht übertragene' : 'Alle Artikel'}
           </Button>
@@ -185,9 +263,16 @@ export default function AdminPdsSyncPage() {
             onClick={() => sammellauf(true)}>
             <Layers size={14} /> Alle übertragen ({sammelListe.length})
           </Button>
-          <Spacer />
-          <Text fontSize="sm" color="fg.muted">{gefiltert.length} Artikel</Text>
-        </HStack>
+        </ArtikelFilter>
+
+        <AuswahlLeiste
+          anzahl={ausgewaehlt.length}
+          arbeitet={arbeitet}
+          onAusblenden={() => handleSichtbarkeit(false)}
+          onEinblenden={() => handleSichtbarkeit(true)}
+          onLoeschen={() => handleLoeschenVorbereiten(ausgewaehlt)}
+          onAufheben={() => setAuswahl(new Set())}
+        />
 
         {sammel && <SammelAnzeige sammel={sammel}
           onAbbrechen={() => { abbruch.current = true }}
@@ -200,6 +285,10 @@ export default function AdminPdsSyncPage() {
             <Table.Root variant="line" size="sm" minW="820px">
               <Table.Header>
                 <Table.Row>
+                  <Table.ColumnHeader w="34px">
+                    <input type="checkbox" checked={alleGewaehlt} onChange={alleUmschalten}
+                      aria-label="Alle sichtbaren auswählen" style={{ cursor: 'pointer' }} />
+                  </Table.ColumnHeader>
                   <Table.ColumnHeader>Artikel</Table.ColumnHeader>
                   <Table.ColumnHeader>Kategorie</Table.ColumnHeader>
                   <Table.ColumnHeader>Einheit</Table.ColumnHeader>
@@ -213,7 +302,11 @@ export default function AdminPdsSyncPage() {
                   const kat = kategorieMap.get(a.kategorie_id)
                   const einheitOk = a.einheit && einheitenSet.has(a.einheit)
                   return (
-                    <Table.Row key={a.id}>
+                    <Table.Row key={a.id} bg={auswahl.has(a.id) ? 'blue.50' : undefined}>
+                      <Table.Cell>
+                        <input type="checkbox" checked={auswahl.has(a.id)} onChange={() => umschalten(a.id)}
+                          aria-label={`${a.name} auswählen`} style={{ cursor: 'pointer' }} />
+                      </Table.Cell>
                       <Table.Cell>
                         <Text fontWeight="medium" fontSize="sm">{a.name}</Text>
                         {a.artikelnr && <Text fontSize="xs" color="fg.muted">Art-Nr: {a.artikelnr}</Text>}
@@ -269,7 +362,7 @@ export default function AdminPdsSyncPage() {
                 })}
                 {gefiltert.length === 0 && (
                   <Table.Row>
-                    <Table.Cell colSpan={6}>
+                    <Table.Cell colSpan={7}>
                       <Text py={4} textAlign="center" color="fg.muted">
                         {nurOffene ? 'Alle Artikel sind übertragen.' : 'Keine Treffer.'}
                       </Text>
@@ -283,6 +376,32 @@ export default function AdminPdsSyncPage() {
       </Box>
 
       {ergebnis && <Ergebnis {...ergebnis} onClose={() => setErgebnis(null)} />}
+
+      <ArtikelLoeschDialog
+        daten={loeschDialog}
+        arbeitet={arbeitet}
+        hinweis={
+          loeschDialog?.liste.some((a) => a.pds_katalog_uuid)
+            ? 'Mindestens ein Artikel steht schon in PDS. Der Eintrag dort bleibt stehen — '
+              + 'PDS löscht Katalogeinträge nur, solange sie keinen Bestand und keine Verwendung haben.'
+            : null
+        }
+        onClose={() => setLoeschDialog(null)}
+        onLoeschen={handleLoeschenAusfuehren}
+        onAusblenden={async (ids) => {
+          setArbeitet(true)
+          try {
+            await setzeArtikelAktiv(ids, false)
+            setAuswahl(new Set())
+            setLoeschDialog(null)
+            qc.invalidateQueries({ queryKey: ['shop-artikel-pds'] })
+          } catch (e) {
+            window.alert(`Ausblenden fehlgeschlagen: ${e.message}`)
+          } finally {
+            setArbeitet(false)
+          }
+        }}
+      />
     </Box>
   )
 }

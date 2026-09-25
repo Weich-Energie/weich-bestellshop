@@ -55,6 +55,7 @@ export async function listArtikelMitPdsStatus() {
     .select(`
       id, name, artikelnr, einheit, preis_netto, aktiv, kategorie_id,
       lieferant, lieferant_id,
+      bestellbar, nachkalkulation_klima, sichtbar_aufmass,
       pds_katalog_uuid, pds_sync_status, pds_sync_at, pds_sync_fehler
     `)
     .order('name')

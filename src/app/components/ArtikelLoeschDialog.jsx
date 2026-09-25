@@ -4,7 +4,7 @@ import { Trash2, EyeOff, AlertTriangle } from 'lucide-react'
 
 // Zeigt vor dem Loeschen, was an den Artikeln haengt: was es blockiert, was
 // stillschweigend mitginge. Und bietet Ausblenden als umkehrbaren Weg an.
-export default function ArtikelLoeschDialog({ daten, arbeitet, onClose, onLoeschen, onAusblenden }) {
+export default function ArtikelLoeschDialog({ daten, arbeitet, hinweis = null, onClose, onLoeschen, onAusblenden }) {
   const [verstanden, setVerstanden] = useState(false)
   React.useEffect(() => { setVerstanden(false) }, [daten])
   if (!daten) return null
@@ -36,6 +36,11 @@ export default function ArtikelLoeschDialog({ daten, arbeitet, onClose, onLoesch
             </Dialog.Header>
             <Dialog.Body>
               <VStack align="stretch" gap={3}>
+                {hinweis && (
+                  <Box borderWidth="1px" borderColor="blue.200" bg="blue.50" borderRadius="md" p={3}>
+                    <Text fontSize="sm">{hinweis}</Text>
+                  </Box>
+                )}
                 {blockiert.length > 0 && (
                   <Box borderWidth="1px" borderColor="red.300" bg="red.50" borderRadius="md" p={3}>
                     <HStack gap={2} align="start" mb={1}>
