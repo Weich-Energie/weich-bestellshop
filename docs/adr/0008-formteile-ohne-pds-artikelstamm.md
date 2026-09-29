@@ -62,11 +62,12 @@ PDS-Katalog steht.
    leer. Das Klima-Gegenstück `shop_pds_montagematerial_platzhalter` bleibt:
    dort sind es echte Artikel mit Lagerbezug, **ADR 0007 gilt für Klima
    unverändert**.
-3. **`aufmass-pds-uebergabe` muss umgebaut werden.** Sie verlangt heute an jeder
-   Stelle eine `pds_katalog_uuid` — auch auf dem Transportangebots-Weg, wo die
-   Katalog-UUID als Gruppierungsschlüssel dient. Seit dem Löschen der Einträge
-   landet deshalb **jede** Position in „nicht übertragbar". Bis zum Umbau ist
-   die Übergabe stillgelegt.
+3. **`aufmass-pds-uebergabe` ist umgebaut** (29.09.2026) und verlangt nirgends
+   mehr eine `pds_katalog_uuid`. Die Aktion `mengen_setzen` ist entfallen, weil
+   es die Platzhalter-Ebene nicht mehr gibt. Welche Zeile in welchen Topf
+   gehört, sagt die Sicht `aufmass_position_pds_topf` (Migration
+   `20260929110000`) — die Regel liegt in der Datenbank und ist per SQL
+   prüfbar. Der Aufbau steht unten.
 4. Die Formteil-Kunstartikel selbst bleiben. Sie tragen die Mischsatzpreise und
    bewerten das Aufmaß — im Shop.
 
@@ -106,6 +107,51 @@ erste Fassung von `aufmass-pds-uebergabe` setzte `name` und wäre bei der ersten
 echten Übergabe gescheitert.
 
 Das Testangebot ist per API nicht löschbar und muss im Client entfernt werden.
+
+## Der Aufbau im Auftrag: alles **in** einer Leistung
+
+Patricks Vorgabe vom 29.09.2026, in zwei Schritten geschärft:
+
+> „ich möchte gerne immer erst eine Leistung erstellen mit Rohre und Formteile
+> und dahinter sollen dann alle anderen als Artikel"
+
+und nach dem ersten Testlauf:
+
+> „ne der artikel steht unter der leistung aber nicht in der leistung"
+
+Es entsteht deshalb **eine** Position im Leistungsverzeichnis — eine
+`LEISTUNG` „Rohre und Formteile nach Aufmaß vom …" — und alles Weitere hängt
+als `teilleistungen` **in** ihr:
+
+| Teilleistung | Inhalt |
+| --- | --- |
+| 1. | „Rohre und Formteile (Sammelposten nach Mischsatz)", Menge 1, EK = Summe der Rohr- und Formteilzeilen, Aufschlüsselung im Langtext |
+| 2. … n | jeder andere Artikel einzeln mit Menge und Einzel-EK |
+
+### Warum der Formteil-Betrag eine eigene Teilleistung braucht
+
+**PDS verwirft einen Pauschalpreis der Leistung und summiert stattdessen ihre
+Teilleistungen.** Am Testangebot 2026-315 belegt: gesendet wurden 36,02 €
+pauschal auf der Leistung plus zwei Teilleistungen; gespeichert hat PDS
+**47,52 €** — genau 37,52 + 10,00, die Summe der Teilleistungen. Der ganze
+Formteil-Anteil wäre stillschweigend verschwunden.
+
+Deshalb ist der Sammelposten selbst eine `ARTIKEL`-Teilleistung mit Menge 1.
+Gegenprobe am Testangebot **2026-316**:
+
+| Teilleistung | Menge | Einzel-EK | Gesamt |
+| --- | --- | --- | --- |
+| Rohre und Formteile (Sammelposten) | 1 | 36,02 | 36,02 |
+| DVGW-KFR Ventil DN 15 | 2 | 18,76 | 37,52 |
+| Walraven Rohrschelle 15-18 | 8 | 1,25 | 10,00 |
+| **LEISTUNG 01.001** | 1 | | **83,54** |
+
+Die Ebene enthält genau **eine** Position, die drei Teilleistungen tragen
+`nummer: null` (sie werden nicht eigenständig nummeriert) und `katalogUUID:
+null`. `teilleistungIgnorieren` wird nicht gebraucht: der Aufmaß-EK steht
+vollständig und richtig in der Leistung.
+
+Zu löschen sind im Client die Testangebote **2026-314, 2026-315 und 2026-316**.
 
 ## Verworfene Alternativen
 

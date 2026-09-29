@@ -1,5 +1,15 @@
 # PDS-Übergabe der Aufmaß-Erfassung — Bauplan (Ziel-Schritt 5)
 
+> **ÜBERHOLT in den Kernpunkten (29.09.2026).** Der hier geplante Weg über
+> **Formteil-Kunstartikel im PDS-Katalog** und eine **Platzhalter-Ebene
+> „Formteile (Aufmaß)"** ist aufgegeben: siehe
+> [ADR 0008](adr/0008-formteile-ohne-pds-artikelstamm.md). Es gilt jetzt
+> **eine** `LEISTUNG` je Aufmaß, mit dem Sammelposten Rohre/Formteile und
+> allen übrigen Artikeln als `teilleistungen` **in** ihr — ohne
+> `katalogUUID`, ohne `name`, ohne `mengen_setzen`. Das Dokument bleibt für
+> die Herleitung und die Befunde des 07.09. stehen; verbindlich sind ADR 0008
+> und die Sicht `aufmass_position_pds_topf`.
+
 Stand 07.09.2026. **Bewusst nur als Plan, nicht als Code**: die
 PDS-Verbindung dieser Sitzung ist gerade gestört (siehe Chatverlauf), eine
 Function, die in echte Kundenaufträge schreibt, ohne sie auch nur einmal

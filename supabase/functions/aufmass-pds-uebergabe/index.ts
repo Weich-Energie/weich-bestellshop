@@ -1,8 +1,10 @@
 // aufmass-pds-uebergabe — Bringt ein Aufmass (Aufmass-App) in den PDS-Auftrag.
 //
 // STRUKTUR (Patricks Vorgabe 29.09.2026):
-//   1. eine LEISTUNG "Rohre und Formteile" mit dem Gesamt-EK, und
-//   2. dahinter jeder andere Artikel als eigene ARTIKEL-Position.
+//   eine LEISTUNG "Rohre und Formteile nach Aufmass", und **in** ihr als
+//   Teilleistungen erst der Sammelposten Rohre/Formteile, dahinter jeder
+//   andere Artikel einzeln. Nicht daneben: "der Artikel steht unter der
+//   Leistung, aber nicht in der Leistung".
 // Welche Zeile in welchen Topf gehoert, sagt die Sicht
 // aufmass_position_pds_topf — die Regel liegt in der Datenbank und ist per SQL
 // pruefbar.
@@ -272,27 +274,36 @@ Deno.serve(async (req: Request) => {
       return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}`
     })()
 
-    // Erst die Leistung, dann die Artikel — genau die Reihenfolge, die im
-    // Auftrag stehen soll.
-    const positionen: any[] = []
+    // EINE Leistung, alles darin. Patricks Vorgabe vom 29.09.2026: „der Artikel
+    // steht unter der Leistung, aber nicht in der Leistung" — die Artikel
+    // gehoeren also als `teilleistungen` hinein, nicht daneben.
+    //
+    // Der Formteil-Betrag braucht dafuer eine eigene Teilleistung und darf
+    // nicht als Pauschale auf der Leistung stehen: PDS **verwirft** einen
+    // Pauschalpreis der Leistung und summiert stattdessen ihre
+    // Teilleistungen. Am Testangebot 2026-315 belegt — gesendet 36,02 EUR
+    // pauschal, gespeichert 47,52 EUR, genau die Summe der zwei
+    // Teilleistungen. Als Pauschale waere der gesamte Formteil-Anteil
+    // stillschweigend verschwunden.
+    const teilleistungen: any[] = []
     if (leistungEk > 0) {
-      positionen.push({
+      teilleistungen.push({
         // KEIN `name`: PDS loest das Feld gegen den Katalog auf und antwortet
         // 412 ILLEGAL_ARGUMENT ("kein eindeutiger Katalogeintrag zu dem Namen
         // ..."). Am Testangebot 2026-314 belegt (29.09.2026). Die Bezeichnung
         // gehoert in kurztext.
-        positionsTyp: TYP_LEISTUNG, positionsArt: "NORMAL",
-        kurztext: `Rohre und Formteile nach Aufmass vom ${heute}`,
+        positionsTyp: TYP_ARTIKEL, positionsArt: "NORMAL",
+        kurztext: "Rohre und Formteile (Sammelposten nach Mischsatz)".slice(0, 200),
         langtext: leistungZeilen
           .map((z) => `${z.menge} × ${z.name} (${z.ek_einzel.toFixed(2)} €)`)
           .join("\n")
           .slice(0, 4000),
-        menge: 1, pauschal: true,
-        ekPreis: { einzelPreis: leistungEk, gesamtPreis: leistungEk },
+        menge: 1,
+        ekPreis: { einzelPreis: leistungEk },
       })
     }
     for (const a of artikel) {
-      positionen.push({
+      teilleistungen.push({
         // Auch hier kein `name` — siehe oben.
         positionsTyp: TYP_ARTIKEL, positionsArt: "NORMAL",
         kurztext: String(a.name).slice(0, 200),
@@ -300,6 +311,18 @@ Deno.serve(async (req: Request) => {
         ekPreis: { einzelPreis: a.ek_einzel },
       })
     }
+    const positionen = [{
+      positionsTyp: TYP_LEISTUNG, positionsArt: "NORMAL",
+      kurztext: `Rohre und Formteile nach Aufmass vom ${heute}`,
+      langtext: "Aufgeschluesselt in den Teilleistungen. Rohre und Formteile sind "
+        + "ueber die Mischsaetze des Bestellshops bewertet, alle uebrigen Artikel "
+        + "mit ihrem Einzelpreis.",
+      menge: 1, pauschal: true,
+      // PDS rechnet den Betrag ohnehin aus den Teilleistungen; wir setzen ihn
+      // mit, damit Soll und Ergebnis vergleichbar sind.
+      ekPreis: { einzelPreis: vorschau.summe_ek, gesamtPreis: vorschau.summe_ek },
+      teilleistungen,
+    }]
 
     const anfrage = {
       context: { vorgangstyp: "ANGEBOT" },

@@ -150,14 +150,19 @@ Stamm aber nicht mehr loeschbar (`/katalog/delete` greift nur ohne Bestand und
 Verwendung). Dazu ist die UUID-Verbindung gerissen — ein erneuter Sync legte
 die 29 als **Dubletten** an.
 
-**Offen:** `aufmass-pds-uebergabe` verlangt an jeder Stelle eine
-`pds_katalog_uuid`, auch auf dem Transportangebots-Weg (dort als
-Gruppierungsschluessel). Seit dem Loeschen landet deshalb jede Position in
-„nicht uebertragbar" — die Uebergabe ist stillgelegt, bis sie auf eine
-Freitext-Sammelposition umgebaut ist. `/vorgang/create` verlangt kein
-`katalogUUID`; welcher `positionsTyp` fuer Material ohne Stammartikel richtig
-ist (`LEISTUNG` ist belegt, `SONSTIGES1` waere sauberer), gehoert an einem
-Testangebot geprueft.
+**Die Uebergabe laeuft wieder** (29.09.2026, umgebaut): `/vorgang/create`
+verlangt kein `katalogUUID`, und PDS ordnet den Preisanteil auch bei einer
+`LEISTUNG` von sich aus als `OKG_ARTIKEL` ein — `SONSTIGES1` ist nicht noetig.
+Der Auftrag bekommt **eine** Position: die `LEISTUNG` „Rohre und Formteile nach
+Aufmass vom …", und **in** ihr als `teilleistungen` erst den Sammelposten
+Rohre/Formteile (Menge 1, Aufschluesselung im Langtext), dahinter jeden anderen
+Artikel einzeln. Zwei Fallen, beide an Testangeboten belegt:
+- **`name` nie setzen** — PDS loest das Feld gegen den Katalog auf und
+  antwortet 412 ILLEGAL_ARGUMENT. Bezeichnung in `kurztext` (2026-314).
+- **Ein Pauschalpreis auf der Leistung wird verworfen**, PDS summiert ihre
+  Teilleistungen (2026-315: 36,02 gesendet, 47,52 gespeichert). Der
+  Formteil-Betrag braucht deshalb eine eigene Teilleistung; Gegenprobe
+  2026-316 stimmt auf den Cent. Siehe ADR 0008.
 `shop_gut_positionen.rf_zuordnung_quelle` kennt seit 09.09.2026 drei Stufen:
 `automatisch` (Pruefregeln bestanden), `vermutet` (bestplatzierter Kandidat,
 Entscheidung Patrick 08.09.) und `manuell`. Auswertungen sollen `vermutet`
