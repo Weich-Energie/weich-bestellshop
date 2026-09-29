@@ -57,11 +57,19 @@ export default function AdminPdsSyncPage() {
   // als Warnung und nicht erst beim Klick.
   const ohneWarengruppe = kategorien.filter((k) => !k.pds_warengruppe_uuid)
 
-  const lieferanten = useMemo(() => lieferantenAus(artikelListe), [artikelListe])
+  // Formteil-Kunstartikel gehoeren nicht in den PDS-Stamm (ADR 0008) und
+  // werden von pds-katalog-sync mit 409 abgewiesen. Sie hier zu zeigen waere
+  // eine Einladung: sie tragen keine pds_katalog_uuid, gelten damit als
+  // "offen" und wuerden bei einem Sammellauf 29 Fehlschlaege erzeugen.
+  const syncFaehig = useMemo(
+    () => artikelListe.filter((a) => !a.formteil_aufmass), [artikelListe])
+  const ausgeblendeteKunstartikel = artikelListe.length - syncFaehig.length
+
+  const lieferanten = useMemo(() => lieferantenAus(syncFaehig), [syncFaehig])
   const gefiltert = useMemo(() => {
-    const roh = nurOffene ? artikelListe.filter((a) => !a.pds_katalog_uuid) : artikelListe
+    const roh = nurOffene ? syncFaehig.filter((a) => !a.pds_katalog_uuid) : syncFaehig
     return artikelFiltern(roh, filter)
-  }, [artikelListe, filter, nurOffene])
+  }, [syncFaehig, filter, nurOffene])
 
   const ausgewaehlt = useMemo(() => gefiltert.filter((a) => auswahl.has(a.id)), [gefiltert, auswahl])
   const alleGewaehlt = gefiltert.length > 0 && ausgewaehlt.length === gefiltert.length
@@ -137,7 +145,7 @@ export default function AdminPdsSyncPage() {
     }
   }
 
-  const anzahlGesynct = artikelListe.filter((a) => a.pds_katalog_uuid).length
+  const anzahlGesynct = syncFaehig.filter((a) => a.pds_katalog_uuid).length
 
   async function handle(artikel, echt) {
     setLaufend(artikel.id + (echt ? ':echt' : ':probe'))
@@ -212,8 +220,19 @@ export default function AdminPdsSyncPage() {
       <Flex mb={4} align="center" flexWrap="wrap" gap={2}>
         <Heading size="lg">Nach PDS übertragen</Heading>
         <Spacer />
-        <Text fontSize="sm" color="fg.muted">{anzahlGesynct} von {artikelListe.length} übertragen</Text>
+        <Text fontSize="sm" color="fg.muted">{anzahlGesynct} von {syncFaehig.length} übertragen</Text>
       </Flex>
+
+      {ausgeblendeteKunstartikel > 0 && (
+        <Box borderWidth="1px" borderColor="border" bg="bg.subtle" borderRadius="lg" p={3} mb={4}>
+          <Text fontSize="sm" color="fg.muted">
+            {ausgeblendeteKunstartikel} Formteil-Kunstartikel sind hier nicht aufgeführt.
+            Sie gehören nicht in den PDS-Artikelstamm — das Aufmaß kommt als
+            Sammelposition in den Auftrag, die Aufschlüsselung bleibt im Shop
+            (ADR 0008). Ein Sync würde sie abweisen.
+          </Text>
+        </Box>
+      )}
 
       {ladeFehler && (
         <Box borderWidth="1px" borderColor="red.300" bg="red.50" borderRadius="lg" p={4} mb={4}>
