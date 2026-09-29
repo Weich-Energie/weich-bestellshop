@@ -44,7 +44,7 @@ Deno.serve(async (req: Request) => {
     // fail-closed: nur wer die Aufmass-App betreten darf (oder Shop-Admin ist)
     const { data: profil } = await sb.from("employees").select("berechtigungen").eq("email", userData.user.email).single()
     const rechte = (profil?.berechtigungen ?? {}) as Record<string, any>
-    const darf = rechte?.app_access?.aufmass === true || rechte?.app_access?.bestellshop_admin === true || rechte?.rolle === "admin"
+    const darf = rechte?.app_access?.aufmass === true || rechte?.app_access?.bestellshop_admin === true
     if (!darf) return json({ error: "Kein Zugang zur Aufmass-App" }, 403)
 
     const body = await req.json().catch(() => ({}))

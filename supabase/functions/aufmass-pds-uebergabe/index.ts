@@ -31,10 +31,10 @@ const ERLAUBTE_PFADE = new Set(["/vorgang/details", "/vorgang/create"])
 // Die Weich GmbH ist in PDS auch Kunde (Kundennummer 10039); Transportangebote
 // haengen an ihr — wie in pds-auftrag-material.
 const EIGENE_FIRMA_ALS_KUNDE = "6139e897-1a04-48fa-bdd5-b9ac2e47ebd2"
-// Materialkosten ohne Stammartikel. LEISTUNG ist im Haus belegt (Muster C der
-// Nachkalkulation traegt den EK im ekPreis der Leistung); ARTIKEL ohne
-// katalogUUID ist laut Schema erlaubt. Beides ist am 29.09.2026 an einem
-// Testangebot zu bestaetigen — siehe ADR 0008.
+// Materialkosten ohne Stammartikel — am Testangebot 2026-314 bestaetigt
+// (29.09.2026): PDS nimmt beide Typen ohne katalogUUID an und ordnet den
+// Preisanteil von sich aus als OKG_ARTIKEL ein, auch bei der LEISTUNG. Die
+// Materialkosten landen damit in der richtigen Kostenart.
 const TYP_LEISTUNG = "LEISTUNG"
 const TYP_ARTIKEL = "ARTIKEL"
 
@@ -69,7 +69,7 @@ Deno.serve(async (req: Request) => {
     const { data: profil } = await sb.from("employees")
       .select("berechtigungen").eq("email", userData.user.email).single()
     const rechte = (profil?.berechtigungen ?? {}) as Record<string, any>
-    const darf = rechte?.app_access?.bestellshop_admin === true || rechte?.rolle === "admin"
+    const darf = rechte?.app_access?.bestellshop_admin === true
     if (!darf) return json({ error: "Nur Shop-Admins duerfen ein Aufmass nach PDS uebergeben" }, 403)
 
     const body = await req.json().catch(() => ({}))
@@ -277,8 +277,11 @@ Deno.serve(async (req: Request) => {
     const positionen: any[] = []
     if (leistungEk > 0) {
       positionen.push({
+        // KEIN `name`: PDS loest das Feld gegen den Katalog auf und antwortet
+        // 412 ILLEGAL_ARGUMENT ("kein eindeutiger Katalogeintrag zu dem Namen
+        // ..."). Am Testangebot 2026-314 belegt (29.09.2026). Die Bezeichnung
+        // gehoert in kurztext.
         positionsTyp: TYP_LEISTUNG, positionsArt: "NORMAL",
-        name: "Rohre und Formteile",
         kurztext: `Rohre und Formteile nach Aufmass vom ${heute}`,
         langtext: leistungZeilen
           .map((z) => `${z.menge} × ${z.name} (${z.ek_einzel.toFixed(2)} €)`)
@@ -290,8 +293,9 @@ Deno.serve(async (req: Request) => {
     }
     for (const a of artikel) {
       positionen.push({
+        // Auch hier kein `name` — siehe oben.
         positionsTyp: TYP_ARTIKEL, positionsArt: "NORMAL",
-        name: String(a.name).slice(0, 80), kurztext: String(a.name).slice(0, 200),
+        kurztext: String(a.name).slice(0, 200),
         menge: a.menge,
         ekPreis: { einzelPreis: a.ek_einzel },
       })

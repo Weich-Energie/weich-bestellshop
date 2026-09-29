@@ -51,7 +51,7 @@ Deno.serve(async (req: Request) => {
     const rechte = (profil?.berechtigungen ?? {}) as Record<string, any>
     const darf = rechte?.app_access?.aufmass_admin === true
       || rechte?.app_access?.bestellshop_admin === true
-      || rechte?.rolle === "admin"
+     
     if (!darf) return json({ fehler: "Nur der Aufmaß-Admin darf Artikel anlegen" }, 403)
 
     const { data: secret } = await sb.from("integration_secrets")

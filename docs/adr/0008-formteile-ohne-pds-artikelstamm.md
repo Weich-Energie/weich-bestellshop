@@ -77,13 +77,35 @@ trägt `name`, `kurztext`, `langtext`, `menge` und `ekPreis` auch ohne
 Katalogbezug. Als `positionsTyp` stehen neben `ARTIKEL` unter anderem `TEXT`,
 `LEISTUNG` und `SONSTIGES1`–`SONSTIGES4` zur Verfügung.
 
-**Offen und vor dem Umbau zu klären:** welcher Positionstyp für Materialkosten
-ohne Stammartikel der richtige ist. `LEISTUNG` ist im Haus belegt (Muster C der
-Nachkalkulation trägt den EK im `ekPreis` der Leistung), verbucht Material aber
-als Leistung und verfälscht damit die Auswertung nach Kostenarten. `SONSTIGES1`
-wäre sauberer, ist aber an keinem Auftrag belegt. Das gehört an einem
-Testangebot geprüft, nicht geraten — ein Vorgang ist per API nicht löschbar,
-nur im Client.
+### Am Testangebot 2026-314 bestätigt (29.09.2026)
+
+Ein Minimal-Angebot bei der Weich GmbH mit je einer Position, 1 €. Beide Typen
+gehen durch, **ohne** `katalogUUID`:
+
+| Position | Typ | Ergebnis in PDS |
+| --- | --- | --- |
+| 01.001 | `LEISTUNG`, `pauschal: true` | `katalogUUID: null`, Kurztext und Langtext stehen, `ekPreis` übernommen |
+| 01.002 | `ARTIKEL`, Menge 2 | `katalogUUID: null`, Einzelpreis 0,50 €, Gesamtpreis 1,00 € |
+
+**Der wichtigste Befund:** PDS ordnet den Preisanteil von sich aus als
+`OKG_ARTIKEL` ein — bei *beiden* Positionen, auch bei der Leistung. Die
+Materialkosten landen damit in der richtigen Kostenart, und die Sorge, eine
+Leistungsposition würde die Auswertung verfälschen, ist gegenstandslos.
+`SONSTIGES1` ist nicht nötig. Nebenbei: `vkPreis` wird automatisch gleich
+`ekPreis` gesetzt — der dokumentierte Normalfall ohne Aufschlag.
+
+**Die Falle, die der Test aufgedeckt hat:** Das Feld `name` darf bei einer
+Position ohne Stammartikel **nicht** gesetzt werden. PDS löst es gegen den
+Katalog auf und antwortet
+
+    412 ILLEGAL_ARGUMENT — Es konnte kein eindeutiger Katalogeintrag zu dem
+    Namen 'Rohre und Formteile' ermittelt werden.
+
+Die Bezeichnung gehört in `kurztext`, die Aufschlüsselung in `langtext`. Die
+erste Fassung von `aufmass-pds-uebergabe` setzte `name` und wäre bei der ersten
+echten Übergabe gescheitert.
+
+Das Testangebot ist per API nicht löschbar und muss im Client entfernt werden.
 
 ## Verworfene Alternativen
 

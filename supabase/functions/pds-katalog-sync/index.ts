@@ -118,7 +118,7 @@ Deno.serve(async (req: Request) => {
       .single()
 
     const rechte = (profil?.berechtigungen ?? {}) as Record<string, any>
-    const istAdmin = rechte?.app_access?.bestellshop_admin === true || rechte?.rolle === "admin"
+    const istAdmin = rechte?.app_access?.bestellshop_admin === true
     if (!istAdmin) return json({ error: "Nur Shop-Admins duerfen nach PDS uebertragen" }, 403)
 
     const body = await req.json().catch(() => ({}))
