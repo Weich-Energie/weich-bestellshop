@@ -19,8 +19,10 @@ Ressourcenplanung, Service-Ticket und Betriebsradar.
 - Auth: Email + Passwort (Supabase Auth) — kein PIN im Shop
 - App-Access-Check: `employees.berechtigungen.app_access.bestellshop === true`
   (fail-closed) — Pattern uebernommen aus Ressourcenplanung Phase 11/AAC-04
-- Shop-Admin-Flag: `berechtigungen.app_access.bestellshop_admin === true` ODER
-  `berechtigungen.rolle === 'admin'`
+- Shop-Admin-Flag: `berechtigungen.app_access.bestellshop_admin === true` — seit
+  29.09.2026 **nur** noch der Schalter. Die Rolle Admin gilt fuer die
+  Ressourcenplanung und ist kein Generalschluessel mehr (Frontend, Edge Functions,
+  `is_shop_admin()`). Vergeben wird der Schalter in der Benutzerverwaltung der Dach-App.
 - SQL ausfuehren, wenn Port 5432 gesperrt ist (Fremdnetz, `db query` meldet
   `LegacyDbConfigConnectTempRoleError`): `tools/supabase-sql-https.ps1 -SqlFile x.sql`
   geht ueber die Management-API (HTTPS) mit dem CLI-Token aus dem
