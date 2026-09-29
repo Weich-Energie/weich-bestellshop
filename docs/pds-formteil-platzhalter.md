@@ -1,5 +1,23 @@
 # Platzhalter-Ebene „Formteile (Aufmaß)" für SHK-Aufträge
 
+> ## ÜBERHOLT — nicht mehr umsetzen (29.09.2026)
+>
+> Dieser Weg ist aufgegeben. Die Formteile kommen **nicht** in den
+> PDS-Artikelstamm; das Aufmaß wird als Sammelposition mit Freitext in den
+> Auftrag gestellt, die Aufschlüsselung bleibt im Shop. Grund: das Soll in PDS
+> hat keinen Materialkostenanteil, die Nachkalkulation rechnet im Shop —
+> die Artikel brächten ihr nichts und wären im Stamm nicht mehr löschbar.
+>
+> Entscheidung und Zahlen: [adr/0008-formteile-ohne-pds-artikelstamm.md](adr/0008-formteile-ohne-pds-artikelstamm.md).
+> Die Sicht `shop_pds_formteil_platzhalter` ist gelöscht, `pds-katalog-sync`
+> weist Kunstartikel mit HTTP 409 ab.
+>
+> **An Megh:** für SHK-Aufträge ist keine Formteil-Ebene mehr anzulegen. Für
+> Klima gilt [pds-montagematerial-platzhalter.md](pds-montagematerial-platzhalter.md)
+> unverändert weiter.
+>
+> Der Rest dieser Datei bleibt als Herleitung stehen.
+
 Stand 10.09.2026. Gegenstück zu
 [pds-montagematerial-platzhalter.md](pds-montagematerial-platzhalter.md)
 (Klima, ADR 0007), gerichtet an den, der SHK-Aufträge anlegt (Megh / Vorlage

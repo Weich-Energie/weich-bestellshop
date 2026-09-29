@@ -128,11 +128,34 @@ Neue Edge Function `shop-ai` mit taskbasiertem Routing:
 - [docs/strichliste-zuschnitt.md](docs/strichliste-zuschnitt.md) — **Zweck der Historie: Mengengeruest.** Wie viele Zeilen die Strichliste braucht (heute 32 Artikel je Baustelle, Vorschlag 14 Felder), welche Hebel wirklich vereinfachen
 - [docs/systemwechsel-35mm-edelstahl.md](docs/systemwechsel-35mm-edelstahl.md) — 35 mm+ Kupfer/C-Stahl ist 48 % des historischen Verbrauchs und wird auf Heizungsedelstahl umgestellt — wichtig fuer die Frage, welche Gruppen ueberhaupt noch gebraucht werden (der Preisvergleich darin ist eine Nebenrechnung, nicht das Projektziel)
 
-## Formteil-Kunstartikel (07.09.2026)
-`shop_artikel.formteil_aufmass = true` markiert 57 Kunstartikel „Formteil
-<System> <Dimension>" mit dem mengengewichteten R+F-Mittelwert als Preis —
-nie `bestellbar`, kein echter Lieferant. Grundlage der kuenftigen
-PDS-Uebergabe aus der Aufmass-App. Siehe docs/aufmass-formteil-modell.md.
+## Formteil-Kunstartikel — und warum sie NICHT nach PDS gehen (29.09.2026)
+`shop_artikel.formteil_aufmass = true` markiert 29 Kunstartikel „Formteil
+<System> <Dimensionsgruppe> <Preisklasse>" mit dem mengengewichteten
+R+F-Mittelwert als Preis — nie `bestellbar`, kein echter Lieferant. Sie
+bewerten das Aufmass **im Shop**. Siehe docs/aufmass-formteil-modell.md.
+
+**Sie kommen nicht in den PDS-Artikelstamm** (ADR 0008). Am 07.09.2026 waren
+57 davon per `pds-katalog-sync` angelegt; Patrick hat sie am 10.09. im Client
+geloescht. Seither: `pds-katalog-sync` weist `formteil_aufmass` mit **HTTP 409**
+ab, die Sicht `shop_pds_formteil_platzhalter` ist geloescht, und
+`docs/pds-formteil-platzhalter.md` traegt einen UEBERHOLT-Kopf.
+
+Der Grund ist kein Geschmack, sondern das Datenmodell: **das Soll in PDS hat
+gar keinen Materialkostenanteil** (docs/nachkalkulation-datenmodell.md, an
+einem echten Klima-Auftrag verifiziert). Der Ist-Materialeinsatz wird im Shop
+gerechnet; die Artikel brachten der Nachkalkulation also nichts, waeren im
+Stamm aber nicht mehr loeschbar (`/katalog/delete` greift nur ohne Bestand und
+Verwendung). Dazu ist die UUID-Verbindung gerissen — ein erneuter Sync legte
+die 29 als **Dubletten** an.
+
+**Offen:** `aufmass-pds-uebergabe` verlangt an jeder Stelle eine
+`pds_katalog_uuid`, auch auf dem Transportangebots-Weg (dort als
+Gruppierungsschluessel). Seit dem Loeschen landet deshalb jede Position in
+„nicht uebertragbar" — die Uebergabe ist stillgelegt, bis sie auf eine
+Freitext-Sammelposition umgebaut ist. `/vorgang/create` verlangt kein
+`katalogUUID`; welcher `positionsTyp` fuer Material ohne Stammartikel richtig
+ist (`LEISTUNG` ist belegt, `SONSTIGES1` waere sauberer), gehoert an einem
+Testangebot geprueft.
 `shop_gut_positionen.rf_zuordnung_quelle` kennt seit 09.09.2026 drei Stufen:
 `automatisch` (Pruefregeln bestanden), `vermutet` (bestplatzierter Kandidat,
 Entscheidung Patrick 08.09.) und `manuell`. Auswertungen sollen `vermutet`

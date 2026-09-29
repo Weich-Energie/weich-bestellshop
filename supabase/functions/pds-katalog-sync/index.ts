@@ -77,6 +77,7 @@ type Artikel = {
   bild_url: string | null
   aktiv: boolean
   pds_katalog_uuid: string | null
+  formteil_aufmass?: boolean | null
   kategorie_id: string | null
   lieferant_id: string | null
   lieferant: string | null
@@ -131,7 +132,8 @@ Deno.serve(async (req: Request) => {
       .from("shop_artikel")
       .select(
         "id, name, beschreibung, artikelnr, einheit, preis_netto, bild_url, aktiv, " +
-          "pds_katalog_uuid, kategorie_id, lieferant_id, lieferant, aufschlagsklasse",
+          "pds_katalog_uuid, kategorie_id, lieferant_id, lieferant, aufschlagsklasse, " +
+          "formteil_aufmass",
       )
       .eq("id", artikelId)
       .maybeSingle<Artikel>()
@@ -145,6 +147,30 @@ Deno.serve(async (req: Request) => {
         pds_katalog_uuid: artikel.pds_katalog_uuid,
         hinweis: "Dieser Artikel steht schon in PDS. Ein zweiter Aufruf wuerde eine Dublette anlegen.",
       })
+    }
+
+    // Formteil-Kunstartikel gehoeren NICHT in den PDS-Artikelstamm.
+    //
+    // Am 07.09.2026 sind 57 davon angelegt worden; Patrick hat sie im Client
+    // wieder geloescht (29.09.2026) und entschieden, dass es dabei bleibt: das
+    // Aufmass kommt als Sammelposition mit Freitext in den Auftrag, die
+    // Aufschluesselung bleibt im Shop. Die Nachkalkulation braucht die Artikel
+    // nicht — das Soll in PDS hat gar keinen Materialkostenanteil, der
+    // Ist-Materialeinsatz wird im Shop gerechnet
+    // (docs/nachkalkulation-datenmodell.md).
+    //
+    // Die Sperre steht hier und nicht nur in der Oberflaeche, weil ein
+    // Katalogeintrag per API nicht loeschbar ist: ein versehentlicher Lauf
+    // waere nicht zurueckzunehmen. Und weil die UUID-Verbindung gerissen ist,
+    // wuerde er die 29 heutigen Kunstartikel als neue Dubletten anlegen.
+    if (artikel.formteil_aufmass) {
+      return json({
+        status: "gesperrt",
+        hinweis:
+          "Formteil-Kunstartikel werden nicht nach PDS uebertragen (Entscheidung 29.09.2026). "
+          + "Das Aufmass kommt als Sammelposition mit Freitext in den Auftrag, die "
+          + "Aufschluesselung bleibt im Shop. Siehe docs/adr/0008-formteile-ohne-pds-artikelstamm.md.",
+      }, 409)
     }
 
     // ─── Mapping pruefen, statt zu raten ────────────────────────────────────
