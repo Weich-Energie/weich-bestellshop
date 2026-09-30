@@ -307,30 +307,91 @@ export const PLAYBOOKS = {
       await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {})
       await page.waitForTimeout(3500)
     },
-    istProduktUrl: () => false,
+    // Die Detailansicht traegt die Bezeichnung, die der Trefferliste fehlt.
+    // Sie hat entgegen einer frueheren Notiz sehr wohl eine eigene URL
+    // (/p/product/<id>/details) - erreichbar ueber einen Klick auf die
+    // Artikelnummer in der Trefferzeile.
+    //
+    // Ohne diesen Schritt kaeme ein Artikel ohne Namen in den Stamm. Ein
+    // erfundener Name waere schlimmer, also lieber ein Klick mehr.
+    async detail(page, nummer) {
+      const zelle = page.locator(`[data-cid="productNumber"]:has-text("${nummer}")`).first()
+      if (!(await zelle.count())) return null
+      await zelle.click({ timeout: 8000 }).catch(() => {})
+      await page.waitForTimeout(3000)
+      if (!/\/p\/product\//.test(page.url())) return null
+
+      return page.evaluate((nr) => {
+        const zeilen = document.body.innerText.split(/\r?\n/).map((z) => z.trim()).filter(Boolean)
+        const i = zeilen.findIndex((z) => z === nr)
+        if (i === -1) return null
+        // Direkt hinter der Nummer stehen Bezeichnung und Hersteller.
+        const titel = zeilen[i + 1] || null
+        const hersteller = zeilen[i + 2] && zeilen[i + 2].length < 40 ? zeilen[i + 2] : null
+        return { artikelnummer: nr, titel, hersteller, url: location.href }
+      }, nummer)
+    },
+    istProduktUrl: (h) => /gutonlineplus\.de\/p\/product\/.+\/details/.test(h),
     sucheUrl: (begriff) => `https://www.gutonlineplus.de/p/search/${encodeURIComponent(begriff)}`,
     netto: { selektor: '[data-cid="NetPriced"], .GCtextLine.bodyLG', muster: /([\d.]+,\d{2})\s*€/ },
-    // Treffer direkt aus der Ergebnistabelle lesen. Jede Zeile hat Elemente mit
-    // gemeinsamem id-Praefix "..._productTable_<n>"; der Nettopreis steht in
-    // data-cid="NetPriced", daneben "per 1 m" und "8,60 € Listenpreis".
+    // Treffer direkt aus der Ergebnistabelle lesen.
+    //
+    // Jede Zeile haengt an einem id-Praefix "..._productTable_<n>". Darin
+    // stehen die Felder mit eigenem data-cid: productNumber und NetPriced.
+    // Danach folgen zwei Geschwister ohne cid: "per 1 Stück" und
+    // "8,60 € Listenpreis".
+    //
+    // Frueher wurden Nummer und Titel aus dem Text der Zeile GERATEN (laengster
+    // Text gewinnt). Das ging schief, sobald die Suchansicht statt der
+    // Kategorieansicht geliefert wurde: als Titel kam "Ziel: 1" heraus, die
+    // Beschriftung des Mengenfeldes. Jetzt wird gelesen, was ausgezeichnet ist.
+    //
+    // WICHTIG: Die Suchansicht traegt KEINE Bezeichnung - nur die Nummer. Wer
+    // einen Artikel daraus anlegen will, muss die Produktseite nachladen.
+    // Ein erfundener Titel waere schlimmer als gar keiner, deshalb bleibt das
+    // Feld hier null.
+    //
+    // Und die Suche ist unscharf: "CCLR22" liefert auch "POVB22". Der Aufrufer
+    // muss auf die Nummer pruefen, die Trefferliste ist ein Vorschlag.
     async trefferAusListe(page) {
       return page.evaluate(() => {
+        const zahl = (s) => {
+          const m = String(s || '').match(/([\d.]+,\d{2})/)
+          return m ? Number(m[1].replace(/\./g, '').replace(',', '.')) : null
+        }
         const out = []
         for (const np of document.querySelectorAll('[data-cid="NetPriced"]')) {
           const prefix = (np.id || '').replace(/_netPriceContainer.*$/, '')
           if (!prefix || !/productTable_\d+$/.test(prefix)) continue
-          const zeile = Array.from(document.querySelectorAll(`[id^="${prefix}_"]`))
-          const texte = [...new Set(zeile.filter((e) => e.children.length === 0).map((e) => e.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean))]
-          const nettoText = np.textContent.replace(/\s+/g, ' ').trim()
-          const einheit = (np.parentElement?.textContent.match(/per\s+([\d,.]+\s*[A-Za-zäöü]+)/) || [])[1] ?? null
-          const listeT = texte.find((t) => /Listenpreis/.test(t)) || ''
-          const liste = (listeT.match(/([\d.]+,\d{2})/) || [])[1] ?? null
-          const artikelnummer = texte.find((t) => /^[A-Z0-9][A-Z0-9.\-\/]{4,}$/.test(t) && !/€/.test(t)) ?? null
-          const titel = texte.filter((t) => !/€|Listenpreis|^per\s|^m$|^Stück$/.test(t) && t !== artikelnummer).sort((a, b) => b.length - a.length)[0] ?? null
-          const zahl = (s) => (s ? Number(s.replace(/[^\d,]/g, '').replace(',', '.')) : null)
-          out.push({ url: location.href, artikelnummer, titel, netto_preis: zahl(nettoText), netto_quelle: `${nettoText} ${einheit ? 'per ' + einheit : ''} ${listeT}`.trim(), listenpreis: zahl(liste), einheit })
+
+          const feld = (cid) => {
+            const e = document.querySelector(`[id^="${prefix}_"][data-cid="${cid}"]`)
+            return e ? e.textContent.replace(/\s+/g, ' ').trim() : null
+          }
+          // Einheit und Listenpreis haben kein data-cid; sie stehen als
+          // Geschwister im selben Preis-Container.
+          const umfeld = Array.from(document.querySelectorAll(`[id^="${prefix}_netPriceContainer"]`))
+            .filter((e) => e.children.length === 0)
+            .map((e) => e.textContent.replace(/\s+/g, ' ').trim())
+          const einheitText = umfeld.find((t) => /^per\s/i.test(t)) || null
+          const listeText = umfeld.find((t) => /Listenpreis/i.test(t)) || null
+
+          // Bezeichnung nur, wenn die Seite eine ausweist - im Bild-alt oder
+          // in einem Titel-Attribut. Sonst bleibt sie leer.
+          const bild = document.querySelector(`[id^="${prefix}_productImg"] img, [id^="${prefix}_"] img`)
+          const titel = (bild?.getAttribute('alt') || bild?.getAttribute('title') || '').trim() || null
+
+          out.push({
+            url: location.href,
+            artikelnummer: feld('productNumber'),
+            titel,
+            netto_preis: zahl(np.textContent),
+            netto_quelle: [np.textContent.trim(), einheitText, listeText].filter(Boolean).join(' '),
+            listenpreis: zahl(listeText),
+            einheit: einheitText ? einheitText.replace(/^per\s+/i, '') : null,
+          })
         }
-        return out
+        return out.filter((t) => t.artikelnummer)
       })
     },
     seiteUrl(listeUrl, n) { return n === 0 ? listeUrl : listeUrl + (listeUrl.includes('?') ? '&' : '?') + `page=${n + 1}` },

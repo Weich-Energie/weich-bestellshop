@@ -66,6 +66,18 @@ try {
     const genau = treffer.filter((t) => norm(t.artikelnummer) === norm(nr))
     const nimm = genau.length ? genau : treffer.slice(0, 3)
 
+    // Manche Trefferlisten fuehren nur die Nummer (GUT). Fuer einen exakten
+    // Treffer die Bezeichnung nachladen - ein Artikel ohne Namen taugt nicht
+    // fuer den Stamm, und einen zu erfinden waere schlimmer.
+    if (genau.length === 1 && !genau[0].titel && typeof pb.detail === 'function') {
+      const d = await pb.detail(page, nr).catch(() => null)
+      if (d?.titel) {
+        genau[0].titel = d.titel
+        genau[0].hersteller = d.hersteller ?? null
+        genau[0].url = d.url ?? genau[0].url
+      }
+    }
+
     ergebnis.push({ gesucht: nr, genau: genau.length > 0, treffer: nimm })
     if (!nimm.length) {
       console.log(`${nr.padEnd(14)} NICHT GEFUNDEN`)
