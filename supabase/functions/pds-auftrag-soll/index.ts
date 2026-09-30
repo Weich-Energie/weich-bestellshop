@@ -408,10 +408,36 @@ Deno.serve(async (req: Request) => {
       // muss nicht erneut von Hand eingetragen werden.
       const istBereitsErfasst = ekLeistungen
 
+      // ─── Kalkulationsart vorbelegen ───────────────────────────────────
+      // Die Altauftraege wurden in zwei Versionen kalkuliert: mit ausgewiesenen
+      // Montagestunden, oder mit den Montagezeiten im Artikelpreis. An der Form
+      // der Positionen ist erkennbar, welche vorliegt:
+      //   - eine Leistungsposition mit echtem EK sammelt das Material (Muster C)
+      //   - eine Montageposition ohne katalogUUID weist die Montage aus (A)
+      //   - nur Geraetepositionen heisst: die Zeit steckt im Geraetepreis (B)
+      // Vorbelegt, nicht festgelegt — wie damals gerechnet wurde, weiss nur der
+      // Betrieb. Ein erneuter Import darf eine Korrektur deshalb nicht
+      // ueberschreiben, siehe unten.
+      let kalkulationsart = "unbekannt"
+      if (ekLeistungen > 0) kalkulationsart = "material_in_leistung"
+      else if (erloesMontage > 0 || vkEigenleistung > 0) kalkulationsart = "stunden_ausgewiesen"
+      else if (geraete.length > 0) kalkulationsart = "zeit_im_artikel"
+
+      const { data: vorhanden } = await sb
+        .from("shop_nachkalkulation")
+        .select("kalkulationsart")
+        .eq("pds_vorgang_uuid", vorgangUUID)
+        .maybeSingle()
+      // Eine von Hand gesetzte Art bleibt stehen.
+      if (vorhanden && vorhanden.kalkulationsart && vorhanden.kalkulationsart !== "unbekannt") {
+        kalkulationsart = vorhanden.kalkulationsart
+      }
+
       const { data: gespeichert, error } = await sb
         .from("shop_nachkalkulation")
         .upsert(
           {
+            kalkulationsart,
             pds_vorgang_uuid: vorgangUUID,
             pds_vorgangs_nummer: det.vorgangsNummer ?? "",
             bezeichnung: det.bezeichnung ?? "",
@@ -440,6 +466,7 @@ Deno.serve(async (req: Request) => {
       return json({
         status: "importiert",
         nachkalkulation_id: gespeichert.id,
+        kalkulationsart,
         soll: {
           vk_gesamt: runde(vkGesamt),
           ek_fremdeinkauf: runde(ekFremd),

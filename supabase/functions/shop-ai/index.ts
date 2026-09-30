@@ -1,5 +1,6 @@
 // shop-ai — KI-Support fuer Bestellshop.
-// Task-Routing: enrich_artikel + analyze_bedarf_bild + extract_beleg + extract_shop_link + extract_shop_screenshot.
+// Task-Routing: enrich_artikel + analyze_bedarf_bild + extract_beleg + extract_aufmass
+// + extract_shop_link + extract_shop_screenshot.
 // Modell-Politik (siehe ADR 0003): Sonnet 4.6 fuer alle Tasks — Konsistenz + bessere
 // Qualitaet bei Kategorie/Tag-Matching und Vision-Praezision. Kosten pro Aufruf bleiben
 // bei einem internen Shop absolut vernachlaessigbar (~$0.01). Haiku waere fuer spaetere
@@ -131,6 +132,89 @@ async function analyzeBedarfBild(body: any) {
   ]
 
   const text = await callClaude(MODEL_VISION, systemPrompt, [{ role: "user", content: userContent }], 800)
+  const parsed = extractJson(text)
+  if (!parsed) return json({ error: "KI-Antwort nicht parsebar", raw: text }, 502)
+  return json({ result: parsed })
+}
+
+// ─── Task: extract_aufmass ───────────────────────────────────────────
+// Foto eines ausgefuellten Aufmass- oder Montageberichts lesen. Uebergangs-
+// loesung, bis das Aufmass in der App erfasst wird.
+//
+// Der entscheidende Unterschied zu extract_beleg: der Vordruck ist ein
+// Shop-Ausdruck und traegt in der Mengenspalte ueberall eine GEDRUCKTE 1. Die
+// gilt nicht. Zaehlbar ist allein, was ein Monteur mit der Hand danebenge-
+// schrieben hat. Wer die gedruckte 1 uebernimmt, bekommt eine vollstaendig
+// aussehende und vollstaendig falsche Nachkalkulation.
+async function extractAufmass(body: any) {
+  const { bild_url, artikel_hinweis } = body
+  if (!bild_url) return json({ error: "bild_url fehlt" }, 400)
+
+  const imgRes = await fetch(bild_url)
+  if (!imgRes.ok) return json({ error: `Bild-Download fehlgeschlagen: ${imgRes.status}` }, 502)
+  const buf = await imgRes.arrayBuffer()
+  if (buf.byteLength > 20 * 1024 * 1024) return json({ error: "Bild > 20 MB" }, 413)
+  const base64 = bytesToBase64(new Uint8Array(buf))
+  let mimeType = imgRes.headers.get("content-type") || "image/jpeg"
+  const istPdf = mimeType.includes("pdf")
+  if (!istPdf && !["image/jpeg", "image/png", "image/gif", "image/webp"].includes(mimeType)) {
+    mimeType = "image/jpeg"
+  }
+
+  // Bekannte Artikelnummern mitgeben: abgegriffene Zettel und krakelige
+  // Handschrift werden damit deutlich zuverlaessiger gelesen, weil das Modell
+  // gegen eine echte Liste abgleichen kann statt zu raten.
+  const hinweis = typeof artikel_hinweis === "string" && artikel_hinweis.length
+    ? `\n\nBekannte Artikel aus dem Katalog (Nummer = Bezeichnung), nutze sie zum Abgleich:\n${artikel_hinweis.slice(0, 12000)}`
+    : ""
+
+  const systemPrompt =
+    `Du liest ausgefuellte Aufmass- und Montageberichte der Firma WEICHENERGIE ` +
+    `(Weich GmbH, Klima- und Heizungsbau). Der Vordruck ist meist ein Ausdruck aus ` +
+    `einem Lieferantenshop mit Artikelnummer, Bezeichnung und Preisspalten. Ein ` +
+    `Monteur hat auf der Baustelle die tatsaechlich verbauten Mengen HANDSCHRIFTLICH ` +
+    `daneben notiert.\n\n` +
+    `ENTSCHEIDENDE REGEL: Nur die handschriftliche Menge zaehlt. In der gedruckten ` +
+    `Mengen- oder Anzahl-Spalte steht bei jeder Zeile eine 1 — das ist ein Kopierrest ` +
+    `des Ausdrucks und KEINE Menge. Uebernimm sie niemals. Steht neben einer Zeile ` +
+    `nichts von Hand, lass die Zeile weg.\n\n` +
+    `Handschrift ist oft unsauber: 1 und 7, 4 und 9, 0 und 6 werden verwechselt. Gib ` +
+    `deine Lesesicherheit je Zeile ehrlich an. Ein Haken oder ein Strich ohne Zahl ` +
+    `bedeutet Menge 1 bei Sicherheit 0.6. Durchgestrichene Zeilen gehoeren weg.\n\n` +
+    `Meterware (Leitung, Kabel, Schlauch, Isolierung) wird in Metern notiert, auch ` +
+    `wenn der Artikel eine Rolle ist. Uebernimm die Zahl wie sie dasteht und setze ` +
+    `die Einheit auf "m".\n\n` +
+    `Antworte STRIKT nur mit JSON (kein Prosa, kein Codeblock). Schema:\n` +
+    `{\n` +
+    `  "baustelle": "Name oder Auftragsnummer vom Blatt, leer wenn nicht lesbar",\n` +
+    `  "datum": "YYYY-MM-DD oder leer",\n` +
+    `  "monteur": "Name oder Kuerzel, leer wenn nicht lesbar",\n` +
+    `  "stunden": null,\n` +
+    `  "zeilen": [\n` +
+    `    {\n` +
+    `      "artikelnr": "gedruckte Artikelnummer der Zeile, leer wenn keine",\n` +
+    `      "bezeichnung": "gedruckte Bezeichnung der Zeile",\n` +
+    `      "menge": 3,\n` +
+    `      "einheit": "Stück|m|Rolle|Pack",\n` +
+    `      "sicherheit": 0.95,\n` +
+    `      "notiz": "nur bei Auffaelligkeit, sonst leer"\n` +
+    `    }\n` +
+    `  ]\n` +
+    `}\n` +
+    `"stunden" nur setzen, wenn auf dem Blatt ausdruecklich Arbeitsstunden stehen ` +
+    `(z. B. "8 Std", "2 Mann 6 h") — dann als Gesamtstunden aller Personen als Zahl.` +
+    hinweis
+
+  const quelle = istPdf
+    ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } }
+    : { type: "image", source: { type: "base64", media_type: mimeType, data: base64 } }
+
+  const userContent = [
+    quelle,
+    { type: "text", text: "Lies diesen Aufmassbericht. Nur die handschriftlichen Mengen." },
+  ]
+
+  const text = await callClaude(MODEL_VISION, systemPrompt, [{ role: "user", content: userContent }], 8000)
   const parsed = extractJson(text)
   if (!parsed) return json({ error: "KI-Antwort nicht parsebar", raw: text }, 502)
   return json({ result: parsed })
@@ -353,6 +437,7 @@ Deno.serve(async (req: Request) => {
     if (task === "enrich_artikel") return await enrichArtikel(body)
     if (task === "analyze_bedarf_bild") return await analyzeBedarfBild(body)
     if (task === "extract_beleg") return await extractBeleg(body)
+    if (task === "extract_aufmass") return await extractAufmass(body)
     if (task === "extract_shop_link") return await extractShopLink(body)
     if (task === "extract_shop_screenshot") return await extractShopScreenshot(body)
     return json({ error: `Unbekannte task: ${task}` }, 400)

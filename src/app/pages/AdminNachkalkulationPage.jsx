@@ -11,9 +11,11 @@ import {
   sucheAuftraege, importiereSoll, materialVorschau, mengenSetzen, transportAnlegen, materialZuruecksetzen,
 } from '../../data/api/pdsSync.js'
 import {
-  listNachkalkulationen, addPosition, deletePosition, setStatus,
+  listNachkalkulationen, addPosition, deletePosition, setStatus, KALKULATIONSARTEN,
 } from '../../data/api/nachkalkulation.js'
 import { listArtikel } from '../../data/api/artikel.js'
+import NachkalkulationStunden from '../components/NachkalkulationStunden.jsx'
+import AufmassFotoBox from '../components/AufmassFotoBox.jsx'
 
 function euro(n) {
   if (n == null) return '—'
@@ -132,6 +134,7 @@ function Uebersicht({ onOeffnen }) {
                   <Table.ColumnHeader textAlign="right">Nach Geräteeinkauf</Table.ColumnHeader>
                   <Table.ColumnHeader textAlign="right">Ist-Material</Table.ColumnHeader>
                   <Table.ColumnHeader textAlign="right">Rest für Lohn</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="right">Je Stunde</Table.ColumnHeader>
                   <Table.ColumnHeader textAlign="right">Auftrag gesamt</Table.ColumnHeader>
                   <Table.ColumnHeader>Status</Table.ColumnHeader>
                   <Table.ColumnHeader></Table.ColumnHeader>
@@ -143,10 +146,21 @@ function Uebersicht({ onOeffnen }) {
                     <Table.Cell>
                       <Text fontSize="sm" fontWeight="medium">{n.pds_vorgangs_nummer}</Text>
                       <Text fontSize="xs" color="fg.muted">{n.bezeichnung}</Text>
+                      <Art wert={n.kalkulationsart} />
                     </Table.Cell>
                     <Table.Cell textAlign="right"><Text fontSize="sm">{euro(n.deckung_material_und_lohn)}</Text></Table.Cell>
                     <Table.Cell textAlign="right"><Text fontSize="sm">{euro(n.ist_material)}</Text></Table.Cell>
                     <Table.Cell textAlign="right"><Abweichung wert={n.rest_fuer_lohn} /></Table.Cell>
+                    <Table.Cell textAlign="right">
+                      {n.erreichter_stundensatz != null ? (
+                        <Text fontSize="sm" fontWeight="medium"
+                          color={Number(n.erreichter_stundensatz) < Number(n.stundensatz_monteur || 69) ? 'red.600' : 'green.700'}>
+                          {euro(n.erreichter_stundensatz)}
+                        </Text>
+                      ) : (
+                        <Text fontSize="xs" color="fg.muted">keine Stunden</Text>
+                      )}
+                    </Table.Cell>
                     <Table.Cell textAlign="right"><Text fontSize="sm">{euro(n.soll_vk_gesamt)}</Text></Table.Cell>
                     <Table.Cell>
                       <Badge size="sm" colorPalette={n.status === 'geprueft' ? 'green' : n.status === 'erfasst' ? 'blue' : 'gray'}>
@@ -160,7 +174,7 @@ function Uebersicht({ onOeffnen }) {
                 ))}
                 {liste.length === 0 && (
                   <Table.Row>
-                    <Table.Cell colSpan={7}>
+                    <Table.Cell colSpan={8}>
                       <Text py={4} textAlign="center" color="fg.muted">
                         Noch keine Nachkalkulation — hol dir oben einen Auftrag aus PDS.
                       </Text>
@@ -174,6 +188,18 @@ function Uebersicht({ onOeffnen }) {
       </Box>
     </Box>
   )
+}
+
+// Die Kalkulationsart gehoert an den Auftrag, weil dieselbe Zahl je nach Art
+// etwas anderes bedeutet: bei "Zeit im Artikel" steckt der Montageerloes im
+// Geraetepreis, bei "Stunden ausgewiesen" steht er daneben. Wer beides ohne
+// dieses Kennzeichen vergleicht, vergleicht Geraetemargen mit Mischpreisen.
+function Art({ wert }) {
+  if (!wert || wert === 'unbekannt') {
+    return <Badge size="sm" colorPalette="orange" variant="subtle" mt={1}>Art ungeklärt</Badge>
+  }
+  const k = KALKULATIONSARTEN.find((x) => x.wert === wert)
+  return <Badge size="sm" variant="subtle" mt={1}>{k?.kurz || wert}</Badge>
 }
 
 // Vorzeichen bewusst deutlich: negativ heisst, das Material allein hat den Rest
@@ -266,7 +292,11 @@ function Detail({ id, onZurueck }) {
         <Kennzahl titel="Auftrag gesamt (VK)" wert={euro(nk.soll_vk_gesamt)} />
       </HStack>
 
+      <NachkalkulationStunden nk={nk} onAenderung={neu} />
+
       <KalkuliertePositionen soll={nk.soll_positionen} />
+
+      <AufmassFotoBox nachkalkulationId={id} artikelListe={artikelListe} onAenderung={neu} />
 
       <Box borderWidth="1px" borderRadius="lg" p={4} mb={4} bg="white">
         <Text fontWeight="bold" fontSize="sm" mb={2}>Verbautes Material erfassen</Text>

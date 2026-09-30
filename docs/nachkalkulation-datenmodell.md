@@ -378,3 +378,92 @@ nachgezogen.
 Offen bei diesem Auftrag: Für das Wandgerät FTXM50A (Soll-EK 704,27 €) liegt
 keine Bestellposition vor, vermutlich Lagerware. Sein Ist ist unbelegt und in
 der Rechnung oben mit dem Soll-Wert angesetzt.
+
+## Die zwei alten Kalkulationsarten, und wie sie vergleichbar werden
+
+Stand 30.09.2026, Vorgabe des Betriebs: Die Altauftraege wurden in **zwei
+Versionen** kalkuliert — einmal mit **ausgewiesenen Montagestunden**, einmal mit
+den **Montagezeiten im Artikelpreis**. Beide muessen gleichzeitig
+nachkalkulierbar sein.
+
+Das ist kein neuer Befund, sondern die Erfassungsmuster oben aus Sicht der
+Arbeitszeit. `shop_nachkalkulation.kalkulationsart` haelt es jetzt am Auftrag
+fest:
+
+| Wert | Muster | Woran erkennbar | Soll-Stunde |
+|---|---|---|---|
+| `stunden_ausgewiesen` | A und der heutige Weg | Montageposition ohne `katalogUUID`, oder Eigenleistung | ablesbar |
+| `zeit_im_artikel` | B | nur Geraetepositionen, keine Montage | **existiert nicht** |
+| `material_in_leistung` | C | Leistungsposition mit echtem `ekPreis` | ablesbar |
+
+Vorbelegt wird der Wert beim Soll-Import aus der Form der Positionen. Ein
+erneuter Import ueberschreibt eine von Hand gesetzte Art **nicht** — wie damals
+gerechnet wurde, weiss nur der Betrieb.
+
+Die leere Soll-Stunde bei `zeit_im_artikel` ist kein Pflegefehler, sondern die
+Kalkulationsart selbst. Die Oberflaeche sperrt das Feld dort, statt es leer
+stehen zu lassen.
+
+### Die Bruecke ist der erreichte Stundensatz
+
+Vergleichbar ueber beide Versionen ist nur eine Groesse: **was je geleisteter
+Stunde uebrig blieb.** Ob die Montage ausgewiesen war oder im Geraetepreis
+steckte — gearbeitet wurde so oder so.
+
+```
+Ist-Stunden       = ist_stunden_techniker + ist_stunden_monteur
+Lohnkosten        = Stunden x eingefrorener Satz (75 / 69 EUR/h, Klimarechner)
+Ergebnis          = rest_fuer_lohn - Lohnkosten
+erreicht je Std   = rest_fuer_lohn / Ist-Stunden
+```
+
+`rest_fuer_lohn` allein sagt nur, wieviel Geld nach dem Material uebrig war —
+nicht, ob es gereicht hat. Erst mit den Stunden wird daraus eine Aussage. Und
+genau diese Zahl ist der Ruecklauf in die Angebotskalkulation: der Klimarechner
+haelt seine Standardzeiten ausdruecklich fuer Platzhalter, die „aus echter
+Nachkalkulation" kommen sollen.
+
+Die Saetze werden am Auftrag **eingefroren**, aus demselben Grund wie `ek_einzel`
+an der Position: eine spaetere Satzaenderung darf eine abgeschlossene
+Nachkalkulation nicht rueckwirkend verschieben.
+
+`stunden_quelle` trennt `zettel` von `zeiterfassung` und `schaetzung`. Ohne die
+Trennung liest sich eine Schaetzung spaeter wie eine gemessene Zahl.
+
+## Aufmasszettel als Foto — die Uebergangsloesung
+
+Bis das Aufmass durchgaengig in der App erfasst wird (Gewerk `klima` in
+`weich-aufmass`, live seit 30.09.2026), bleiben die Altauftraege auf Papier. Der
+Zettel wird fotografiert, `shop-ai` liest ihn mit dem Task `extract_aufmass`, ein
+Mensch bestaetigt.
+
+```
+shop_aufmass_foto        eine Seite: bild_pfad (Bucket shop-belege, Praefix aufmass/),
+                         status neu | laeuft | gelesen | uebernommen | fehler
+shop_aufmass_foto_zeile  was gelesen wurde: roh_artikelnr, roh_bezeichnung,
+                         roh_menge, sicherheit, artikel_id, treffer_art,
+                         status offen | uebernommen | verworfen, position_id
+```
+
+Drei Dinge, die den Ausschlag geben:
+
+1. **Nur die Handschrift zaehlt.** Der Vordruck ist ein Shop-Ausdruck und traegt
+   in jeder Mengenzeile eine gedruckte 1 — ein Kopierrest. Der Prompt sagt das
+   ausdruecklich; eine ungeprueft uebernommene Seite saehe sonst vollstaendig aus
+   und waere falsch.
+2. **Der Bestaetigungsschritt bleibt.** Handschrift wird verwechselt (1/7, 4/9,
+   0/6). Die KI gibt je Zeile eine Lesesicherheit an; unter 0,8 wird die Zeile
+   markiert. Deshalb liegen die gelesenen Zeilen in einer eigenen Tabelle und
+   nicht gleich in `shop_nachkalkulation_positionen`.
+3. **Der Katalog wird mitgegeben.** Die Artikel mit `nachkalkulation_klima` gehen
+   als Abgleichliste in den Prompt. Das Modell muss die Nummer dann nicht raten,
+   sondern wiedererkennen.
+
+### Nebenprodukt: der Artikelstamm waechst mit
+
+Zeilen ohne `artikel_id` sind kein Fehler, sondern die **Arbeitsliste fuer den
+Artikelstamm der Aufmass-App**: was dort auftaucht, wurde in den letzten Monaten
+verbaut und fehlt im Katalog. Sie gehen als Freitext in die Nachkalkulation, damit
+die Summe stimmt, und bleiben sichtbar, bis der Artikel angelegt ist
+(`nachkalkulation_klima` + `sichtbar_aufmass`). Ueber die nachkalkulierten
+Altauftraege entsteht so nebenbei der Stamm, den die App braucht.
