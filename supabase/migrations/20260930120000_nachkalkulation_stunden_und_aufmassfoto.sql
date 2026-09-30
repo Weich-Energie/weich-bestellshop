@@ -165,3 +165,85 @@ create policy shop_aufmass_foto_zeile_rw on public.shop_aufmass_foto_zeile
   for all to authenticated
   using (public.is_shop_admin())
   with check (public.is_shop_admin());
+
+-- --- 6) Das Soll kommt oft aus dem Reonic-Angebot, nicht aus PDS ----------
+-- Patrick, 30.09.2026: "auftrag holen muss aber im prinzip das reonic angebot
+-- holen weil oft der auftrag noch nicht gefuellt ist". Der PDS-Vorgang ist
+-- damit nicht mehr Voraussetzung, sondern einer von zwei Wegen.
+--
+-- Die Reonic-API ist aus der Cloud nur eingeschraenkt erreichbar, deshalb
+-- kommt das Angebot zunaechst als PDF herein und wird gelesen wie ein Zettel.
+-- Eine spaetere API-Strecke aendert nur die Herkunft, nicht dieses Schema.
+alter table public.shop_nachkalkulation
+  alter column pds_vorgang_uuid drop not null;
+
+alter table public.shop_nachkalkulation
+  add column if not exists soll_quelle text not null default 'pds',
+  add column if not exists reonic_projekt_id text,
+  add column if not exists soll_beleg_pfad text;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'shop_nk_soll_quelle_check') then
+    alter table public.shop_nachkalkulation
+      add constraint shop_nk_soll_quelle_check
+      check (soll_quelle in ('pds', 'reonic_angebot', 'hand'));
+  end if;
+end $$;
+
+comment on column public.shop_nachkalkulation.soll_quelle is
+  'Woher die Soll-Werte stammen. pds = aus dem Auftrag gelesen. reonic_angebot '
+  '= aus dem hochgeladenen Angebots-PDF, weil der PDS-Auftrag noch leer war. '
+  'hand = eingetragen. Die Zahlen sehen gleich aus, sind aber verschieden '
+  'belastbar - ein Angebot ist noch kein Auftrag.';
+
+comment on column public.shop_nachkalkulation.soll_beleg_pfad is
+  'Das gelesene Angebots-PDF im Bucket shop-belege. Damit bleibt nachvollziehbar, '
+  'woher eine Soll-Zahl kam, die nicht aus PDS stammt.';
+
+-- Der eindeutige Schluessel gilt jetzt nur noch fuer echte PDS-Vorgaenge.
+-- Mehrere Nachkalkulationen ohne Vorgang muessen nebeneinander existieren
+-- koennen, sonst liesse sich nur ein einziges Angebot erfassen.
+do $$
+begin
+  if exists (select 1 from pg_constraint
+             where conname = 'shop_nachkalkulation_pds_vorgang_uuid_key') then
+    alter table public.shop_nachkalkulation
+      drop constraint shop_nachkalkulation_pds_vorgang_uuid_key;
+  end if;
+end $$;
+
+create unique index if not exists shop_nk_pds_vorgang_uidx
+  on public.shop_nachkalkulation (pds_vorgang_uuid)
+  where pds_vorgang_uuid is not null;
+
+-- --- 7) Welche Sorte Blatt liegt vor ---------------------------------------
+-- Es kommen drei Sorten herein, und sie werden alle gleich fotografiert:
+-- die Materialliste, der Stundenzettel und das Angebot. Die KI schlaegt vor,
+-- was sie vor sich hat; bestaetigt wird es von Hand, weil eine falsch
+-- einsortierte Seite still in die falschen Felder laufen wuerde.
+alter table public.shop_aufmass_foto
+  add column if not exists blatt_art text not null default 'unbekannt',
+  -- Was auf einem Stundenzettel steht: Zeilen je Person und Tag, plus Summen.
+  -- Als jsonb, weil die Zettel unterschiedlich aussehen und die Summe zaehlt.
+  add column if not exists stunden_gelesen jsonb;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'shop_aufmass_foto_blatt_check') then
+    alter table public.shop_aufmass_foto
+      add constraint shop_aufmass_foto_blatt_check
+      check (blatt_art in ('unbekannt', 'material', 'stunden', 'angebot'));
+  end if;
+end $$;
+
+comment on column public.shop_aufmass_foto.blatt_art is
+  'material = Aufmass- oder Montagebericht mit Mengen. stunden = Stundenzettel. '
+  'angebot = Reonic-Angebot als Soll-Quelle. Von der KI vorgeschlagen, vom '
+  'Menschen bestaetigt.';
+
+comment on column public.shop_aufmass_foto.stunden_gelesen is
+  'Rohergebnis eines Stundenzettels: { zeilen: [{name, datum, stunden, rolle}], '
+  'summe_techniker, summe_monteur }. Rolle heisst techniker oder monteur - wer '
+  'welche ist, weiss nur der Betrieb, deshalb ist die Zuordnung bestaetigungs- '
+  'pflichtig, bevor sie in die Stundenfelder laeuft.';

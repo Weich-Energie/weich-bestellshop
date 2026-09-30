@@ -467,3 +467,60 @@ verbaut und fehlt im Katalog. Sie gehen als Freitext in die Nachkalkulation, dam
 die Summe stimmt, und bleiben sichtbar, bis der Artikel angelegt ist
 (`nachkalkulation_klima` + `sichtbar_aufmass`). Ueber die nachkalkulierten
 Altauftraege entsteht so nebenbei der Stamm, den die App braucht.
+
+## Nachtrag 30.09.2026: das Soll kommt oft aus dem Reonic-Angebot
+
+Patricks Vorgabe: „auftrag holen muss aber im prinzip das reonic angebot holen
+weil oft der auftrag noch nicht gefuellt ist". Der Satz weiter oben — „Der
+PDS-Auftrag traegt die Soll-Werte bereits vollstaendig, insofern ist Reonic nicht
+Voraussetzung" — ist damit **ueberholt**.
+
+`soll_quelle` haelt fest, woher die Zahlen kommen: `pds`, `reonic_angebot` oder
+`hand`. Sie sehen gleich aus und sind verschieden belastbar; ein Angebot ist noch
+kein Auftrag. `pds_vorgang_uuid` ist dafuer **nullable** geworden, der
+Eindeutigkeitsschluessel ein partieller Index — mehrere Baustellen ohne
+PDS-Vorgang muessen nebeneinander stehen koennen.
+
+### Warum das Angebot als PDF hereinkommt und nicht per API
+
+Die Reonic-API ist aus der Cloud nur eingeschraenkt erreichbar. `weich-api` auf
+dem VPS haelt die Schluessel und macht die lesenden Aufrufe; so laeuft es beim
+BzA-Assistenten (`weich-energie-app/supabase/functions/bza-reonic`). Dieselbe
+Function schreibt die KfW-Nummer allerdings **direkt** gegen `api.reonic.de` —
+entweder ist die Sperre also nicht durchgaengig, oder der Kommentar ist aelter
+als der Code. Das gehoert geprueft, bevor jemand die VPS-Kette baut.
+
+Bis dahin: Angebot als PDF hochladen, dieselbe Strecke wie die Zettel. Kein
+neuer Dienst, heute einsetzbar. `uebernimmAngebot()` setzt daraus die
+Soll-Werte und leitet die Kalkulationsart ab — stehen ausser Geraeten noch
+Montage- oder Materialpositionen darin, waren die Stunden ausgewiesen; stehen
+nur Geraete darin, steckte die Zeit im Geraetepreis.
+
+**Was das Angebot nicht hergibt, sind die Einkaufspreise.** Geraetepositionen
+ohne `ek_gesamt` werden gezaehlt und angezeigt, nicht als 0 gefuehrt — sonst
+faellt die Deckung zu hoch aus.
+
+## Drei Sorten Blatt, ein Upload
+
+`shop_aufmass_foto.blatt_art` unterscheidet `material`, `stunden` und `angebot`.
+Die KI bestimmt die Art selbst und fuellt nur den passenden Abschnitt ihres
+Schemas; bestaetigt wird von Hand, weil eine falsch einsortierte Seite still in
+die falschen Felder liefe.
+
+Beim **Stundenzettel** bleibt eine Zuordnung uebrig, die kein Blatt hergibt: wer
+Techniker ist und wer Monteur. Der Unterschied sind 6 EUR die Stunde. Die
+gelesenen Zeilen liegen deshalb als `stunden_gelesen` (jsonb) am Foto und laufen
+erst nach der Zuordnung in `ist_stunden_techniker` / `ist_stunden_monteur` —
+addiert, weil ein Auftrag mehrere Zettel hat.
+
+## Erfassen und Pruefen sind getrennt
+
+`/zettel` ist die Handy-Seite: Baustelle waehlen (oder neu anlegen),
+fotografieren, fertig. `capture="environment"` bringt auf dem Telefon direkt die
+Kamera statt der Galerie. Gelesen wird sofort — ein unscharfes Foto faellt so auf
+der Baustelle auf und nicht drei Wochen spaeter.
+
+Das Durchgehen der Zeilen bleibt auf `/admin/nachkalkulation`, wo man beim
+Nachkalkulieren ohnehin sitzt. Die Tabellen dort haben 680 bis 860 Pixel
+Mindestbreite und sind auf dem Telefon nicht zu bedienen — das ist der Grund fuer
+die Trennung, nicht Geschmack.

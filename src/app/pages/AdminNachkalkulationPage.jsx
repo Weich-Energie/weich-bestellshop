@@ -146,7 +146,14 @@ function Uebersicht({ onOeffnen }) {
                     <Table.Cell>
                       <Text fontSize="sm" fontWeight="medium">{n.pds_vorgangs_nummer}</Text>
                       <Text fontSize="xs" color="fg.muted">{n.bezeichnung}</Text>
-                      <Art wert={n.kalkulationsart} />
+                      <HStack gap={1} mt={1} flexWrap="wrap">
+                        <Art wert={n.kalkulationsart} />
+                        {n.soll_quelle && n.soll_quelle !== 'pds' && (
+                          <Badge size="sm" colorPalette="blue" variant="outline">
+                            {n.soll_quelle === 'reonic_angebot' ? 'Soll aus Angebot' : 'Soll von Hand'}
+                          </Badge>
+                        )}
+                      </HStack>
                     </Table.Cell>
                     <Table.Cell textAlign="right"><Text fontSize="sm">{euro(n.deckung_material_und_lohn)}</Text></Table.Cell>
                     <Table.Cell textAlign="right"><Text fontSize="sm">{euro(n.ist_material)}</Text></Table.Cell>
@@ -196,10 +203,10 @@ function Uebersicht({ onOeffnen }) {
 // dieses Kennzeichen vergleicht, vergleicht Geraetemargen mit Mischpreisen.
 function Art({ wert }) {
   if (!wert || wert === 'unbekannt') {
-    return <Badge size="sm" colorPalette="orange" variant="subtle" mt={1}>Art ungeklärt</Badge>
+    return <Badge size="sm" colorPalette="orange" variant="subtle">Art ungeklärt</Badge>
   }
   const k = KALKULATIONSARTEN.find((x) => x.wert === wert)
-  return <Badge size="sm" variant="subtle" mt={1}>{k?.kurz || wert}</Badge>
+  return <Badge size="sm" variant="subtle">{k?.kurz || wert}</Badge>
 }
 
 // Vorzeichen bewusst deutlich: negativ heisst, das Material allein hat den Rest

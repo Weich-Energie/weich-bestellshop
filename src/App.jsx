@@ -23,6 +23,7 @@ const AdminHistoriePage = lazy(() => import('./app/pages/AdminHistoriePage.jsx')
 const AdminLieferantenPage = lazy(() => import('./app/pages/AdminLieferantenPage.jsx'))
 const AdminPdsSyncPage = lazy(() => import('./app/pages/AdminPdsSyncPage.jsx'))
 const AdminNachkalkulationPage = lazy(() => import('./app/pages/AdminNachkalkulationPage.jsx'))
+const ZettelHochladenPage = lazy(() => import('./app/pages/ZettelHochladenPage.jsx'))
 
 function Ladeanzeige() {
   return <Flex minH="60vh" align="center" justify="center"><Spinner size="xl" /></Flex>
@@ -65,6 +66,9 @@ export default function App() {
           <Route path="admin/bedarf" element={<ProtectedRoute adminOnly><AdminBedarfPage /></ProtectedRoute>} />
           <Route path="admin/pds-sync" element={<ProtectedRoute adminOnly><AdminPdsSyncPage /></ProtectedRoute>} />
           <Route path="admin/nachkalkulation" element={<ProtectedRoute adminOnly><AdminNachkalkulationPage /></ProtectedRoute>} />
+          {/* Eigene Route statt eines Reiters: die Seite wird auf der Baustelle am
+              Telefon aufgerufen, nicht im Durchklicken der Verwaltung. */}
+          <Route path="zettel" element={<ProtectedRoute adminOnly><ZettelHochladenPage /></ProtectedRoute>} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

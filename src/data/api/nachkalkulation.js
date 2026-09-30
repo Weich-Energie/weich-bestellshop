@@ -6,6 +6,7 @@ const NK_SELECT = `
   soll_ek_leistungen, soll_vk_leistungen, soll_stand, soll_positionen,
   kalkulationsart, soll_stunden, ist_stunden_techniker, ist_stunden_monteur,
   stundensatz_techniker, stundensatz_monteur, stunden_quelle,
+  soll_quelle, reonic_projekt_id, soll_beleg_pfad,
   pds_transport_uuid, pds_transport_nummer, pds_transport_at, pds_transport_positionen,
   status, notiz, created_at, updated_at,
   shop_nachkalkulation_positionen (

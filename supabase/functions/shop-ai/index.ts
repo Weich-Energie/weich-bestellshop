@@ -169,27 +169,42 @@ async function extractAufmass(body: any) {
     : ""
 
   const systemPrompt =
-    `Du liest ausgefuellte Aufmass- und Montageberichte der Firma WEICHENERGIE ` +
-    `(Weich GmbH, Klima- und Heizungsbau). Der Vordruck ist meist ein Ausdruck aus ` +
-    `einem Lieferantenshop mit Artikelnummer, Bezeichnung und Preisspalten. Ein ` +
-    `Monteur hat auf der Baustelle die tatsaechlich verbauten Mengen HANDSCHRIFTLICH ` +
-    `daneben notiert.\n\n` +
+    `Du liest Baustellenunterlagen der Firma WEICHENERGIE (Weich GmbH, Klima- und ` +
+    `Heizungsbau). Es kommen DREI Sorten Blatt herein, und sie werden alle gleich ` +
+    `abfotografiert. Bestimme zuerst, was du vor dir hast:\n\n` +
+    `  "material" — Aufmass- oder Montagebericht. Meist ein Ausdruck aus einem ` +
+    `Lieferantenshop mit Artikelnummer, Bezeichnung und Preisspalten; ein Monteur hat ` +
+    `die verbauten Mengen HANDSCHRIFTLICH danebengeschrieben.\n` +
+    `  "stunden" — Stundenzettel. Namen, Tage, Arbeitszeiten, oft handschriftlich.\n` +
+    `  "angebot" — ein gedrucktes Angebot oder Auftrag (haeufig aus Reonic) mit ` +
+    `Positionen, Mengen und Preisen. Nichts Handschriftliches.\n\n` +
+    `Fuelle nur den Abschnitt, der zur erkannten Art gehoert. Die anderen bleiben leer.\n\n` +
+    `--- BEI "material" ---\n` +
     `ENTSCHEIDENDE REGEL: Nur die handschriftliche Menge zaehlt. In der gedruckten ` +
     `Mengen- oder Anzahl-Spalte steht bei jeder Zeile eine 1 — das ist ein Kopierrest ` +
     `des Ausdrucks und KEINE Menge. Uebernimm sie niemals. Steht neben einer Zeile ` +
-    `nichts von Hand, lass die Zeile weg.\n\n` +
+    `nichts von Hand, lass die Zeile weg.\n` +
     `Handschrift ist oft unsauber: 1 und 7, 4 und 9, 0 und 6 werden verwechselt. Gib ` +
     `deine Lesesicherheit je Zeile ehrlich an. Ein Haken oder ein Strich ohne Zahl ` +
-    `bedeutet Menge 1 bei Sicherheit 0.6. Durchgestrichene Zeilen gehoeren weg.\n\n` +
+    `bedeutet Menge 1 bei Sicherheit 0.6. Durchgestrichene Zeilen gehoeren weg.\n` +
     `Meterware (Leitung, Kabel, Schlauch, Isolierung) wird in Metern notiert, auch ` +
-    `wenn der Artikel eine Rolle ist. Uebernimm die Zahl wie sie dasteht und setze ` +
-    `die Einheit auf "m".\n\n` +
+    `wenn der Artikel eine Rolle ist. Uebernimm die Zahl wie sie dasteht, Einheit "m".\n\n` +
+    `--- BEI "stunden" ---\n` +
+    `Je Eintrag Name, Datum und Stunden. "2 Mann 6 h" sind zwei Zeilen zu 6 Stunden. ` +
+    `Pausen abziehen, wenn sie ausgewiesen sind. Die Rolle (techniker oder monteur) ` +
+    `nur setzen, wenn sie auf dem Blatt steht — sonst leer lassen und NICHT raten.\n\n` +
+    `--- BEI "angebot" ---\n` +
+    `Alle Warenpositionen mit Menge und Preisen, netto. KEINE Zeilen wie Zwischensumme, ` +
+    `MwSt, Rabatt, Endbetrag. Steht nur ein Gesamtpreis je Zeile, rechne den Einzelpreis ` +
+    `nicht aus, sondern gib den Gesamtpreis an. Erkenne, ob eine Position ein Geraet ist ` +
+    `(Aussengeraet, Innengeraet, Waermepumpe, Speicher) oder eine Montage- bzw. ` +
+    `Materialpauschale — das entscheidet spaeter ueber die Kalkulationsart.\n\n` +
     `Antworte STRIKT nur mit JSON (kein Prosa, kein Codeblock). Schema:\n` +
     `{\n` +
+    `  "blatt_art": "material|stunden|angebot",\n` +
     `  "baustelle": "Name oder Auftragsnummer vom Blatt, leer wenn nicht lesbar",\n` +
     `  "datum": "YYYY-MM-DD oder leer",\n` +
     `  "monteur": "Name oder Kuerzel, leer wenn nicht lesbar",\n` +
-    `  "stunden": null,\n` +
     `  "zeilen": [\n` +
     `    {\n` +
     `      "artikelnr": "gedruckte Artikelnummer der Zeile, leer wenn keine",\n` +
@@ -199,10 +214,18 @@ async function extractAufmass(body: any) {
     `      "sicherheit": 0.95,\n` +
     `      "notiz": "nur bei Auffaelligkeit, sonst leer"\n` +
     `    }\n` +
-    `  ]\n` +
+    `  ],\n` +
+    `  "stunden_zeilen": [\n` +
+    `    { "name": "Nachname", "datum": "YYYY-MM-DD", "stunden": 8, "rolle": "", "sicherheit": 0.9 }\n` +
+    `  ],\n` +
+    `  "angebot_positionen": [\n` +
+    `    { "bezeichnung": "...", "menge": 1, "einheit": "Stck",\n` +
+    `      "ek_gesamt": null, "vk_gesamt": 2420.00, "ist_geraet": true }\n` +
+    `  ],\n` +
+    `  "angebot_summe_vk": 8875.00\n` +
     `}\n` +
-    `"stunden" nur setzen, wenn auf dem Blatt ausdruecklich Arbeitsstunden stehen ` +
-    `(z. B. "8 Std", "2 Mann 6 h") — dann als Gesamtstunden aller Personen als Zahl.` +
+    `Deutsche Zahlen (Komma als Dezimal) in Zahlen mit Punkt umwandeln. ` +
+    `Ein Feld, das du nicht lesen kannst, bleibt leer oder null — rate nicht.` +
     hinweis
 
   const quelle = istPdf
@@ -211,7 +234,7 @@ async function extractAufmass(body: any) {
 
   const userContent = [
     quelle,
-    { type: "text", text: "Lies diesen Aufmassbericht. Nur die handschriftlichen Mengen." },
+    { type: "text", text: "Bestimme die Blattart und lies das Blatt aus." },
   ]
 
   const text = await callClaude(MODEL_VISION, systemPrompt, [{ role: "user", content: userContent }], 8000)

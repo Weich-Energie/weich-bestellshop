@@ -78,6 +78,60 @@ export async function leseAufmassFoto(fotoId) {
     const ergebnis = antwort?.result
     if (!ergebnis) throw new Error('Kein Ergebnis von der KI')
 
+    // Drei Sorten Blatt kommen durch denselben Upload: Materialliste,
+    // Stundenzettel, Angebot. Die KI schlaegt vor, was sie gelesen hat.
+    const art = ['material', 'stunden', 'angebot'].includes(ergebnis.blatt_art)
+      ? ergebnis.blatt_art
+      : 'unbekannt'
+
+    // Stundenzettel: die Zeilen bleiben als Rohergebnis stehen. Sie laufen
+    // NICHT von selbst in die Stundenfelder — welcher Name Techniker ist und
+    // welcher Monteur, weiss nur der Betrieb, und der Satz unterscheidet sich.
+    if (art === 'stunden') {
+      const stundenZeilen = Array.isArray(ergebnis.stunden_zeilen) ? ergebnis.stunden_zeilen : []
+      await supabase
+        .from('shop_aufmass_foto')
+        .update({
+          status: 'gelesen',
+          blatt_art: art,
+          gelesen_am: new Date().toISOString(),
+          stunden_gelesen: {
+            zeilen: stundenZeilen,
+            summe: stundenZeilen.reduce((s, z) => s + Number(z.stunden || 0), 0),
+            baustelle: ergebnis.baustelle || null,
+            datum: ergebnis.datum || null,
+          },
+        })
+        .eq('id', fotoId)
+      return {
+        blatt_art: art,
+        stunden_zeilen: stundenZeilen.length,
+        stunden_summe: stundenZeilen.reduce((s, z) => s + Number(z.stunden || 0), 0),
+      }
+    }
+
+    // Angebot: die Positionen sind das Soll, nicht das Ist. Sie werden hier nur
+    // gelesen und zurueckgegeben; uebernommen wird mit uebernimmAngebot(), weil
+    // das die Soll-Werte des Auftrags ueberschreibt.
+    if (art === 'angebot') {
+      const positionen = Array.isArray(ergebnis.angebot_positionen) ? ergebnis.angebot_positionen : []
+      await supabase
+        .from('shop_aufmass_foto')
+        .update({
+          status: 'gelesen',
+          blatt_art: art,
+          gelesen_am: new Date().toISOString(),
+          stunden_gelesen: {
+            angebot_positionen: positionen,
+            summe_vk: ergebnis.angebot_summe_vk ?? null,
+            baustelle: ergebnis.baustelle || null,
+            datum: ergebnis.datum || null,
+          },
+        })
+        .eq('id', fotoId)
+      return { blatt_art: art, positionen: positionen.length, summe_vk: ergebnis.angebot_summe_vk ?? null }
+    }
+
     // Offene Zeilen eines frueheren Laufs raeumen, uebernommene nicht anfassen.
     await supabase.from('shop_aufmass_foto_zeile').delete().eq('foto_id', fotoId).eq('status', 'offen')
 
@@ -107,15 +161,15 @@ export async function leseAufmassFoto(fotoId) {
 
     await supabase
       .from('shop_aufmass_foto')
-      .update({ status: 'gelesen', gelesen_am: new Date().toISOString() })
+      .update({ status: 'gelesen', blatt_art: art, gelesen_am: new Date().toISOString() })
       .eq('id', fotoId)
 
     return {
+      blatt_art: art,
       kopf: {
         baustelle: ergebnis.baustelle || null,
         datum: ergebnis.datum || null,
         monteur: ergebnis.monteur || null,
-        stunden: ergebnis.stunden != null ? Number(ergebnis.stunden) : null,
       },
       zeilen: rows.length,
       ohne_artikel: rows.filter((r) => !r.artikel_id).length,
@@ -168,7 +222,8 @@ export async function listFotos(nachkalkulationId) {
   const { data, error } = await supabase
     .from('shop_aufmass_foto')
     .select(`
-      id, bild_pfad, original_name, seitennr, status, fehler_text, gelesen_am, created_at,
+      id, bild_pfad, original_name, seitennr, status, blatt_art, stunden_gelesen,
+      fehler_text, gelesen_am, created_at,
       shop_aufmass_foto_zeile ( id, status, artikel_id, sicherheit )
     `)
     .eq('nachkalkulation_id', nachkalkulationId)
@@ -281,6 +336,132 @@ export async function uebernimmZeilen(nachkalkulationId, zeilen) {
   }
 
   return ergebnis
+}
+
+// ─── Stundenzettel uebernehmen ─────────────────────────────────────────
+
+// Die gelesenen Stunden laufen nicht von selbst in die Felder: welcher Name
+// Techniker ist und welcher Monteur, weiss nur der Betrieb, und die Saetze
+// unterscheiden sich um 6 EUR die Stunde. Die Zuordnung kommt deshalb aus der
+// Oberflaeche, nicht aus dem Blatt.
+//
+// Addiert wird auf den vorhandenen Stand — ein Auftrag hat mehrere
+// Stundenzettel, und jeder bringt seinen Teil mit.
+export async function uebernimmStunden(nachkalkulationId, fotoId, { techniker = 0, monteur = 0 }) {
+  const { data: nk, error: nErr } = await supabase
+    .from('shop_nachkalkulation')
+    .select('ist_stunden_techniker, ist_stunden_monteur')
+    .eq('id', nachkalkulationId)
+    .single()
+  if (nErr) throw nErr
+
+  const neuT = Number(nk.ist_stunden_techniker || 0) + Number(techniker || 0)
+  const neuM = Number(nk.ist_stunden_monteur || 0) + Number(monteur || 0)
+
+  const { error } = await supabase
+    .from('shop_nachkalkulation')
+    .update({
+      ist_stunden_techniker: neuT > 0 ? neuT : null,
+      ist_stunden_monteur: neuM > 0 ? neuM : null,
+      stunden_quelle: 'zettel',
+    })
+    .eq('id', nachkalkulationId)
+  if (error) throw error
+
+  await supabase.from('shop_aufmass_foto').update({ status: 'uebernommen' }).eq('id', fotoId)
+  return { techniker: neuT, monteur: neuM }
+}
+
+// ─── Angebot als Soll uebernehmen ──────────────────────────────────────
+
+// Der Regelfall ist der Soll-Import aus PDS. Oft ist der PDS-Auftrag aber noch
+// nicht gefuellt, dann ist das Reonic-Angebot die einzige Soll-Quelle
+// (Patrick, 30.09.2026). Die Zahlen sehen gleich aus, sind aber verschieden
+// belastbar — deshalb haelt soll_quelle fest, woher sie kamen.
+//
+// Die Kalkulationsart faellt dabei mit ab: enthaelt das Angebot ausser Geraeten
+// noch Montage- oder Materialpositionen, waren die Stunden ausgewiesen; stehen
+// nur Geraete darin, steckte die Zeit im Geraetepreis.
+export async function uebernimmAngebot(nachkalkulationId, fotoId) {
+  const { data: foto, error: fErr } = await supabase
+    .from('shop_aufmass_foto')
+    .select('stunden_gelesen, bild_pfad')
+    .eq('id', fotoId)
+    .single()
+  if (fErr) throw fErr
+
+  const positionen = foto.stunden_gelesen?.angebot_positionen || []
+  if (!positionen.length) throw new Error('Im Angebot wurde keine Position gelesen')
+
+  const zahl = (v) => (v == null ? 0 : Number(v) || 0)
+  const geraete = positionen.filter((p) => p.ist_geraet)
+  const uebrige = positionen.filter((p) => !p.ist_geraet)
+
+  const vkGesamt = foto.stunden_gelesen?.summe_vk != null
+    ? Number(foto.stunden_gelesen.summe_vk)
+    : positionen.reduce((s, p) => s + zahl(p.vk_gesamt), 0)
+  const vkGeraete = geraete.reduce((s, p) => s + zahl(p.vk_gesamt), 0)
+  const ekGeraete = geraete.reduce((s, p) => s + zahl(p.ek_gesamt), 0)
+  const erloesMontage = uebrige.reduce((s, p) => s + zahl(p.vk_gesamt), 0)
+
+  const { data: nk } = await supabase
+    .from('shop_nachkalkulation')
+    .select('kalkulationsart')
+    .eq('id', nachkalkulationId)
+    .single()
+
+  const felder = {
+    soll_quelle: 'reonic_angebot',
+    soll_beleg_pfad: foto.bild_pfad,
+    soll_vk_gesamt: runde(vkGesamt),
+    soll_vk_geraete: runde(vkGeraete),
+    soll_ek_geraete: runde(ekGeraete),
+    soll_erloes_montage: runde(erloesMontage),
+    soll_stand: new Date().toISOString(),
+    soll_positionen: { angebot: positionen },
+  }
+  // Eine von Hand gesetzte Art bleibt stehen.
+  if (!nk?.kalkulationsart || nk.kalkulationsart === 'unbekannt') {
+    felder.kalkulationsart = erloesMontage > 0 ? 'stunden_ausgewiesen' : 'zeit_im_artikel'
+  }
+
+  const { error } = await supabase.from('shop_nachkalkulation').update(felder).eq('id', nachkalkulationId)
+  if (error) throw error
+
+  await supabase.from('shop_aufmass_foto').update({ status: 'uebernommen' }).eq('id', fotoId)
+  return {
+    positionen: positionen.length,
+    vk_gesamt: runde(vkGesamt),
+    ek_geraete: runde(ekGeraete),
+    // Ohne Einkaufspreise im Angebot fehlt die halbe Rechnung — das gehoert
+    // gesagt, nicht stillschweigend als 0 gefuehrt.
+    ohne_ek: geraete.filter((p) => p.ek_gesamt == null).length,
+  }
+}
+
+function runde(n) {
+  return Math.round(Number(n || 0) * 100) / 100
+}
+
+// ─── Nachkalkulation ohne PDS-Auftrag ──────────────────────────────────
+
+// Fuer den Fall, dass es den Auftrag in PDS noch gar nicht gibt. Der Bezug zum
+// Vorgang kann spaeter nachgetragen werden; bis dahin traegt die Zeile nur den
+// Namen der Baustelle.
+export async function neueNachkalkulation({ bezeichnung, reonicProjektId = null }) {
+  const { data, error } = await supabase
+    .from('shop_nachkalkulation')
+    .insert({
+      pds_vorgang_uuid: null,
+      pds_vorgangs_nummer: '—',
+      bezeichnung,
+      soll_quelle: 'hand',
+      reonic_projekt_id: reonicProjektId,
+    })
+    .select('id')
+    .single()
+  if (error) throw error
+  return data
 }
 
 // Setzt das Foto auf "uebernommen", wenn keine offene Zeile mehr da ist.
