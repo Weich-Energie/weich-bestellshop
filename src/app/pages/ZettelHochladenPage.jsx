@@ -13,8 +13,9 @@ import { useQuery } from '@tanstack/react-query'
 import {
   Box, Heading, Text, VStack, HStack, Button, Input, Badge, Spinner, Flex,
 } from '@chakra-ui/react'
-import { Camera, Check, Plus, ArrowLeft } from 'lucide-react'
+import { Camera, Check, Plus, ArrowLeft, Search, Download } from 'lucide-react'
 import { listNachkalkulationen } from '../../data/api/nachkalkulation.js'
+import { sucheAuftraege, importiereSoll } from '../../data/api/pdsSync.js'
 import { uploadAufmassFoto, leseAufmassFoto, neueNachkalkulation } from '../../data/api/aufmassFoto.js'
 
 const ART_TEXT = {
@@ -55,7 +56,101 @@ export default function ZettelHochladenPage() {
         ))}
       </VStack>
 
+      <AusPds vorhanden={liste} onAngelegt={refetch} onOeffnen={setGewaehlt} />
       <NeueBaustelle onAngelegt={refetch} />
+    </Box>
+  )
+}
+
+// Die PDS-Akte gibt es meist schon (Patrick, 30.09.2026) — die Nachkalkulation
+// dazu aber noch nicht. Ohne diesen Schritt müsste man erst an den Rechner,
+// bevor man auf der Baustelle fotografieren kann.
+//
+// Geholt wird dabei auch gleich das Soll aus dem Auftrag. Ist der dort noch
+// leer, sieht man das hinterher an den Zahlen und traegt das Angebot nach,
+// wenn man es zur Hand hat.
+function AusPds({ vorhanden, onAngelegt, onOeffnen }) {
+  const [offen, setOffen] = useState(false)
+  const [suchwort, setSuchwort] = useState('')
+  const [treffer, setTreffer] = useState(null)
+  const [laeuft, setLaeuft] = useState(false)
+  const [holt, setHolt] = useState(null)
+  const [fehler, setFehler] = useState(null)
+
+  // Was schon als Nachkalkulation existiert, steht oben in der Liste —
+  // in den Treffern waere es nur eine zweite Gelegenheit, dasselbe anzulegen.
+  const bekannt = new Set(vorhanden.map((n) => n.pds_vorgang_uuid).filter(Boolean))
+
+  async function suchen() {
+    if (!suchwort.trim()) return
+    setLaeuft(true); setFehler(null)
+    try {
+      setTreffer(await sucheAuftraege(suchwort.trim()))
+    } catch (e) {
+      setFehler(e.message)
+    } finally {
+      setLaeuft(false)
+    }
+  }
+
+  async function holen(a) {
+    setHolt(a.vorgang_uuid); setFehler(null)
+    try {
+      const antwort = await importiereSoll(a.vorgang_uuid)
+      await onAngelegt?.()
+      onOeffnen?.({
+        id: antwort.nachkalkulation_id,
+        bezeichnung: a.bezeichnung,
+        pds_vorgangs_nummer: a.vorgangs_nummer,
+      })
+    } catch (e) {
+      setFehler(e.message)
+    } finally {
+      setHolt(null)
+    }
+  }
+
+  if (!offen) {
+    return (
+      <Button size="sm" variant="outline" mt={4} w="100%" onClick={() => setOffen(true)}>
+        <Search size={14} /> Auftrag aus PDS holen
+      </Button>
+    )
+  }
+
+  return (
+    <Box borderWidth="1px" borderRadius="lg" p={3} mt={4} bg="white">
+      <Text fontSize="sm" fontWeight="medium" mb={2}>Auftrag aus PDS</Text>
+      <HStack gap={2} mb={2}>
+        <Input size="sm" placeholder="Name oder Auftragsnummer" value={suchwort}
+          onChange={(e) => setSuchwort(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && suchen()} />
+        <Button size="sm" onClick={suchen} loading={laeuft}>Suchen</Button>
+      </HStack>
+
+      {fehler && <Text fontSize="sm" color="red.600" mb={2}>{fehler}</Text>}
+
+      {treffer && (
+        <VStack align="stretch" gap={2} maxH="50vh" overflowY="auto">
+          {treffer.auftraege.filter((a) => !bekannt.has(a.vorgang_uuid)).map((a) => (
+            <Flex key={a.vorgang_uuid} borderWidth="1px" borderRadius="md" p={2} align="center" gap={2}>
+              <Box flex="1" minW={0}>
+                <Text fontSize="sm">{a.bezeichnung}</Text>
+                <Text fontSize="xs" color="fg.muted">{a.vorgangs_nummer}</Text>
+              </Box>
+              <Button size="xs" variant="outline" loading={holt === a.vorgang_uuid}
+                onClick={() => holen(a)}>
+                <Download size={12} /> Holen
+              </Button>
+            </Flex>
+          ))}
+          {treffer.auftraege.filter((a) => !bekannt.has(a.vorgang_uuid)).length === 0 && (
+            <Text fontSize="sm" color="fg.muted">Kein neuer Auftrag — die Treffer stehen schon oben.</Text>
+          )}
+        </VStack>
+      )}
+
+      <Button size="sm" variant="ghost" mt={2} onClick={() => setOffen(false)}>Zuklappen</Button>
     </Box>
   )
 }

@@ -299,6 +299,20 @@ function Detail({ id, onZurueck }) {
         <Kennzahl titel="Auftrag gesamt (VK)" wert={euro(nk.soll_vk_gesamt)} />
       </HStack>
 
+      {/* Der leere PDS-Auftrag ist der Normalfall, nicht die Ausnahme: das
+          Regieaufmass wird ja gerade erfasst, um ihn zu fuellen. Der Hinweis
+          sagt deshalb, was fehlt, ohne es zum Fehler zu erklaeren. */}
+      {!Number(nk.soll_vk_gesamt) && nk.soll_quelle !== 'reonic_angebot' && (
+        <Box borderWidth="1px" borderRadius="lg" p={3} mb={4} bg="blue.50" borderColor="blue.200">
+          <Text fontSize="sm" fontWeight="medium">Der Auftrag in PDS trägt noch keine Werte</Text>
+          <Text fontSize="sm" color="fg.muted">
+            Fürs Erfassen macht das nichts — das Regieaufmaß geht ohnehin in den Auftrag.
+            Nur die Kennzahlen unten bleiben leer, bis ein Soll da ist. Lade das
+            Reonic-Angebot als PDF hoch, wenn du es zur Hand hast.
+          </Text>
+        </Box>
+      )}
+
       <NachkalkulationStunden nk={nk} onAenderung={neu} />
 
       <KalkuliertePositionen soll={nk.soll_positionen} />
