@@ -71,7 +71,7 @@ Deno.serve(async (req: Request) => {
     const { data: profil } = await sb.from("employees")
       .select("berechtigungen").eq("email", userData.user.email).single()
     const rechte = (profil?.berechtigungen ?? {}) as Record<string, any>
-    const darf = rechte?.app_access?.bestellshop_admin === true
+    const darf = rechte?.rolle === "admin"
     if (!darf) return json({ error: "Nur Shop-Admins duerfen ein Aufmass nach PDS uebergeben" }, 403)
 
     const body = await req.json().catch(() => ({}))

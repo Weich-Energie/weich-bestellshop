@@ -50,7 +50,7 @@ Deno.serve(async (req: Request) => {
       .select("berechtigungen").eq("email", userData.user.email).single()
     const rechte = (profil?.berechtigungen ?? {}) as Record<string, any>
     const darf = rechte?.app_access?.aufmass_admin === true
-      || rechte?.app_access?.bestellshop_admin === true
+      || rechte?.rolle === "admin"
      
     if (!darf) return json({ fehler: "Nur der Aufmaß-Admin darf Artikel anlegen" }, 403)
 

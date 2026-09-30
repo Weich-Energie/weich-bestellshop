@@ -44,10 +44,9 @@ export function AuthProvider({ children }) {
   // im UI zu zeigen (auch wenn der User gerade im "als User anzeigen"-Modus ist).
   const hasAdminRights = useMemo(() => {
     if (!currentUser) return false
-    const access = currentUser.berechtigungen?.app_access
-    // Seit 29.09.2026 nur noch der Schalter: die Rolle Admin gilt fuer die
-    // Ressourcenplanung, nicht mehr als Generalschluessel fuer den Shop.
-    return access?.bestellshop_admin === true
+    // Seit 30.09.2026 ist Shop-Verwaltung Admin-Sache (Patricks Vorgabe):
+    // es zaehlt allein die Rolle, einen eigenen Schalter gibt es nicht mehr.
+    return currentUser.berechtigungen?.rolle === 'admin'
   }, [currentUser])
 
   // Effektiver Admin-Status: rohes Admin-Recht, aber respektiert View-Toggle.
