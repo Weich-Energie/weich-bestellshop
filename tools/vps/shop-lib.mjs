@@ -394,6 +394,60 @@ export const PLAYBOOKS = {
       return listeUrl + (listeUrl.includes('?') ? '&' : '?') + `page=${n + 1}`
     },
   },
+
+  // FEGA & Schmitt (shop.fega.de) — Elektrogrosshandel. Klassischer
+  // PHP-Shop: Login als POST auf clsAIShop.php?cmd=MemberLogin, Felder
+  // memb_login und memb_pass. Kein Einwilligungsbanner auf der Anmeldeseite.
+  //
+  // Gebraucht fuer das Regieaufmass: die Elektro-Zeilen der Montageberichte
+  // (FI-Schalter, LS-Automaten, NYM, H07V-K, Kabelkanal) haben kein
+  // Gegenstueck im Shop-Katalog und muessen mit echtem Preis angelegt werden.
+  'fega-schmitt': {
+    name: 'FEGA & Schmitt',
+    basis: 'https://shop.fega.de',
+    loginUrl: 'https://shop.fega.de/index.php',
+    pruefUrl: 'https://shop.fega.de/index.php',
+    async login(page, benutzer, passwort) {
+      await page.goto(this.loginUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 })
+      await page.fill('input[name="memb_login"]', benutzer)
+      await page.fill('input[name="memb_pass"]', passwort)
+      await page.locator('form:has(input[name="memb_pass"]) button[type="submit"], form:has(input[name="memb_pass"]) input[type="submit"]')
+        .first().click({ timeout: 8000 })
+        .catch(async () => { await page.press('input[name="memb_pass"]', 'Enter') })
+      await page.waitForLoadState('networkidle', { timeout: 45_000 }).catch(() => {})
+      await page.waitForTimeout(2500)
+      return this.istAngemeldet(page)
+    },
+    async istAngemeldet(page) {
+      // Die Anmeldeseite IST die Startseite — nach dem Login ist das
+      // Kennwortfeld weg. Der Abmelden-Link ist das zweite Merkmal.
+      const pw = await page.locator('input[name="memb_pass"]').count()
+      const abmelden = await page.locator('a[href*="Logout"], a[href*="logout"], a:has-text("Abmelden")').count()
+      return abmelden > 0 || pw === 0
+    },
+    // Das Suchfeld heisst q (id productSearch, Platzhalter "Artikel finden");
+    // ein eigenes Suchformular mit action gibt es nicht, die Seite baut die
+    // URL selbst. Deshalb ueber das Feld suchen statt ueber eine gebaute URL.
+    async suchen(page, begriff) {
+      if (!/shop\.fega\.de/.test(page.url())) {
+        await page.goto(this.pruefUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 })
+      }
+      const feld = page.locator('#productSearch, input[name="q"]').first()
+      await feld.waitFor({ timeout: 20_000 })
+      await feld.fill('')
+      await feld.fill(begriff)
+      await feld.press('Enter')
+      await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {})
+      await page.waitForTimeout(2500)
+    },
+    sucheUrl: (begriff) => `https://shop.fega.de/abtest/scripts/shop.php?cmd=Suche&q=${encodeURIComponent(begriff)}`,
+    istProduktUrl: (h) => /shop\.fega\.de\/.*(cmd=Artikel|artikeldetail)/i.test(h),
+    netto: { selektor: '[class*="price"], [class*="preis"]', muster: /([\d.]+,\d{2})/ },
+    seiteUrl(listeUrl, n) {
+      if (n === 0) return listeUrl
+      return listeUrl + (listeUrl.includes('?') ? '&' : '?') + `seite=${n + 1}`
+    },
+  },
 }
 
 export function playbook(slug) {
