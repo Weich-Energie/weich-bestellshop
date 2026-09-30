@@ -36,6 +36,11 @@ export default function AufmassFotoBox({ nachkalkulationId, artikelListe = [], o
   const qc = useQueryClient()
   const [laedtHoch, setLaedtHoch] = useState(false)
   const [liestAlle, setLiestAlle] = useState(false)
+  // Welches Foto gerade gelesen wird, und bei einem Sammellauf das wievielte.
+  // Ein Vision-Aufruf dauert mehrere Sekunden; ohne Rueckmeldung sieht die
+  // Seite aus, als haette der Knopf nichts getan.
+  const [liestFoto, setLiestFoto] = useState(null)
+  const [fortschritt, setFortschritt] = useState(null)
   const [fehler, setFehler] = useState(null)
   const [offenesFoto, setOffenesFoto] = useState(null)
 
@@ -73,7 +78,9 @@ export default function AufmassFotoBox({ nachkalkulationId, artikelListe = [], o
 
   async function handleLesen(fotoId) {
     setFehler(null)
+    setLiestFoto(fotoId)
     try { await leseAufmassFoto(fotoId) } catch (e) { setFehler(e.message) }
+    setLiestFoto(null)
     neu()
   }
 
@@ -85,10 +92,16 @@ export default function AufmassFotoBox({ nachkalkulationId, artikelListe = [], o
   // bringen nur Zeitueberlaeufe.
   async function alleLesen() {
     setLiestAlle(true); setFehler(null)
+    let i = 0
     for (const f of ungelesen) {
+      i += 1
+      setFortschritt({ nr: i, von: ungelesen.length })
+      setLiestFoto(f.id)
       try { await leseAufmassFoto(f.id) } catch { /* Fehler steht am Foto */ }
       neu()
     }
+    setLiestFoto(null)
+    setFortschritt(null)
     setLiestAlle(false)
   }
 
@@ -111,7 +124,8 @@ export default function AufmassFotoBox({ nachkalkulationId, artikelListe = [], o
         <Spacer />
         {ungelesen.length > 0 && (
           <Button size="xs" colorPalette="blue" loading={liestAlle} onClick={alleLesen}>
-            <ScanLine size={12} /> {ungelesen.length} noch lesen
+            <ScanLine size={12} />{' '}
+            {fortschritt ? `liest ${fortschritt.nr} von ${fortschritt.von}` : `${ungelesen.length} noch lesen`}
           </Button>
         )}
         <Button as="label" size="xs" variant="outline" cursor="pointer" loading={laedtHoch}>
@@ -143,8 +157,10 @@ export default function AufmassFotoBox({ nachkalkulationId, artikelListe = [], o
                 colorPalette={f.blatt_art === 'stunden' ? 'purple' : f.blatt_art === 'angebot' ? 'blue' : 'gray'}>
                 {ART_TEXT[f.blatt_art] || f.blatt_art}
               </Badge>
-              <Badge size="sm" colorPalette={STATUS_FARBE[f.status]} variant="subtle">
-                {STATUS_TEXT[f.status] || f.status}
+              <Badge size="sm" colorPalette={liestFoto === f.id ? 'blue' : STATUS_FARBE[f.status]} variant="subtle">
+                {liestFoto === f.id
+                  ? 'wird gelesen — das dauert ein paar Sekunden'
+                  : (STATUS_TEXT[f.status] || f.status)}
               </Badge>
               {f.zeilen_gesamt > 0 && (
                 <Text fontSize="xs" color="fg.muted">
@@ -173,7 +189,9 @@ export default function AufmassFotoBox({ nachkalkulationId, artikelListe = [], o
                 <ExternalLink size={13} />
               </IconButton>
               {f.status !== 'laeuft' && (
-                <Button size="xs" variant="outline" onClick={() => handleLesen(f.id)}>
+                <Button size="xs" variant="outline" loading={liestFoto === f.id}
+                  loadingText="liest…" disabled={liestAlle && liestFoto !== f.id}
+                  onClick={() => handleLesen(f.id)}>
                   <ScanLine size={12} /> {f.status === 'neu' ? 'Lesen' : 'Neu lesen'}
                 </Button>
               )}
