@@ -16,9 +16,19 @@
 //   transport_anlegen — Angebot für die Positionen ohne Platzhalter.
 //   zuruecksetzen     — hebt die Markierung "übertragen" aller Positionen auf.
 //
-// Übertragen werden nur Positionen mit Shop-Artikel UND PDS-Katalog-UUID.
 // Eine Position gilt als übertragen (pds_transport_at), sobald ihre Menge im
 // Auftrag steht oder sie in einem Transportangebot liegt.
+//
+// Seit dem 30.09.2026 ist das ein REGIEAUFMASS, kein Rechenwerkzeug (Patrick:
+// „weniger als kalkulations ding selbst sehen sondern als regie aufmaß, welches
+// wir in den auftrag von pds ergänzen müssen"). Daraus folgen zwei Dinge:
+//   - Freitext und Artikel ohne PDS-Eintrag gehen trotzdem mit, als freie
+//     Position im Transportangebot. /vorgang/create verlangt kein katalogUUID
+//     (ADR 0008); nur der Platzhalter-Weg braucht eines. Was verbaut wurde,
+//     muss in den Auftrag — ein fehlender Katalogeintrag ist ein
+//     Stammdatenthema und darf die Abrechnung nicht aufhalten.
+//   - Die Ist-Stunden gehen als LOHN-Positionen mit, eine je Rolle, einmal
+//     (Merker stunden_transport_at).
 
 import { createClient } from "jsr:@supabase/supabase-js@2"
 
@@ -144,6 +154,8 @@ Deno.serve(async (req: Request) => {
       .select(`
         id, pds_vorgang_uuid, pds_vorgangs_nummer, bezeichnung, status,
         pds_transport_uuid, pds_transport_nummer,
+        ist_stunden_techniker, ist_stunden_monteur,
+        stundensatz_techniker, stundensatz_monteur, stunden_transport_at,
         shop_nachkalkulation_positionen (
           id, artikel_id, freitext, menge, einheit, ek_einzel, quelle, pds_transport_at,
           shop_artikel ( id, name, einheit, pds_katalog_uuid, preis_netto, aufschlagsklasse )
@@ -168,6 +180,7 @@ Deno.serve(async (req: Request) => {
           pds_transport_nummer: null,
           pds_transport_at: null,
           pds_transport_positionen: null,
+          stunden_transport_at: null,
         })
         .eq("id", nkId)
       if (e2) return json({ error: e2.message }, 500)
@@ -261,7 +274,11 @@ Deno.serve(async (req: Request) => {
       positions_ids: string[]
     }
     type TransportZiel = {
-      katalog_uuid: string
+      // Null heisst: freie Position ohne Katalogbezug. /vorgang/create verlangt
+      // kein katalogUUID (ADR 0008) — nur updateposition braucht eines, weil es
+      // eine vorhandene Position trifft. Beim Regieaufmass zaehlt aber, dass
+      // alles Verbaute in den Auftrag kommt, auch was im Katalog fehlt.
+      katalog_uuid: string | null
       name: string
       einheit: string | null
       menge: number
@@ -282,33 +299,31 @@ Deno.serve(async (req: Request) => {
       const name = a?.name ?? p.freitext ?? "(ohne Bezeichnung)"
 
       if (p.pds_transport_at) { bereitsUebertragen++; continue }
-      if (!a) {
-        nichtUebertragbar.push({ name, menge, grund: "Freitext ohne Shop-Artikel — zuerst als Artikel anlegen" })
-        continue
-      }
-      if (!a.pds_katalog_uuid) {
-        nichtUebertragbar.push({ name, menge, grund: "Artikel noch nicht in PDS — zuerst unter „Nach PDS übertragen“ anlegen" })
-        continue
-      }
       if (!(menge > 0)) {
         nichtUebertragbar.push({ name, menge, grund: "Menge 0" })
         continue
       }
 
-      const platz = platzhalterJeKatalog.get(a.pds_katalog_uuid)
-      if (platz) {
-        const z = mengenJeKatalog.get(a.pds_katalog_uuid)
+      // Freitext und Artikel ohne PDS-Eintrag gehen als freie Position ins
+      // Transportangebot. Frueher fielen sie hier heraus — beim Regieaufmass
+      // waere das falsch: was verbaut wurde, muss in den Auftrag, sonst wird es
+      // nicht abgerechnet. Der fehlende Katalogeintrag ist ein Stammdatenthema
+      // und darf die Abrechnung nicht aufhalten.
+      const katalogUuid = a?.pds_katalog_uuid ?? null
+      const platz = katalogUuid ? platzhalterJeKatalog.get(katalogUuid) : undefined
+      if (platz && katalogUuid && a) {
+        const z = mengenJeKatalog.get(katalogUuid)
         if (z) {
           z.menge_plus = runde(z.menge_plus + menge)
           z.menge_neu = runde(z.menge_aktuell + z.menge_plus)
           z.positions_ids.push(p.id)
         } else {
           const aktuell = Number(platz.menge ?? 0)
-          mengenJeKatalog.set(a.pds_katalog_uuid, {
+          mengenJeKatalog.set(katalogUuid, {
             position_uuid: platz.uuid!,
             nummer: platz.nummer ?? null,
             ebene: platz.ebene,
-            katalog_uuid: a.pds_katalog_uuid,
+            katalog_uuid: katalogUuid,
             name: platz.kurztext ?? a.name,
             einheit: platz.masseinheit?.bezeichnung ?? p.einheit ?? a.einheit ?? null,
             menge_aktuell: aktuell,
@@ -323,18 +338,21 @@ Deno.serve(async (req: Request) => {
       // Kein Platzhalter im Auftrag → Transportangebot.
       const ek = p.ek_einzel != null
         ? Number(p.ek_einzel)
-        : (a.preis_netto != null ? Number(a.preis_netto) : 0)
-      const aufschlag = a.aufschlagsklasse ? aufschlagJeKlasse.get(a.aufschlagsklasse) ?? null : null
+        : (a?.preis_netto != null ? Number(a.preis_netto) : 0)
+      const aufschlag = a?.aufschlagsklasse ? aufschlagJeKlasse.get(a.aufschlagsklasse) ?? null : null
       const vk = aufschlag != null && ek > 0 ? berechneVk(ek, aufschlag) : null
-      const t = transportJeKatalog.get(a.pds_katalog_uuid)
+      // Freie Positionen haben keine UUID zum Zusammenfassen — der Name tut es,
+      // damit zweimal dasselbe Freitext-Teil nicht zwei Zeilen ergibt.
+      const schluessel = katalogUuid ?? `frei:${name.toLowerCase().trim()}`
+      const t = transportJeKatalog.get(schluessel)
       if (t) {
         t.menge = runde(t.menge + menge)
         t.positions_ids.push(p.id)
       } else {
-        transportJeKatalog.set(a.pds_katalog_uuid, {
-          katalog_uuid: a.pds_katalog_uuid,
-          name: a.name,
-          einheit: p.einheit ?? a.einheit ?? null,
+        transportJeKatalog.set(schluessel, {
+          katalog_uuid: katalogUuid,
+          name: a?.name ?? name,
+          einheit: p.einheit ?? a?.einheit ?? null,
           menge,
           ek_einzel: runde(ek),
           vk_einzel: vk,
@@ -378,6 +396,15 @@ Deno.serve(async (req: Request) => {
       },
       nicht_uebertragbar: nichtUebertragbar,
       bereits_uebertragen: bereitsUebertragen,
+      // Beim Regieaufmass gehoeren die Stunden dazu. Sie stehen hier, damit vor
+      // dem Anlegen sichtbar ist, was mitgeht — und ob sie schon drin sind.
+      stunden: {
+        techniker: Number(nk.ist_stunden_techniker ?? 0),
+        monteur: Number(nk.ist_stunden_monteur ?? 0),
+        satz_techniker: Number(nk.stundensatz_techniker ?? 75),
+        satz_monteur: Number(nk.stundensatz_monteur ?? 69),
+        bereits_uebertragen: Boolean((nk as Record<string, unknown>).stunden_transport_at),
+      },
     }
 
     // Ein Satz, der sagt, was passieren wird.
@@ -455,7 +482,33 @@ Deno.serve(async (req: Request) => {
     }
 
     // ─── Transportangebot anlegen ──────────────────────────────────────────
-    if (transport.length === 0) return json({ error: "Keine Position für ein Transportangebot.", ...vorschau }, 400)
+
+    // Die geleisteten Stunden gehen als LOHN-Positionen mit, eine je Rolle.
+    // Einmal — ein zweites Transportangebot fuer nachgetragenes Material darf
+    // sie nicht ein zweites Mal in den Auftrag bringen.
+    const stundenPositionen = (nk as Record<string, unknown>).stunden_transport_at
+      ? []
+      : ([
+        { std: Number(nk.ist_stunden_techniker ?? 0), satz: Number(nk.stundensatz_techniker ?? 75), text: "Technikerstunden" },
+        { std: Number(nk.ist_stunden_monteur ?? 0), satz: Number(nk.stundensatz_monteur ?? 69), text: "Monteurstunden" },
+      ]
+        .filter((s) => s.std > 0)
+        .map((s) => ({
+          positionsTyp: "LOHN",
+          positionsArt: "NORMAL",
+          kurztext: `${s.text} nach Aufmass`,
+          masseinheit: { bezeichnung: "Std" },
+          menge: s.std,
+          // Beim Lohn ist der Verrechnungssatz beides: was er uns kostet und
+          // was berechnet wird. Ein Aufschlag darauf waere eine zweite Marge.
+          ekPreis: { einzelPreis: s.satz },
+          vkPreis: { einzelPreis: s.satz },
+          vkFix: true,
+        })))
+
+    if (transport.length === 0 && stundenPositionen.length === 0) {
+      return json({ error: "Keine Position für ein Transportangebot.", ...vorschau }, 400)
+    }
 
     const anfrage = {
       context: { vorgangstyp: "ANGEBOT" },
@@ -468,14 +521,26 @@ Deno.serve(async (req: Request) => {
           ebenen: [{
             bezeichnung: ebeneBezeichnung,
             ebeneArt: "NORMAL",
-            positionen: transport.map((p) => ({
-              positionsTyp: "ARTIKEL",
-              positionsArt: "NORMAL",
-              katalogUUID: p.katalog_uuid,
-              menge: p.menge,
-              ekPreis: { einzelPreis: p.ek_einzel },
-              ...(p.vk_einzel != null ? { vkPreis: { einzelPreis: p.vk_einzel }, vkFix: true } : {}),
-            })),
+            positionen: [
+              ...transport.map((p) => ({
+                positionsTyp: "ARTIKEL",
+                positionsArt: "NORMAL",
+                // Mit Katalogbezug holt PDS die Bezeichnung selbst. Ohne einen
+                // muss sie mitkommen — und zwar als kurztext: das Feld `name`
+                // loest PDS gegen den Katalog auf und antwortet 412 (ADR 0008).
+                ...(p.katalog_uuid
+                  ? { katalogUUID: p.katalog_uuid }
+                  : { kurztext: p.name, ...(p.einheit ? { masseinheit: { bezeichnung: p.einheit } } : {}) }),
+                menge: p.menge,
+                ekPreis: { einzelPreis: p.ek_einzel },
+                ...(p.vk_einzel != null ? { vkPreis: { einzelPreis: p.vk_einzel }, vkFix: true } : {}),
+              })),
+              // Die Stunden gehoeren zum Regieaufmass wie das Material: was
+              // geleistet wurde, muss in den Auftrag, sonst wird es nicht
+              // abgerechnet. Sie stehen als eigene Zeile je Rolle, weil sich
+              // die Saetze unterscheiden.
+              ...stundenPositionen,
+            ],
           }],
         },
       },
@@ -516,6 +581,7 @@ Deno.serve(async (req: Request) => {
         pds_transport_nummer: angebotNummer || null,
         pds_transport_at: jetzt,
         pds_transport_positionen: transport.length,
+        ...(stundenPositionen.length ? { stunden_transport_at: jetzt } : {}),
         ...(nk.status === "offen" ? { status: "erfasst" } : {}),
       })
       .eq("id", nkId)
@@ -527,6 +593,7 @@ Deno.serve(async (req: Request) => {
         uuid: angebotUUID,
         vorgangs_nummer: angebotNummer,
         positionen: transport.length,
+        stunden_positionen: stundenPositionen.length,
         ek_summe: transportEk,
         vk_summe: transportVk,
       },
