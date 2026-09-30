@@ -138,8 +138,26 @@ export async function leseAufmassFoto(fotoId) {
       return { blatt_art: art, positionen: positionen.length, summe_vk: ergebnis.angebot_summe_vk ?? null }
     }
 
-    // Offene Zeilen eines frueheren Laufs raeumen, uebernommene nicht anfassen.
-    await supabase.from('shop_aufmass_foto_zeile').delete().eq('foto_id', fotoId).eq('status', 'offen')
+    // Offene Zeilen eines frueheren Laufs raeumen - aber nur die, an denen
+    // niemand war. Was von Hand zugeordnet, korrigiert oder mit einer Notiz
+    // versehen wurde, bleibt stehen: diese Entscheidungen stehen nicht auf dem
+    // Blatt und koennte kein zweiter Lesedurchgang wiederherstellen.
+    await supabase
+      .from('shop_aufmass_foto_zeile')
+      .delete()
+      .eq('foto_id', fotoId)
+      .eq('status', 'offen')
+      .eq('von_hand', false)
+
+    // Was von Hand bleibt, darf nicht noch einmal als neue Zeile entstehen.
+    const { data: behalten } = await supabase
+      .from('shop_aufmass_foto_zeile')
+      .select('roh_artikelnr, roh_bezeichnung')
+      .eq('foto_id', fotoId)
+      .eq('status', 'offen')
+    const schonDa = new Set(
+      (behalten || []).map((b) => `${normalizeArtikelnr(b.roh_artikelnr)}|${(b.roh_bezeichnung || '').toLowerCase().trim()}`),
+    )
 
     const zeilen = Array.isArray(ergebnis.zeilen) ? ergebnis.zeilen : []
     const rows = zeilen
@@ -160,8 +178,11 @@ export async function leseAufmassFoto(fotoId) {
         }
       })
 
-    if (rows.length) {
-      const { error: insErr } = await supabase.from('shop_aufmass_foto_zeile').insert(rows)
+    const neueRows = rows.filter(
+      (r) => !schonDa.has(`${normalizeArtikelnr(r.roh_artikelnr)}|${(r.roh_bezeichnung || '').toLowerCase().trim()}`),
+    )
+    if (neueRows.length) {
+      const { error: insErr } = await supabase.from('shop_aufmass_foto_zeile').insert(neueRows)
       if (insErr) throw insErr
     }
 
@@ -197,9 +218,10 @@ export async function leseAufmassFoto(fotoId) {
         datum: ergebnis.datum || null,
         monteur: ergebnis.monteur || null,
       },
-      zeilen: rows.length,
-      ohne_artikel: rows.filter((r) => !r.artikel_id).length,
-      unsicher: rows.filter((r) => r.sicherheit != null && r.sicherheit < 0.8).length,
+      zeilen: neueRows.length,
+      behalten: schonDa.size,
+      ohne_artikel: neueRows.filter((r) => !r.artikel_id).length,
+      unsicher: neueRows.filter((r) => r.sicherheit != null && r.sicherheit < 0.8).length,
     }
   } catch (e) {
     await supabase
@@ -324,7 +346,7 @@ export async function getFotoSignedUrl(pfad, gueltigSek = 3600) {
 export async function setZeileMenge(id, menge) {
   const { error } = await supabase
     .from('shop_aufmass_foto_zeile')
-    .update({ roh_menge: Number(menge) })
+    .update({ roh_menge: Number(menge), von_hand: true })
     .eq('id', id)
   if (error) throw error
 }
@@ -332,7 +354,7 @@ export async function setZeileMenge(id, menge) {
 export async function setZeileArtikel(id, artikelId) {
   const { error } = await supabase
     .from('shop_aufmass_foto_zeile')
-    .update({ artikel_id: artikelId, treffer_art: artikelId ? 'name' : 'keiner' })
+    .update({ artikel_id: artikelId, treffer_art: artikelId ? 'name' : 'keiner', von_hand: true })
     .eq('id', id)
   if (error) throw error
 }
@@ -340,7 +362,7 @@ export async function setZeileArtikel(id, artikelId) {
 export async function verwirfZeile(id) {
   const { error } = await supabase
     .from('shop_aufmass_foto_zeile')
-    .update({ status: 'verworfen' })
+    .update({ status: 'verworfen', von_hand: true })
     .eq('id', id)
   if (error) throw error
 }
