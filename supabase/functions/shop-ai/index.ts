@@ -165,7 +165,7 @@ async function extractAufmass(body: any) {
   // Handschrift werden damit deutlich zuverlaessiger gelesen, weil das Modell
   // gegen eine echte Liste abgleichen kann statt zu raten.
   const hinweis = typeof artikel_hinweis === "string" && artikel_hinweis.length
-    ? `\n\nBekannte Artikel aus dem Katalog (Nummer = Bezeichnung), nutze sie zum Abgleich:\n${artikel_hinweis.slice(0, 12000)}`
+    ? `\n\nBekannte Artikel aus dem Katalog (Nummer = Bezeichnung), nutze sie zum Abgleich:\n${artikel_hinweis.slice(0, 60000)}`
     : ""
 
   const systemPrompt =

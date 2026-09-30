@@ -62,12 +62,18 @@ export async function leseAufmassFoto(fotoId) {
       .createSignedUrl(foto.bild_pfad, 300)
     if (sErr) throw sErr
 
-    // Die Klima-Artikel als Abgleichliste mitgeben. Das ist der groesste Hebel
-    // fuer die Lesequalitaet: das Modell muss die Nummer nicht raten, sondern
-    // kann sie wiedererkennen.
-    const artikel = await klimaArtikel()
+    // Der Katalog als Abgleichliste. Das ist der groesste Hebel fuer die
+    // Lesequalitaet: das Modell muss die Nummer nicht raten, sondern kann sie
+    // wiedererkennen. Dazu die GUT-Nummern, denn die stehen auf den Zetteln —
+    // im Shop steht derselbe Artikel unter seiner R+F-Nummer.
+    const [artikel, bruecke] = await Promise.all([alleArtikel(), gutBruecke()])
+    const rueckwaerts = new Map()
+    for (const [gut, rf] of bruecke) if (!rueckwaerts.has(rf)) rueckwaerts.set(rf, gut)
     const hinweis = artikel
-      .map((a) => `${a.artikelnr || '—'} = ${a.name}`)
+      .map((a) => {
+        const gut = rueckwaerts.get(normalizeArtikelnr(a.artikelnr))
+        return `${a.artikelnr || '—'}${gut ? ` (auch ${gut})` : ''} = ${a.name}`
+      })
       .join('\n')
 
     const { data: antwort, error: aiErr } = await supabase.functions.invoke('shop-ai', {
@@ -139,7 +145,7 @@ export async function leseAufmassFoto(fotoId) {
     const rows = zeilen
       .filter((z) => z && z.menge != null && Number(z.menge) > 0)
       .map((z) => {
-        const treffer = findeArtikel(artikel, z)
+        const treffer = findeArtikel(artikel, z, bruecke)
         return {
           foto_id: fotoId,
           roh_artikelnr: z.artikelnr || null,
@@ -204,26 +210,56 @@ export async function leseAufmassFoto(fotoId) {
   }
 }
 
-// Die Artikel, die in der Nachkalkulation ueberhaupt in Frage kommen.
-async function klimaArtikel() {
+// Alle aktiven Artikel, nicht nur die mit Klima-Kennzeichen.
+//
+// Der engere Filter war ein Fehler: das Regieaufmass gilt fuer jedes Gewerk,
+// und beim ersten echten Zettel (Waermepumpe) waren 30 von 30 Zeilen "nicht im
+// Shop" — obwohl der Shop 486 Artikel fuehrt und nur 32 davon das
+// Klima-Kennzeichen tragen.
+async function alleArtikel() {
   const { data, error } = await supabase
     .from('shop_artikel')
-    .select('id, artikelnr, name, einheit, preis_netto')
+    .select('id, artikelnr, name, einheit, preis_netto, nachkalkulation_klima')
     .eq('aktiv', true)
-    .eq('nachkalkulation_klima', true)
     .order('name')
   if (error) throw error
   return data || []
 }
 
+// Die Monteure schreiben GUT-Nummern auf, im Shop stehen die R+F-Artikel.
+// `shop_gut_rf_zuordnung` ist die Bruecke (400 gepflegte Zuordnungen, siehe
+// CLAUDE.md) — ohne sie bleibt jede zweite Zeile unerkannt, obwohl der Artikel
+// laengst da ist.
+async function gutBruecke() {
+  const { data, error } = await supabase
+    .from('shop_gut_rf_zuordnung')
+    .select('gut_artikelnummer, rf_artikelnummer')
+    .eq('entscheidung', 'zugeordnet')
+  if (error) return new Map()
+  const m = new Map()
+  for (const z of data || []) {
+    const gut = normalizeArtikelnr(z.gut_artikelnummer)
+    if (gut && z.rf_artikelnummer) m.set(gut, normalizeArtikelnr(z.rf_artikelnummer))
+  }
+  return m
+}
+
 // Artikelnummer schlaegt Namen. Eine uebereinstimmende Nummer ist ein harter
 // Treffer, der Namensvergleich bleibt Heuristik — deshalb steht die Herkunft
 // des Treffers an der Zeile und ist in der Liste sichtbar.
-function findeArtikel(artikel, zeile) {
+function findeArtikel(artikel, zeile, bruecke) {
   const nr = normalizeArtikelnr(zeile.artikelnr)
   if (nr) {
     const treffer = artikel.find((a) => normalizeArtikelnr(a.artikelnr) === nr)
     if (treffer) return { artikel: treffer, art: 'artikelnr' }
+
+    // Zweiter Anlauf ueber die GUT-Nummer. Zaehlt als harter Treffer: die
+    // Zuordnung ist gepflegtes Stammdatum, keine Vermutung.
+    const rfNr = bruecke?.get(nr)
+    if (rfNr) {
+      const ueber = artikel.find((a) => normalizeArtikelnr(a.artikelnr) === rfNr)
+      if (ueber) return { artikel: ueber, art: 'artikelnr' }
+    }
   }
   const text = String(zeile.bezeichnung || '').toLowerCase().trim()
   if (text.length > 4) {

@@ -234,8 +234,11 @@ function Detail({ id, onZurueck }) {
   const { data: liste = [] } = useQuery({ queryKey: ['nachkalkulationen'], queryFn: listNachkalkulationen })
   const { data: artikelListe = [] } = useQuery({
     queryKey: ['shop-artikel'],
-    // Nur Artikel mit Kennzeichen "Nachkalkulation Klima" (Migration 014).
-    queryFn: () => listArtikel({ nurNachkalkulation: true }),
+    // Bewusst der ganze Katalog, nicht nur das Klima-Kennzeichen: das
+    // Regieaufmass gilt fuer jedes Gewerk. Beim ersten Waermepumpen-Zettel
+    // waren 30 von 30 Zeilen "nicht im Shop", obwohl der Shop 486 Artikel
+    // fuehrt und nur 32 davon das Kennzeichen tragen.
+    queryFn: () => listArtikel({}),
   })
 
   const nk = liste.find((n) => n.id === id)
