@@ -363,6 +363,12 @@ export const PLAYBOOKS = {
         for (const np of document.querySelectorAll('[data-cid="NetPriced"]')) {
           const prefix = (np.id || '').replace(/_netPriceContainer.*$/, '')
           if (!prefix || !/productTable_\d+$/.test(prefix)) continue
+          // Die Seite zeigt NEBEN den Suchtreffern eine zweite Artikelliste im
+          // linken Raster (zuletzt angesehen bzw. Merkliste). Sie hat dieselbe
+          // Struktur, gehoert aber nicht zum Suchergebnis. Am 30.09.2026 hat
+          // sie eine Suche nach "KFE-Hahn" mit lauter Prestabo-Boegen
+          // beantwortet - und die sahen aus wie ein Ergebnis.
+          if (/leftGrid|rightGrid/.test(prefix)) continue
 
           const feld = (cid) => {
             const e = document.querySelector(`[id^="${prefix}_"][data-cid="${cid}"]`)
