@@ -280,8 +280,17 @@ export const PLAYBOOKS = {
       return this.istAngemeldet(page)
     },
     async istAngemeldet(page) {
-      // Nach dem Login verschwindet das Login-Formular aus dem Benutzermenue.
-      const pw = await page.locator('#a3_inputPass').count()
+      // Eine abgelaufene Sitzung zeigt einen ZWEITEN Anmeldedialog, dessen
+      // Felder nicht #a3_inputPass heissen. Die alte Pruefung sah dort kein
+      // Kennwortfeld und meldete "angemeldet" - jede folgende Suche lief
+      // stillschweigend gegen die Loginseite und fand nichts. Am 30.09.2026
+      // kostete das eine ganze Runde Fehlersuche.
+      const erneut = await page.locator('text=/Bitte melden Sie sich erneut an/i').count()
+      if (erneut > 0) return false
+      const zugangsdaten = await page.locator('text=/Zugangsdaten eingeben/i').count()
+      if (zugangsdaten > 0) return false
+
+      const pw = await page.locator('#a3_inputPass, input[type="password"]:visible').count()
       const abmelden = await page.locator('a:has-text("Abmelden"), a:has-text("Logout"), a[href*="logout"], a[href*="Logout"], #a3_btnLogout, [id*="Logout"]').count()
       return abmelden > 0 || pw === 0
     },
