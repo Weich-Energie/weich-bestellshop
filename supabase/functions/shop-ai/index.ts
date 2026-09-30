@@ -178,7 +178,11 @@ async function extractAufmass(body: any) {
     `  "stunden" — Stundenzettel. Namen, Tage, Arbeitszeiten, oft handschriftlich.\n` +
     `  "angebot" — ein gedrucktes Angebot oder Auftrag (haeufig aus Reonic) mit ` +
     `Positionen, Mengen und Preisen. Nichts Handschriftliches.\n\n` +
-    `Fuelle nur den Abschnitt, der zur erkannten Art gehoert. Die anderen bleiben leer.\n\n` +
+    `Fuelle nur den Abschnitt, der zur erkannten Art gehoert. Die anderen bleiben leer.\n` +
+    `AUSNAHME: Stehen auf einem Materialblatt auch Arbeitsstunden (Namen mit Zeiten, ` +
+    `"8 Std", "2 Mann 6 h", eine Zeile "Stunden: 12"), dann fuelle "stunden_zeilen" ` +
+    `ZUSAETZLICH aus. Das ist der haeufige Fall — der Monteur notiert beides auf dasselbe ` +
+    `Blatt. Sie zu uebersehen heisst, dass die Arbeit nicht abgerechnet wird.\n\n` +
     `--- BEI "material" ---\n` +
     `ENTSCHEIDENDE REGEL: Nur die handschriftliche Menge zaehlt. In der gedruckten ` +
     `Mengen- oder Anzahl-Spalte steht bei jeder Zeile eine 1 — das ist ein Kopierrest ` +

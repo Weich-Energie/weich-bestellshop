@@ -157,6 +157,11 @@ export default function AufmassFotoBox({ nachkalkulationId, artikelListe = [], o
                   <Text fontSize="xs">{f.zeilen_unsicher} unsicher gelesen</Text>
                 </HStack>
               )}
+              {f.blatt_art !== 'stunden' && f.stunden_gelesen?.zeilen?.length > 0 && (
+                <Badge size="sm" colorPalette="purple" variant="outline">
+                  {f.stunden_gelesen.gebucht_am ? 'Stunden gebucht' : 'auch Stunden drauf'}
+                </Badge>
+              )}
               {f.zeilen_ohne_artikel > 0 && (
                 <Text fontSize="xs" color="purple.600">
                   {f.zeilen_ohne_artikel} ohne Artikel im Katalog
@@ -222,7 +227,7 @@ function StundenZettel({ foto, nachkalkulationId, onAenderung }) {
     Object.fromEntries(zeilen.map((z, i) => [i, z.rolle === 'techniker' ? 'techniker' : 'monteur'])))
   const [laeuft, setLaeuft] = useState(false)
   const [fehler, setFehler] = useState(null)
-  const erledigt = foto.status === 'uebernommen'
+  const erledigt = Boolean(foto.stunden_gelesen?.gebucht_am) || foto.status === 'uebernommen'
 
   const summeT = zeilen.reduce((s, z, i) => s + (rollen[i] === 'techniker' ? Number(z.stunden || 0) : 0), 0)
   const summeM = zeilen.reduce((s, z, i) => s + (rollen[i] === 'monteur' ? Number(z.stunden || 0) : 0), 0)

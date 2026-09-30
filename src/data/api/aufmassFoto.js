@@ -159,13 +159,33 @@ export async function leseAufmassFoto(fotoId) {
       if (insErr) throw insErr
     }
 
+    // Ein Materialblatt traegt haeufig auch die Stunden — der Monteur schreibt
+    // beides auf denselben Zettel. Sie werden mitgenommen und warten auf die
+    // Rollenzuordnung wie bei einem reinen Stundenzettel.
+    const stundenZeilen = Array.isArray(ergebnis.stunden_zeilen) ? ergebnis.stunden_zeilen : []
+
     await supabase
       .from('shop_aufmass_foto')
-      .update({ status: 'gelesen', blatt_art: art, gelesen_am: new Date().toISOString() })
+      .update({
+        status: 'gelesen',
+        blatt_art: art,
+        gelesen_am: new Date().toISOString(),
+        ...(stundenZeilen.length
+          ? {
+            stunden_gelesen: {
+              zeilen: stundenZeilen,
+              summe: stundenZeilen.reduce((s, z) => s + Number(z.stunden || 0), 0),
+              baustelle: ergebnis.baustelle || null,
+              datum: ergebnis.datum || null,
+            },
+          }
+          : {}),
+      })
       .eq('id', fotoId)
 
     return {
       blatt_art: art,
+      stunden_zeilen: stundenZeilen.length,
       kopf: {
         baustelle: ergebnis.baustelle || null,
         datum: ergebnis.datum || null,
@@ -355,6 +375,12 @@ export async function uebernimmStunden(nachkalkulationId, fotoId, { techniker = 
     .single()
   if (nErr) throw nErr
 
+  const { data: foto } = await supabase
+    .from('shop_aufmass_foto')
+    .select('stunden_gelesen')
+    .eq('id', fotoId)
+    .single()
+
   const neuT = Number(nk.ist_stunden_techniker || 0) + Number(techniker || 0)
   const neuM = Number(nk.ist_stunden_monteur || 0) + Number(monteur || 0)
 
@@ -368,7 +394,16 @@ export async function uebernimmStunden(nachkalkulationId, fotoId, { techniker = 
     .eq('id', nachkalkulationId)
   if (error) throw error
 
-  await supabase.from('shop_aufmass_foto').update({ status: 'uebernommen' }).eq('id', fotoId)
+  // Der Merker liegt im jsonb, nicht im Status: ein Materialblatt traegt oft
+  // auch die Stunden, und dessen Zeilen sind nach dem Buchen noch offen. Wer
+  // hier den Status auf "uebernommen" setzte, erklaerte das Material fuer
+  // erledigt, das noch niemand angesehen hat.
+  await supabase
+    .from('shop_aufmass_foto')
+    .update({ stunden_gelesen: { ...(foto?.stunden_gelesen || {}), gebucht_am: new Date().toISOString() } })
+    .eq('id', fotoId)
+  await fotoStatusNachziehen(fotoId)
+
   return { techniker: neuT, monteur: neuM }
 }
 
