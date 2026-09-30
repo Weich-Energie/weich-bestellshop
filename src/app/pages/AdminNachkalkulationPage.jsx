@@ -750,6 +750,29 @@ function MaterialBlock({ nk, onGeaendert }) {
               ))}
             </Box>
           )}
+          {/* Beim Regieaufmass gehoeren die Stunden in den Auftrag wie das
+              Material. Vor dem Anlegen muss sichtbar sein, was mitgeht. */}
+          {vorschau.stunden && (vorschau.stunden.techniker > 0 || vorschau.stunden.monteur > 0) && (
+            <Box mt={2} borderWidth="1px" borderRadius="md" p={2} bg="gray.50">
+              <Text fontSize="xs" fontWeight="medium" mb={1}>
+                {vorschau.stunden.bereits_uebertragen
+                  ? 'Stunden stehen bereits im Auftrag'
+                  : 'Geht als Lohnposition mit'}
+              </Text>
+              {vorschau.stunden.techniker > 0 && (
+                <Text fontSize="xs" color="fg.muted">
+                  Technikerstunden {vorschau.stunden.techniker} h × {euro(vorschau.stunden.satz_techniker)}
+                  {' = '}{euro(vorschau.stunden.techniker * vorschau.stunden.satz_techniker)}
+                </Text>
+              )}
+              {vorschau.stunden.monteur > 0 && (
+                <Text fontSize="xs" color="fg.muted">
+                  Monteurstunden {vorschau.stunden.monteur} h × {euro(vorschau.stunden.satz_monteur)}
+                  {' = '}{euro(vorschau.stunden.monteur * vorschau.stunden.satz_monteur)}
+                </Text>
+              )}
+            </Box>
+          )}
           <Text fontSize="xs" color="fg.muted" mt={2}>{vorschau.hinweis}</Text>
         </Box>
       )}
