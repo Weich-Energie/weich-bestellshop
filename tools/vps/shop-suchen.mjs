@@ -18,11 +18,20 @@ const wert = (n, s) => { const i = args.indexOf(`--${n}`); return i >= 0 && args
 const slug = wert('lieferant', null)
 const max = Number(wert('max', 20))
 const details = Number(wert('details', 0))
+// --json: Ausgabe fuer Maschinen statt fuer Menschen. So ruft weich-api das
+// Skript, und die Antwort geht unveraendert bis in die Oberflaeche durch.
+const alsJson = args.includes('--json')
 const begriff = args.find((a, i) => !a.startsWith('--') && !['--lieferant', '--max', '--details'].includes(args[i - 1]))
 if (!slug || !begriff) { console.error('Aufruf: --lieferant <slug> "<begriff>"'); process.exit(1) }
 
 const { browser, page, angemeldet } = await oeffnen(slug)
-if (!angemeldet) { console.error(`${slug}: nicht angemeldet`); await browser.close(); process.exit(2) }
+if (!angemeldet) {
+  // Eigenes Kennzeichen: eine abgelaufene Sitzung ist kein Suchfehler, sondern
+  // braucht eine neue Anmeldung. Der Aufrufer soll nicht sinnlos wiederholen.
+  if (alsJson) console.log(JSON.stringify({ sitzung_abgelaufen: true, lieferant: slug }))
+  else console.error(`${slug}: nicht angemeldet`)
+  await browser.close(); process.exit(2)
+}
 const pb = playbook(slug)
 
 try {
@@ -40,12 +49,34 @@ try {
     await pb.suchen(page, begriff)
   }
 
-  // Die URL gehoert in die Ausgabe: eine Suche, die still auf der Startseite
-  // bleibt, liefert eine Liste, die wie ein Ergebnis aussieht und keines ist.
-  console.log(`"${begriff}" bei ${slug} — ${treffer.length} Treffer  [${page.url()}]`)
-  for (const t of treffer) {
-    const preis = t.netto_preis != null ? `${t.netto_preis.toFixed(2)} €` : '?'
-    console.log(`${String(t.artikelnummer ?? '?').padEnd(16)} ${preis.padStart(10)} ${(t.einheit ?? '').padEnd(10)} ${t.titel ?? ''}`)
+  if (alsJson) {
+    // Die URL gehoert mit: eine Suche, die still auf der Startseite bleibt,
+    // liefert eine Liste, die wie ein Ergebnis aussieht und keines ist.
+    const norm = (x) => String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+    console.log(JSON.stringify({
+      lieferant: slug,
+      begriff,
+      url: page.url(),
+      gesamt: treffer.length,
+      treffer: treffer.map((t) => ({
+        artikelnr: t.artikelnummer ?? null,
+        name: t.titel ?? null,
+        hersteller: t.hersteller ?? null,
+        preis_netto: t.netto_preis ?? null,
+        listenpreis: t.listenpreis ?? null,
+        einheit: t.einheit ?? null,
+        // Sagt der Oberflaeche, ob sie den Treffer vorschlagen darf oder nur
+        // anbieten: eine uebereinstimmende Nummer ist etwas anderes als ein
+        // Artikel, der bei der Suche zufaellig mit dabei war.
+        exakt: norm(t.artikelnummer) === norm(begriff),
+      })),
+    }))
+  } else {
+    console.log(`"${begriff}" bei ${slug} — ${treffer.length} Treffer  [${page.url()}]`)
+    for (const t of treffer) {
+      const preis = t.netto_preis != null ? `${t.netto_preis.toFixed(2)} €` : '?'
+      console.log(`${String(t.artikelnummer ?? '?').padEnd(16)} ${preis.padStart(10)} ${(t.einheit ?? '').padEnd(10)} ${t.titel ?? ''}`)
+    }
   }
 } finally {
   await browser.close()

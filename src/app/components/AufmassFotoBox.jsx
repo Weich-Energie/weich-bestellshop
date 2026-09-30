@@ -14,7 +14,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Box, Text, HStack, VStack, Button, Input, Table, Badge, Spinner, Flex, Spacer, IconButton,
 } from '@chakra-ui/react'
-import { Camera, ScanLine, Check, X, Trash2, ExternalLink, AlertTriangle, Clock, FileText } from 'lucide-react'
+import { Camera, ScanLine, Check, X, Trash2, ExternalLink, AlertTriangle, Clock, FileText, Search } from 'lucide-react'
+import LieferantSucheDialog from './LieferantSucheDialog.jsx'
+import { listKategorien } from '../../data/api/kategorien.js'
+import { listLieferanten } from '../../data/api/lieferanten.js'
 import {
   uploadAufmassFoto, leseAufmassFoto, listFotos, listZeilen, getFotoSignedUrl,
   setZeileMenge, setZeileArtikel, verwirfZeile, uebernimmZeilen, fotoStatusNachziehen, deleteFoto,
@@ -434,6 +437,9 @@ function Zeilen({ fotoId, nachkalkulationId, artikelListe, onAenderung }) {
     queryKey: ['aufmass-zeilen', fotoId],
     queryFn: () => listZeilen(fotoId),
   })
+  // Fuer den Suchdialog: Kategorie und Lieferant eines neu angelegten Artikels.
+  const { data: kategorien = [] } = useQuery({ queryKey: ['kategorien'], queryFn: listKategorien })
+  const { data: lieferanten = [] } = useQuery({ queryKey: ['lieferanten'], queryFn: listLieferanten })
 
   function neu() {
     qc.invalidateQueries({ queryKey: ['aufmass-zeilen', fotoId] })
@@ -487,6 +493,7 @@ function Zeilen({ fotoId, nachkalkulationId, artikelListe, onAenderung }) {
           <Table.Body>
             {zeilen.map((z) => (
               <Zeile key={z.id} z={z} artikelListe={artikelListe}
+                kategorien={kategorien} lieferanten={lieferanten}
                 onUebernehmen={() => uebernehmen([z])} onAenderung={neu} />
             ))}
           </Table.Body>
@@ -496,8 +503,9 @@ function Zeilen({ fotoId, nachkalkulationId, artikelListe, onAenderung }) {
   )
 }
 
-function Zeile({ z, artikelListe, onUebernehmen, onAenderung }) {
+function Zeile({ z, artikelListe, kategorien, lieferanten, onUebernehmen, onAenderung }) {
   const [menge, setMenge] = useState(z.roh_menge ?? '')
+  const [suchtImShop, setSuchtImShop] = useState(false)
   const erledigt = z.status !== 'offen'
   const unsicher = z.sicherheit != null && Number(z.sicherheit) < 0.8
 
@@ -543,9 +551,14 @@ function Zeile({ z, artikelListe, onUebernehmen, onAenderung }) {
               ))}
             </select>
             {!z.artikel_id && (
-              <Text fontSize="10px" color="purple.600">
-                fehlt im Katalog — gehört in den Artikelstamm der Aufmaß-App
-              </Text>
+              <VStack align="start" gap={0.5}>
+                <Text fontSize="10px" color="purple.600">
+                  fehlt im Katalog — gehört in den Artikelstamm der Aufmaß-App
+                </Text>
+                <Button size="xs" variant="outline" onClick={() => setSuchtImShop(true)}>
+                  <Search size={11} /> Im Lieferantenshop suchen
+                </Button>
+              </VStack>
             )}
             {z.treffer_art === 'name' && z.artikel_id && (
               <Text fontSize="10px" color="fg.muted">über den Namen gefunden, bitte prüfen</Text>
@@ -584,6 +597,24 @@ function Zeile({ z, artikelListe, onUebernehmen, onAenderung }) {
           </HStack>
         )}
       </Table.Cell>
+      {/* Der Suchdialog braucht die ganze Breite und wuerde in einer Zelle
+          zerdrueckt. Chakra erlaubt kein zweites tr aus derselben Komponente,
+          deshalb liegt er als aufgespannte Zelle unter der Zeile. */}
+      {suchtImShop && (
+        <Table.Cell colSpan={4} p={0} borderBottomWidth="0">
+          <LieferantSucheDialog
+            zeile={z}
+            kategorien={kategorien}
+            lieferanten={lieferanten}
+            onAbbrechen={() => setSuchtImShop(false)}
+            onFertig={async (artikel) => {
+              await setZeileArtikel(z.id, artikel.id)
+              setSuchtImShop(false)
+              onAenderung()
+            }}
+          />
+        </Table.Cell>
+      )}
     </Table.Row>
   )
 }

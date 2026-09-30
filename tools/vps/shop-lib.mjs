@@ -516,6 +516,40 @@ export const PLAYBOOKS = {
       await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {})
       await page.waitForTimeout(2500)
     },
+    // Trefferzeilen folgen immer demselben Muster: sechs- oder siebenstellige
+    // Nummer, darunter die Bezeichnung, darunter die beiden Preise.
+    //
+    // Die Spalte heisst "Netto / Brutto" und meint NICHT die Mehrwertsteuer:
+    // netto ist der eigene Einkaufspreis, brutto der Bruttolistenpreis des
+    // Herstellers. Wer den zweiten Wert nimmt, legt beim NYM 186,08 EUR statt
+    // 110,15 EUR als Einkauf an.
+    async trefferAusListe(page) {
+      return page.evaluate(() => {
+        const zeilen = document.body.innerText.replace(/\r/g, '').split('\n').map((z) => z.trim()).filter(Boolean)
+        const istNummer = (z) => /^\d{6,7}$/.test(z)
+        const istPreis = (z) => /^[\d.]+,\d{2}\s*€?$/.test(z)
+        const zahl = (t) => (t ? Number(t.replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '')) : null)
+        const out = []
+        for (let i = 0; i < zeilen.length; i++) {
+          if (!istNummer(zeilen[i])) continue
+          const danach = zeilen.slice(i + 1, i + 12)
+          const preise = danach.filter(istPreis)
+          const titel = danach.find((z) => z.length > 10 && !istPreis(z) && !/^\+/.test(z)) || null
+          // Ohne Bezeichnung ist es keine Artikelzeile, sondern irgendeine
+          // andere Zahl auf der Seite - Bestellnummer, Menge, Postleitzahl.
+          if (!titel) continue
+          out.push({
+            url: location.href,
+            artikelnummer: zeilen[i],
+            titel,
+            netto_preis: zahl(preise[0] ?? null),
+            listenpreis: zahl(preise[1] ?? null),
+            einheit: danach.find((z) => /^(STK|MTR|PAK|ROL|KG|LTR|SET)$/i.test(z)) || null,
+          })
+        }
+        return out
+      })
+    },
     sucheUrl: (begriff) => `https://shop.fega.de/abtest/scripts/shop.php?cmd=Suche&q=${encodeURIComponent(begriff)}`,
     istProduktUrl: (h) => /shop\.fega\.de\/.*(cmd=Artikel|artikeldetail)/i.test(h),
     netto: { selektor: '[class*="price"], [class*="preis"]', muster: /([\d.]+,\d{2})/ },

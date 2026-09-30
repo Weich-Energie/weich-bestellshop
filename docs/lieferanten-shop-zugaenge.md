@@ -222,3 +222,53 @@ nichts im Kundenkonto. Der Bestell-Bot mit `bot_jobs`, verschlüsselten
 Zugängen in `shop_lieferanten.zugang_chiffre` und `SUPPLIER_CRED_KEY` ist ein
 eigener Schritt; der Master-Key existiert bis heute weder auf dem VPS noch als
 Supabase-Secret. Der Abruf hier braucht ihn nicht.
+
+## Suchen aus der App heraus (30.09.2026)
+
+Bis hierher war das Nachschlagen im Lieferantenshop Handarbeit auf dem VPS.
+Seit dem 30.09.2026 gibt es dafuer einen Knopf an jeder Aufmasszeile, die
+keinen Artikel im Katalog hat: **„Im Lieferantenshop suchen"**.
+
+Die Kette ist dieselbe wie beim BzA-Assistenten:
+
+```
+Bestellshop  ->  Edge Function lieferant-suche  ->  weich-api /lieferant/suche
+             ->  shop-suchen.mjs --json  ->  angemeldeter Browser  ->  Shop
+```
+
+- **`shop-suchen.mjs --json`** gibt Nummer, Bezeichnung, Hersteller,
+  Nettopreis, Listenpreis und Einheit aus, dazu `exakt` — ob die Nummer mit dem
+  Suchbegriff uebereinstimmt. Bei Shops, deren Trefferliste keine Bezeichnung
+  fuehrt (GUT), wird sie aus der Detailansicht nachgeladen.
+- **`weich-api /lieferant/suche`** (`src/lieferantSuche.ts`) startet das Skript
+  als Kindprozess, ohne Shell — der Suchbegriff kommt aus einem Eingabefeld.
+  Die erlaubten Lieferanten stehen als Weissliste im Modul, nicht im Aufruf.
+- **`lieferant-suche`** prueft Anmeldung und Admin-Rolle und reicht weiter.
+  Sie schreibt nichts; angelegt wird der Artikel danach vom Frontend.
+
+### Was der Mensch entscheidet, und warum
+
+Der Ablauf ist zweistufig: die App sucht und schlaegt vor, bestaetigt wird von
+Hand. Drei Dinge kann keine Maschine entscheiden, und alle drei sind an einem
+einzigen Montagebericht vorgekommen:
+
+1. **Ob die Nummer zum eingebauten Teil gehoert.** Auf dem Zettel stand ein
+   FI-Schalter Typ A (28,77 EUR), eingebaut war ein Typ B (372,88 EUR).
+2. **Ob ein Artikel als Rolle oder in Metern gefuehrt wird.** Der Shop schreibt
+   beides gleich; bei 10 m aus einer 100-m-Rolle rechnet die Nachkalkulation
+   sonst das Hundertfache. Der Dialog warnt, wenn ein Gebinde- oder Rollenpreis
+   neben einer kleinen Zettelmenge steht — er rechnet aber nicht um.
+3. **Ob die Bezeichnung stimmt.** „Profipress" auf dem Zettel, Prestabo im
+   Regal: eine Verwechslung dieser beiden Systeme hat schon einmal 8 990 EUR
+   falsch bepreist.
+
+### Zwei Preisfallen, die im Playbook stehen
+
+- **FEGA** stellt zwei Preise nebeneinander unter „Netto / Brutto". Das ist
+  **nicht** die Mehrwertsteuer: netto ist der eigene Einkaufspreis, brutto der
+  Bruttolistenpreis des Herstellers. Beim NYM 3x2,5 sind das 110,15 gegen
+  186,08 EUR.
+- **GUT** zeigt neben den Suchtreffern eine zweite Artikelliste im linken
+  Raster (zuletzt angesehen). Sie hat dieselbe Struktur und beantwortete eine
+  Suche nach „KFE-Hahn" mit lauter Prestabo-Boegen. Das Playbook schliesst
+  `leftGrid` deshalb aus.
