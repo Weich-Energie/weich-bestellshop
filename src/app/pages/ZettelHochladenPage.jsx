@@ -8,10 +8,10 @@
 // Diese Seite kann genau eins: Auftrag waehlen, fotografieren, hochladen. Die
 // Bilder werden gelesen und warten dann auf die Bestaetigung am Rechner.
 
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Box, Heading, Text, VStack, HStack, Button, Input, Badge, Spinner, Flex,
+  Box, Heading, Text, VStack, HStack, Button, Input, Badge, Spinner, Flex, Spacer,
 } from '@chakra-ui/react'
 import { Camera, Check, Plus, ArrowLeft, Search, Download } from 'lucide-react'
 import { listNachkalkulationen } from '../../data/api/nachkalkulation.js'
@@ -201,10 +201,19 @@ function NeueBaustelle({ onAngelegt }) {
   )
 }
 
+// Hochladen und Lesen sind getrennt (Patrick, 30.09.2026: "es wäre vielleicht
+// besser wenn ich die fotos schnell alle machen kann und dann erst uploade,
+// weil es nach jedem foto ein paar sekunden dauert"). Auf der Baustelle zaehlt
+// Tempo: die Bilder gehen sofort raus, das Lesen laeuft danach von selbst
+// weiter, waehrend schon das naechste fotografiert wird.
+//
+// Der Reihe nach gelesen, nicht alle auf einmal: jedes Bild ist ein
+// Vision-Aufruf, und gleichzeitige Aufrufe bringen nur Zeitueberlaeufe.
 function Hochladen({ nk, onZurueck }) {
   const [laeuft, setLaeuft] = useState(false)
   const [fertig, setFertig] = useState([])
   const [fehler, setFehler] = useState(null)
+  const liestGerade = useRef(false)
 
   async function handleUpload(e) {
     const dateien = Array.from(e.target.files || [])
@@ -213,12 +222,7 @@ function Hochladen({ nk, onZurueck }) {
     for (const datei of dateien) {
       try {
         const foto = await uploadAufmassFoto({ nachkalkulationId: nk.id, file: datei })
-        // Gleich lesen lassen, damit auf der Baustelle schon sichtbar ist, ob
-        // das Bild etwas taugt. Ein unscharfes Foto faellt so sofort auf und
-        // nicht erst drei Wochen spaeter am Rechner.
-        let gelesen = null
-        try { gelesen = await leseAufmassFoto(foto.id) } catch (e2) { gelesen = { fehler: e2.message } }
-        setFertig((f) => [...f, { name: datei.name, ...gelesen }])
+        setFertig((f) => [...f, { id: foto.id, name: datei.name, status: 'wartet' }])
       } catch (e3) {
         setFehler(e3.message)
       }
@@ -226,6 +230,28 @@ function Hochladen({ nk, onZurueck }) {
     setLaeuft(false)
     e.target.value = ''
   }
+
+  // Arbeitet die Warteschlange ab, immer nur eines. Laeuft weiter, solange die
+  // Seite offen ist; geht sie vorher zu, bleibt das Bild auf "noch nicht
+  // gelesen" und wird am Rechner mit einem Klick nachgeholt.
+  useEffect(() => {
+    if (liestGerade.current) return
+    const naechstes = fertig.find((f) => f.status === 'wartet')
+    if (!naechstes) return
+
+    liestGerade.current = true
+    setFertig((f) => f.map((x) => (x.id === naechstes.id ? { ...x, status: 'liest' } : x)))
+    leseAufmassFoto(naechstes.id)
+      .then((erg) => {
+        setFertig((f) => f.map((x) => (x.id === naechstes.id ? { ...x, status: 'fertig', ...erg } : x)))
+      })
+      .catch((e) => {
+        setFertig((f) => f.map((x) => (x.id === naechstes.id ? { ...x, status: 'fehler', fehler: e.message } : x)))
+      })
+      .finally(() => { liestGerade.current = false })
+  }, [fertig])
+
+  const offen = fertig.filter((f) => f.status === 'wartet' || f.status === 'liest').length
 
   return (
     <Box maxW="560px" mx="auto">
@@ -248,20 +274,39 @@ function Hochladen({ nk, onZurueck }) {
 
       {fehler && <Text fontSize="sm" color="red.600" mb={2}>{fehler}</Text>}
 
+      {fertig.length > 0 && (
+        <HStack gap={2} mb={2}>
+          <Text fontSize="sm" fontWeight="medium">{fertig.length} hochgeladen</Text>
+          {offen > 0 && (
+            <>
+              <Spinner size="xs" />
+              <Text fontSize="xs" color="fg.muted">{offen} werden noch gelesen</Text>
+            </>
+          )}
+        </HStack>
+      )}
+
       <VStack align="stretch" gap={2}>
-        {fertig.map((f, i) => (
-          <Box key={i} borderWidth="1px" borderRadius="md" p={3} bg="white">
+        {fertig.map((f) => (
+          <Box key={f.id} borderWidth="1px" borderRadius="md" p={3} bg="white">
             <HStack gap={2}>
-              {f.fehler ? (
+              {f.status === 'wartet' && <Text fontSize="sm" color="fg.muted">hochgeladen</Text>}
+              {f.status === 'liest' && (
+                <><Spinner size="xs" /><Text fontSize="sm" color="fg.muted">wird gelesen…</Text></>
+              )}
+              {f.status === 'fehler' && (
                 <Text fontSize="sm" color="red.600">konnte nicht gelesen werden</Text>
-              ) : (
+              )}
+              {f.status === 'fertig' && (
                 <>
                   <Check size={14} color="green" />
                   <Badge size="sm" variant="subtle">{ART_TEXT[f.blatt_art] || 'gelesen'}</Badge>
                 </>
               )}
+              <Spacer />
+              <Text fontSize="10px" color="fg.muted" truncate maxW="120px">{f.name}</Text>
             </HStack>
-            {!f.fehler && (
+            {f.status === 'fertig' && (
               <Text fontSize="xs" color="fg.muted" mt={1}>
                 {f.blatt_art === 'stunden'
                   ? `${f.stunden_zeilen} Einträge, ${f.stunden_summe} Stunden`
@@ -282,8 +327,9 @@ function Hochladen({ nk, onZurueck }) {
 
       {fertig.length > 0 && (
         <Text fontSize="xs" color="fg.muted" mt={4}>
-          Die Zettel liegen jetzt am Auftrag. Übernommen wird am Rechner unter
-          Nachkalkulation — erst dort werden aus den gelesenen Zeilen Positionen.
+          Die Zettel liegen am Auftrag. Du kannst hier weg, sobald sie hochgeladen sind —
+          was noch nicht gelesen wurde, holst du am Rechner mit einem Klick nach.
+          Übernommen wird ohnehin dort, unter Nachkalkulation.
         </Text>
       )}
     </Box>

@@ -35,6 +35,7 @@ const ART_TEXT = {
 export default function AufmassFotoBox({ nachkalkulationId, artikelListe = [], onAenderung }) {
   const qc = useQueryClient()
   const [laedtHoch, setLaedtHoch] = useState(false)
+  const [liestAlle, setLiestAlle] = useState(false)
   const [fehler, setFehler] = useState(null)
   const [offenesFoto, setOffenesFoto] = useState(null)
 
@@ -59,7 +60,6 @@ export default function AufmassFotoBox({ nachkalkulationId, artikelListe = [], o
         nr += 1
         const foto = await uploadAufmassFoto({ nachkalkulationId, file: datei, seitennr: nr })
         neu()
-        // Gleich lesen lassen: das ist der Grund, warum man hochlaedt.
         try { await leseAufmassFoto(foto.id) } catch { /* Fehler steht am Foto */ }
         neu()
       }
@@ -75,6 +75,21 @@ export default function AufmassFotoBox({ nachkalkulationId, artikelListe = [], o
     setFehler(null)
     try { await leseAufmassFoto(fotoId) } catch (e) { setFehler(e.message) }
     neu()
+  }
+
+  // Auf der Baustelle zaehlt Tempo, deshalb laedt das Telefon nur hoch und
+  // liest nebenher. Wer vorher weggeht, hat hier den Rest stehen.
+  const ungelesen = fotos.filter((f) => f.status === 'neu' || f.status === 'fehler')
+
+  // Der Reihe nach: jedes Bild ist ein Vision-Aufruf, gleichzeitige Aufrufe
+  // bringen nur Zeitueberlaeufe.
+  async function alleLesen() {
+    setLiestAlle(true); setFehler(null)
+    for (const f of ungelesen) {
+      try { await leseAufmassFoto(f.id) } catch { /* Fehler steht am Foto */ }
+      neu()
+    }
+    setLiestAlle(false)
   }
 
   async function handleLoeschen(fotoId) {
@@ -94,6 +109,11 @@ export default function AufmassFotoBox({ nachkalkulationId, artikelListe = [], o
         <Camera size={15} />
         <Text fontWeight="bold" fontSize="sm">Aufmaßzettel</Text>
         <Spacer />
+        {ungelesen.length > 0 && (
+          <Button size="xs" colorPalette="blue" loading={liestAlle} onClick={alleLesen}>
+            <ScanLine size={12} /> {ungelesen.length} noch lesen
+          </Button>
+        )}
         <Button as="label" size="xs" variant="outline" cursor="pointer" loading={laedtHoch}>
           <Camera size={12} /> Fotos hinzufügen
           <input type="file" accept="image/*,application/pdf" multiple hidden onChange={handleUpload} />
