@@ -50,6 +50,11 @@ const ERLAUBTE_PFADE = new Set([
 // Transportangebot hängt an ihr, nicht am Kunden.
 const EIGENE_FIRMA_ALS_KUNDE = "6139e897-1a04-48fa-bdd5-b9ac2e47ebd2"
 
+// Regiearbeit als Katalogartikel: EK 45, VK 69, Einheit Std, mit eigenem
+// Langtext im Katalog. Patrick, 30.09.2026 - spaeter werden daraus vielleicht
+// mehrere Artikel je Qualifikation, heute laeuft alles hierueber.
+const ARB_REG_UUID = "05e63c9d-b8d9-44ef-8915-8f0626955c08"
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: CORS })
 }
@@ -155,7 +160,9 @@ Deno.serve(async (req: Request) => {
         id, pds_vorgang_uuid, pds_vorgangs_nummer, bezeichnung, status,
         pds_transport_uuid, pds_transport_nummer,
         ist_stunden_techniker, ist_stunden_monteur,
-        stundensatz_techniker, stundensatz_monteur, stunden_transport_at,
+        stundensatz_techniker, stundensatz_monteur, stunden_transport_at, stunden_quelle,
+        anfahrt_zone, anfahrt_fahrten, anfahrt_satz, baustelle_adresse,
+        pauschalen, geruest, geruest_betrag, nebenkosten_transport_at,
         shop_nachkalkulation_positionen (
           id, artikel_id, freitext, menge, einheit, ek_einzel, quelle, pds_transport_at,
           shop_artikel ( id, name, einheit, pds_katalog_uuid, preis_netto, aufschlagsklasse )
@@ -181,6 +188,7 @@ Deno.serve(async (req: Request) => {
           pds_transport_at: null,
           pds_transport_positionen: null,
           stunden_transport_at: null,
+          nebenkosten_transport_at: null,
         })
         .eq("id", nkId)
       if (e2) return json({ error: e2.message }, 500)
@@ -405,6 +413,18 @@ Deno.serve(async (req: Request) => {
         satz_monteur: Number(nk.stundensatz_monteur ?? 69),
         bereits_uebertragen: Boolean((nk as Record<string, unknown>).stunden_transport_at),
       },
+      // Was ausser Material und Stunden mitgeht. Steht in der Vorschau, damit
+      // vor dem Anlegen sichtbar ist, was in PDS entsteht - und was fehlt.
+      nebenkosten: {
+        zone: nk.anfahrt_zone ?? null,
+        fahrten: Number(nk.anfahrt_fahrten ?? 0),
+        satz: Number(nk.anfahrt_satz ?? 0),
+        anfahrt_gesamt: runde(Number(nk.anfahrt_fahrten ?? 0) * Number(nk.anfahrt_satz ?? 0)),
+        pauschalen: Array.isArray(nk.pauschalen) ? nk.pauschalen : [],
+        geruest: Boolean(nk.geruest),
+        geruest_betrag: Number(nk.geruest_betrag ?? 0),
+        bereits_uebertragen: Boolean((nk as Record<string, unknown>).nebenkosten_transport_at),
+      },
     }
 
     // Ein Satz, der sagt, was passieren wird.
@@ -483,33 +503,100 @@ Deno.serve(async (req: Request) => {
 
     // ─── Transportangebot anlegen ──────────────────────────────────────────
 
-    // Die geleisteten Stunden gehen als LOHN-Positionen mit, eine je Rolle.
-    // Einmal — ein zweites Transportangebot fuer nachgetragenes Material darf
-    // sie nicht ein zweites Mal in den Auftrag bringen.
-    const stundenPositionen = (nk as Record<string, unknown>).stunden_transport_at
-      ? []
-      : ([
-        { std: Number(nk.ist_stunden_techniker ?? 0), satz: Number(nk.stundensatz_techniker ?? 75), text: "Technikerstunden" },
-        { std: Number(nk.ist_stunden_monteur ?? 0), satz: Number(nk.stundensatz_monteur ?? 69), text: "Monteurstunden" },
-      ]
-        .filter((s) => s.std > 0)
-        .map((s) => ({
-          positionsTyp: "LOHN",
-          positionsArt: "NORMAL",
-          // Die Einheit gehoert in den Text: /vorgang/create kennt kein Feld
-          // masseinheit (400 "Unrecognized field"). PDS setzt sie beim Anlegen
-          // aus dem Katalog, und eine freie Position hat keinen - dort bleibt
-          // sie leer, so wie an den Montagematerial-Positionen der Altauftraege.
-          kurztext: `${s.text} nach Aufmass (Std)`,
-          menge: s.std,
-          // Beim Lohn ist der Verrechnungssatz beides: was er uns kostet und
-          // was berechnet wird. Ein Aufschlag darauf waere eine zweite Marge.
-          ekPreis: { einzelPreis: s.satz },
-          vkPreis: { einzelPreis: s.satz },
-          vkFix: true,
-        })))
+    // --- Stunden ----------------------------------------------------------
+    // Ueber den Katalogartikel ARB-REG, nicht als freie Lohnposition (Patrick,
+    // 30.09.2026: "aktuell laeuft viel ueber arb-reg"). Der Artikel traegt EK
+    // 45 und VK 69 je Stunde und die Einheit Std; Preise werden deshalb NICHT
+    // mitgeschickt, sondern dem Katalog ueberlassen. Spaeter koennen daraus
+    // mehrere Artikel je Qualifikation werden - dann aendert sich hier nur die
+    // Auswahl der UUID.
+    //
+    // Die Aufschluesselung steht im Langtext, weil die Position nur eine Menge
+    // hat: wer sie in drei Monaten liest, soll sehen, woraus die Stunden
+    // bestehen, ohne den Zettel zu suchen.
+    const stdT = Number(nk.ist_stunden_techniker ?? 0)
+    const stdM = Number(nk.ist_stunden_monteur ?? 0)
+    const stdGesamt = runde(stdT + stdM)
+    const schonGebucht = Boolean((nk as Record<string, unknown>).stunden_transport_at)
 
-    if (transport.length === 0 && stundenPositionen.length === 0) {
+    const stundenPositionen = (!schonGebucht && stdGesamt > 0)
+      ? [{
+        positionsTyp: "ARTIKEL",
+        positionsArt: "NORMAL",
+        katalogUUID: ARB_REG_UUID,
+        menge: stdGesamt,
+        langtext: [
+          "Regiearbeit nach Aufmass",
+          stdT > 0 ? `Techniker: ${stdT.toLocaleString("de-DE")} Std` : null,
+          stdM > 0 ? `Monteur: ${stdM.toLocaleString("de-DE")} Std` : null,
+          `Summe: ${stdGesamt.toLocaleString("de-DE")} Std`,
+          nk.stunden_quelle === "schaetzung" ? "Hinweis: Stunden geschaetzt, nicht belegt." : null,
+        ].filter(Boolean).join("\n"),
+      }]
+      : []
+
+    // --- Anfahrt, Pauschalen, Geruest --------------------------------------
+    // Die Dinge, die bei jedem Auftrag anfallen und bisher nirgends standen.
+    // Alle als freie Position: einen Katalogeintrag gibt es fuer keine davon
+    // (am 01.10.2026 gesucht), und der Klimarechner fuehrt sie ebenso.
+    const nebenSchonGebucht = Boolean((nk as Record<string, unknown>).nebenkosten_transport_at)
+    const nebenPositionen: Array<Record<string, unknown>> = []
+
+    if (!nebenSchonGebucht) {
+      const fahrten = Number(nk.anfahrt_fahrten ?? 0)
+      const satz = Number(nk.anfahrt_satz ?? 0)
+      if (fahrten > 0 && satz > 0) {
+        nebenPositionen.push({
+          positionsTyp: "ARTIKEL",
+          positionsArt: "NORMAL",
+          kurztext: `Anfahrt Zone ${nk.anfahrt_zone ?? "?"} (Fahrt)`,
+          menge: fahrten,
+          // Die Anfahrt ist Erloes ohne eigenen Materialeinkauf; der
+          // Fahrzeugaufwand steckt im Satz. Ein EK darauf waere erfunden.
+          ekPreis: { einzelPreis: 0 },
+          vkPreis: { einzelPreis: satz },
+          vkFix: true,
+          langtext: [
+            `Anfahrt Zone ${nk.anfahrt_zone ?? "?"}`,
+            `${fahrten} Fahrt(en) zu je ${satz.toLocaleString("de-DE", { minimumFractionDigits: 2 })} EUR`,
+            "Enthaelt Fahrzeitanteil und Fahrzeugaufwand, je Fahrt und Fahrzeug.",
+          ].join("\n"),
+        })
+      }
+
+      const pauschalen = Array.isArray(nk.pauschalen) ? nk.pauschalen : []
+      for (const pa of pauschalen as Array<Record<string, unknown>>) {
+        const betrag = Number(pa?.betrag ?? 0)
+        if (!(betrag > 0)) continue
+        const text = String(pa?.text ?? pa?.schluessel ?? "Pauschale")
+        nebenPositionen.push({
+          positionsTyp: "ARTIKEL",
+          positionsArt: "NORMAL",
+          kurztext: text,
+          menge: 1,
+          ekPreis: { einzelPreis: 0 },
+          vkPreis: { einzelPreis: betrag },
+          vkFix: true,
+          langtext: [text, pa?.schluessel ? `Schluessel ${pa.schluessel}` : null]
+            .filter(Boolean).join("\n"),
+        })
+      }
+
+      if (nk.geruest && Number(nk.geruest_betrag ?? 0) > 0) {
+        nebenPositionen.push({
+          positionsTyp: "ARTIKEL",
+          positionsArt: "NORMAL",
+          kurztext: "Geruestgestellung",
+          menge: 1,
+          ekPreis: { einzelPreis: 0 },
+          vkPreis: { einzelPreis: Number(nk.geruest_betrag) },
+          vkFix: true,
+          langtext: "Geruestgestellung fuer die Montage, Auf- und Abbau.",
+        })
+      }
+    }
+
+    if (transport.length === 0 && stundenPositionen.length === 0 && nebenPositionen.length === 0) {
       return json({ error: "Keine Position für ein Transportangebot.", ...vorschau }, 400)
     }
 
@@ -538,12 +625,22 @@ Deno.serve(async (req: Request) => {
                 menge: p.menge,
                 ekPreis: { einzelPreis: p.ek_einzel },
                 ...(p.vk_einzel != null ? { vkPreis: { einzelPreis: p.vk_einzel }, vkFix: true } : {}),
+                // Die Bezeichnung noch einmal im Langtext (Patrick, 30.09.2026):
+                // der Kurztext wird in Listen und Ausdrucken abgeschnitten,
+                // und bei einer Katalogposition steht er ueberhaupt nicht im
+                // Dokument, sondern wird aus dem Katalog geholt.
+                langtext: [
+                  p.name,
+                  `${p.menge.toLocaleString("de-DE")} ${p.einheit ?? ""}`.trim(),
+                  "Verbaut laut Aufmass.",
+                ].join("\n"),
               })),
               // Die Stunden gehoeren zum Regieaufmass wie das Material: was
               // geleistet wurde, muss in den Auftrag, sonst wird es nicht
               // abgerechnet. Sie stehen als eigene Zeile je Rolle, weil sich
               // die Saetze unterscheiden.
               ...stundenPositionen,
+              ...nebenPositionen,
             ],
           }],
         },
@@ -586,6 +683,7 @@ Deno.serve(async (req: Request) => {
         pds_transport_at: jetzt,
         pds_transport_positionen: transport.length,
         ...(stundenPositionen.length ? { stunden_transport_at: jetzt } : {}),
+        ...(nebenPositionen.length ? { nebenkosten_transport_at: jetzt } : {}),
         ...(nk.status === "offen" ? { status: "erfasst" } : {}),
       })
       .eq("id", nkId)

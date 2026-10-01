@@ -15,6 +15,7 @@ import {
 } from '../../data/api/nachkalkulation.js'
 import { listArtikel } from '../../data/api/artikel.js'
 import NachkalkulationStunden from '../components/NachkalkulationStunden.jsx'
+import NachkalkulationNebenkosten from '../components/NachkalkulationNebenkosten.jsx'
 import AufmassFotoBox from '../components/AufmassFotoBox.jsx'
 
 function euro(n) {
@@ -317,6 +318,8 @@ function Detail({ id, onZurueck }) {
       )}
 
       <NachkalkulationStunden nk={nk} onAenderung={neu} />
+
+      <NachkalkulationNebenkosten nk={nk} onAenderung={neu} />
 
       <KalkuliertePositionen soll={nk.soll_positionen} />
 
@@ -772,6 +775,34 @@ function MaterialBlock({ nk, onGeaendert }) {
                 <Text fontSize="xs" color="fg.muted">
                   Monteurstunden {vorschau.stunden.monteur} h × {euro(vorschau.stunden.satz_monteur)}
                   {' = '}{euro(vorschau.stunden.monteur * vorschau.stunden.satz_monteur)}
+                </Text>
+              )}
+            </Box>
+          )}
+          {/* Was ausser Material und Stunden mitgeht. Vor einem Schritt, der
+              Positionen in PDS anlegt, gehoert das auf den Schirm. */}
+          {vorschau.nebenkosten && (vorschau.nebenkosten.anfahrt_gesamt > 0
+            || vorschau.nebenkosten.pauschalen?.length > 0 || vorschau.nebenkosten.geruest) && (
+            <Box mt={2} borderWidth="1px" borderRadius="md" p={2} bg="gray.50">
+              <Text fontSize="xs" fontWeight="medium" mb={1}>
+                {vorschau.nebenkosten.bereits_uebertragen
+                  ? 'Anfahrt und Pauschalen stehen bereits im Auftrag'
+                  : 'Geht als eigene Position mit'}
+              </Text>
+              {vorschau.nebenkosten.anfahrt_gesamt > 0 && (
+                <Text fontSize="xs" color="fg.muted">
+                  Anfahrt Zone {vorschau.nebenkosten.zone} · {vorschau.nebenkosten.fahrten} Fahrten
+                  × {euro(vorschau.nebenkosten.satz)} = {euro(vorschau.nebenkosten.anfahrt_gesamt)}
+                </Text>
+              )}
+              {(vorschau.nebenkosten.pauschalen || []).map((p) => (
+                <Text key={p.schluessel} fontSize="xs" color="fg.muted">
+                  {p.text} — {euro(p.betrag)}
+                </Text>
+              ))}
+              {vorschau.nebenkosten.geruest && (
+                <Text fontSize="xs" color="fg.muted">
+                  Gerüstgestellung — {euro(vorschau.nebenkosten.geruest_betrag)}
                 </Text>
               )}
             </Box>

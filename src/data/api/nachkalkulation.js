@@ -7,6 +7,8 @@ const NK_SELECT = `
   kalkulationsart, soll_stunden, ist_stunden_techniker, ist_stunden_monteur,
   stundensatz_techniker, stundensatz_monteur, stunden_quelle,
   soll_quelle, reonic_projekt_id, soll_beleg_pfad,
+  anfahrt_zone, anfahrt_fahrten, anfahrt_satz, baustelle_adresse,
+  pauschalen, geruest, geruest_betrag, nebenkosten_transport_at, stunden_transport_at,
   pds_transport_uuid, pds_transport_nummer, pds_transport_at, pds_transport_positionen,
   status, notiz, created_at, updated_at,
   shop_nachkalkulation_positionen (
@@ -187,4 +189,64 @@ export async function addPosition(nachkalkulationId, { artikel = null, freitext 
 export async function deletePosition(id) {
   const { error } = await supabase.from('shop_nachkalkulation_positionen').delete().eq('id', id)
   if (error) throw error
+}
+
+// ─── Anfahrt, Pauschalen, Gerüst ───────────────────────────────────────
+// Die Allgemeinkosten, die bei jedem Auftrag anfallen und bisher nirgends
+// standen. Hergeleitet aus dem Klimarechner (docs/kalkulationslogik.md) —
+// dieselben Sätze, damit Vor- und Nachkalkulation vergleichbar bleiben.
+
+// Zonenmodell: je Fahrt und Fahrzeug, nicht je Person.
+export const ANFAHRT_ZONEN = [
+  { zone: 'Z1', fahrzeit: '0–15 min', satz: 45 },
+  { zone: 'Z2', fahrzeit: '>15–30 min', satz: 90 },
+  { zone: 'Z3', fahrzeit: '>30–45 min', satz: 145 },
+  { zone: 'Z4', fahrzeit: '>45–60 min', satz: 200 },
+]
+
+// Je einmal pro Auftrag. Förderung bleibt außen vor: sie gehört zum Angebot,
+// nicht zum Regieaufmaß.
+export const PAUSCHALEN = [
+  { schluessel: 'PAU-KLIMA', text: 'Einsatzpauschale (Disposition, Rüsten, Nachbereitung, Doku)', betrag: 119 },
+  { schluessel: 'PAU-WZ', text: 'Werkzeug und Messmittel (N₂, Öl, Bohrkrone, Verschleiß)', betrag: 90 },
+  { schluessel: 'PAU-KLEIN', text: 'Kleinmaterial (Schutzschlauch, Klebeband, Dübel, Dichtmasse)', betrag: 50 },
+]
+
+export async function setNebenkosten(id, { zone, fahrten, satz, adresse, pauschalen, geruest, geruestBetrag }) {
+  const zahl = (v) => (v === '' || v == null ? null : Number(String(v).replace(',', '.')))
+  const felder = {}
+  if (zone !== undefined) felder.anfahrt_zone = zone || null
+  if (fahrten !== undefined) felder.anfahrt_fahrten = zahl(fahrten)
+  if (satz !== undefined) felder.anfahrt_satz = zahl(satz)
+  if (adresse !== undefined) felder.baustelle_adresse = adresse || null
+  if (pauschalen !== undefined) felder.pauschalen = pauschalen
+  if (geruest !== undefined) felder.geruest = !!geruest
+  if (geruestBetrag !== undefined) felder.geruest_betrag = zahl(geruestBetrag)
+  if (!Object.keys(felder).length) return
+
+  const { error } = await supabase.from('shop_nachkalkulation').update(felder).eq('id', id)
+  if (error) throw error
+}
+
+// Wie oft war jemand vor Ort? Vorgeschlagen aus den Daten auf den
+// fotografierten Blättern: jeder Tag mit einem Zettel ist eine Fahrt.
+//
+// Der Vorschlag kann nur zu NIEDRIG sein — ein Tag ohne Zettel hinterlässt
+// keine Spur. Deshalb ein Vorschlag und keine Zahl, die sich selbst einträgt.
+export async function fahrtenVorschlag(nachkalkulationId) {
+  const { data, error } = await supabase
+    .from('shop_aufmass_foto')
+    .select('stunden_gelesen, created_at')
+    .eq('nachkalkulation_id', nachkalkulationId)
+  if (error) throw error
+
+  const tage = new Set()
+  for (const f of data || []) {
+    const g = f.stunden_gelesen || {}
+    if (g.datum) tage.add(String(g.datum).slice(0, 10))
+    for (const z of g.zeilen || []) {
+      if (z?.datum) tage.add(String(z.datum).slice(0, 10))
+    }
+  }
+  return { tage: [...tage].sort(), anzahl: tage.size, blaetter: (data || []).length }
 }
