@@ -496,8 +496,11 @@ Deno.serve(async (req: Request) => {
         .map((s) => ({
           positionsTyp: "LOHN",
           positionsArt: "NORMAL",
-          kurztext: `${s.text} nach Aufmass`,
-          masseinheit: { bezeichnung: "Std" },
+          // Die Einheit gehoert in den Text: /vorgang/create kennt kein Feld
+          // masseinheit (400 "Unrecognized field"). PDS setzt sie beim Anlegen
+          // aus dem Katalog, und eine freie Position hat keinen - dort bleibt
+          // sie leer, so wie an den Montagematerial-Positionen der Altauftraege.
+          kurztext: `${s.text} nach Aufmass (Std)`,
           menge: s.std,
           // Beim Lohn ist der Verrechnungssatz beides: was er uns kostet und
           // was berechnet wird. Ein Aufschlag darauf waere eine zweite Marge.
@@ -530,7 +533,8 @@ Deno.serve(async (req: Request) => {
                 // loest PDS gegen den Katalog auf und antwortet 412 (ADR 0008).
                 ...(p.katalog_uuid
                   ? { katalogUUID: p.katalog_uuid }
-                  : { kurztext: p.name, ...(p.einheit ? { masseinheit: { bezeichnung: p.einheit } } : {}) }),
+                  // Einheit in den Text, aus demselben Grund wie oben.
+                  : { kurztext: p.einheit ? `${p.name} (${p.einheit})` : p.name }),
                 menge: p.menge,
                 ekPreis: { einzelPreis: p.ek_einzel },
                 ...(p.vk_einzel != null ? { vkPreis: { einzelPreis: p.vk_einzel }, vkFix: true } : {}),
