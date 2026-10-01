@@ -34,10 +34,55 @@ const CORS = {
 
 // Diese Funktion darf nur lesen. Beide Pfade sind GET-artige Abfragen, die PDS
 // als POST erwartet — ein schreibender Pfad hat hier nichts zu suchen.
+// Firmenstandort Amberg, Fuggerstrasse 23 — derselbe Bezugspunkt wie im
+// Klimarechner. Zwei verschiedene Bezugspunkte hiessen zwei verschiedene Zonen
+// fuer dieselbe Baustelle, und niemand wuesste, welche gilt.
+const BASIS = { lat: 49.4444574, lng: 11.8265056 }
+
+// Zonenmodell des Klimarechners: je Fahrt und Fahrzeug, nicht je Person.
+const ZONEN: Array<[number, string, number]> = [
+  [15, "Z1", 45],
+  [30, "Z2", 90],
+  [45, "Z3", 145],
+  [60, "Z4", 200],
+]
+
+/** Adresse → Fahrzeit ab Amberg → Zone. Best effort: schlaegt ein Schritt
+ *  fehl, bleibt die Zone leer und wird von Hand gesetzt. Ein geratener Wert
+ *  waere schlimmer als keiner, weil er wie eine Messung aussieht. */
+async function zoneErmitteln(adresse: string) {
+  try {
+    const geo = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=de&q=${encodeURIComponent(adresse)}`,
+      { headers: { accept: "application/json", "user-agent": "weich-bestellshop/1.0" } },
+    )
+    if (!geo.ok) return null
+    const treffer = await geo.json()
+    if (!Array.isArray(treffer) || !treffer.length) return null
+
+    const route = await fetch(
+      `https://router.project-osrm.org/route/v1/driving/${BASIS.lng},${BASIS.lat};${treffer[0].lon},${treffer[0].lat}?overview=false`,
+    )
+    if (!route.ok) return null
+    const daten = await route.json()
+    const sek = daten?.routes?.[0]?.duration
+    if (sek == null) return null
+
+    const minuten = Math.round(sek / 60)
+    // Ueber 60 Minuten bleibt es bei Z4 — darueber hinaus gibt es im Modell
+    // nichts, und der Auftrag gehoert ohnehin angesehen.
+    const treffer2 = ZONEN.find(([grenze]) => minuten <= grenze) ?? ZONEN[ZONEN.length - 1]
+    return { minuten, zone: treffer2[1], satz: treffer2[2] }
+  } catch {
+    return null
+  }
+}
+
 const ERLAUBTE_PFADE = new Set([
   "/vorgang/listauftraege",
   "/vorgang/details",
   "/vorgang/listvorgaengebyprojektakte",
+  "/projektakte/details",
 ])
 
 // Die Weich GmbH ist in PDS selbst als Lieferant angelegt (Lieferantennummer
@@ -423,9 +468,37 @@ Deno.serve(async (req: Request) => {
       else if (erloesMontage > 0 || vkEigenleistung > 0) kalkulationsart = "stunden_ausgewiesen"
       else if (geraete.length > 0) kalkulationsart = "zeit_im_artikel"
 
+      // --- Baustelle und Anfahrtszone --------------------------------------
+      // Die Adresse steht nicht am Vorgang, sondern an der Projektakte unter
+      // geschaeftspartner.hauptanschrift. Patrick, 01.10.2026: "anfahrt usw
+      // kannst du doch schon aus dem projekt errechnen".
+      //
+      // Vorsicht bei der Bedeutung: das ist die Anschrift des Kunden, nicht
+      // zwingend die der Baustelle. Bei einem Vermieter sind das zwei
+      // verschiedene Orte. Deshalb wird sie gespeichert und angezeigt, damit
+      // sie jemand sehen und korrigieren kann - nicht still verrechnet.
+      let baustelleAdresse: string | null = null
+      let zoneErgebnis: { minuten: number; zone: string; satz: number } | null = null
+      if (projektakteUUID) {
+        try {
+          const akte = await pds("/projektakte/details", { uuid: projektakteUUID })
+          const an = (akte as Record<string, any>)?.geschaeftspartner?.hauptanschrift
+          const teile = [an?.strasse, [an?.plz, an?.ort].filter(Boolean).join(" ")]
+            .map((t) => String(t ?? "").trim())
+            .filter(Boolean)
+          if (teile.length) {
+            baustelleAdresse = teile.join(", ")
+            zoneErgebnis = await zoneErmitteln(baustelleAdresse)
+          }
+        } catch {
+          // Ohne Adresse laeuft der Import weiter - sie ist Zugabe, nicht
+          // Voraussetzung.
+        }
+      }
+
       const { data: vorhanden } = await sb
         .from("shop_nachkalkulation")
-        .select("kalkulationsart")
+        .select("kalkulationsart, anfahrt_zone, baustelle_adresse")
         .eq("pds_vorgang_uuid", vorgangUUID)
         .maybeSingle()
       // Eine von Hand gesetzte Art bleibt stehen.
@@ -438,6 +511,13 @@ Deno.serve(async (req: Request) => {
         .upsert(
           {
             kalkulationsart,
+            // Eine von Hand gesetzte Zone bleibt stehen, genau wie die
+            // Kalkulationsart: ein erneuter Import darf eine Korrektur nicht
+            // ueberschreiben.
+            ...(vorhanden?.baustelle_adresse ? {} : (baustelleAdresse ? { baustelle_adresse: baustelleAdresse } : {})),
+            ...(vorhanden?.anfahrt_zone || !zoneErgebnis
+              ? {}
+              : { anfahrt_zone: zoneErgebnis.zone, anfahrt_satz: zoneErgebnis.satz }),
             pds_vorgang_uuid: vorgangUUID,
             pds_vorgangs_nummer: det.vorgangsNummer ?? "",
             bezeichnung: det.bezeichnung ?? "",
@@ -467,6 +547,10 @@ Deno.serve(async (req: Request) => {
         status: "importiert",
         nachkalkulation_id: gespeichert.id,
         kalkulationsart,
+        baustelle: baustelleAdresse,
+        anfahrt: zoneErgebnis
+          ? { zone: zoneErgebnis.zone, satz: zoneErgebnis.satz, fahrzeit_minuten: zoneErgebnis.minuten }
+          : null,
         soll: {
           vk_gesamt: runde(vkGesamt),
           ek_fremdeinkauf: runde(ekFremd),
