@@ -5,7 +5,7 @@ import {
   IconButton,
 } from '@chakra-ui/react'
 import {
-  Search, Download, Trash2, Plus, ArrowLeft, TrendingDown, TrendingUp, Eye, Send, RotateCcw,
+  Search, Download, Trash2, Plus, ArrowLeft, TrendingDown, TrendingUp, Eye, Send, RotateCcw, FileText,
 } from 'lucide-react'
 import {
   sucheAuftraege, importiereSoll, materialVorschau, mengenSetzen, transportAnlegen, materialZuruecksetzen,
@@ -16,6 +16,7 @@ import {
 import { listArtikel } from '../../data/api/artikel.js'
 import NachkalkulationStunden from '../components/NachkalkulationStunden.jsx'
 import NachkalkulationNebenkosten from '../components/NachkalkulationNebenkosten.jsx'
+import NachkalkulationBericht from '../components/NachkalkulationBericht.jsx'
 import AufmassFotoBox from '../components/AufmassFotoBox.jsx'
 
 function euro(n) {
@@ -231,6 +232,7 @@ function Detail({ id, onZurueck }) {
   const [gewaehlt, setGewaehlt] = useState(null)
   const [quelle, setQuelle] = useState('monteur')
   const [fehler, setFehler] = useState(null)
+  const [zeigtBericht, setZeigtBericht] = useState(false)
 
   const { data: liste = [] } = useQuery({ queryKey: ['nachkalkulationen'], queryFn: listNachkalkulationen })
   const { data: artikelListe = [] } = useQuery({
@@ -294,6 +296,16 @@ function Detail({ id, onZurueck }) {
           <Button size="sm" variant="outline" onClick={() => handleStatus('geprueft')}>Als geprüft markieren</Button>
         )}
       </Flex>
+
+      <HStack mb={3}>
+        <Button size="sm" variant={zeigtBericht ? 'solid' : 'outline'}
+          colorPalette={zeigtBericht ? 'blue' : undefined}
+          onClick={() => setZeigtBericht(!zeigtBericht)}>
+          <FileText size={14} /> {zeigtBericht ? 'Bericht zuklappen' : 'Nachkalkulationsbericht'}
+        </Button>
+      </HStack>
+
+      {zeigtBericht && <NachkalkulationBericht nk={nk} />}
 
       <HStack gap={4} mb={4} flexWrap="wrap" align="stretch">
         <Kennzahl titel="Nach Geräteeinkauf übrig" wert={euro(nk.deckung_material_und_lohn)} />
