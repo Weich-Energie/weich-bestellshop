@@ -519,6 +519,42 @@ Deno.serve(async (req: Request) => {
     const stdGesamt = runde(stdT + stdM)
     const schonGebucht = Boolean((nk as Record<string, unknown>).stunden_transport_at)
 
+    // Die Einzelzeilen von allen Blaettern dieses Auftrags - Datum, Wer, wie
+    // lange (Patrick, 01.10.2026). Sie stehen nur im Langtext; die Position
+    // selbst traegt eine Menge, und wer sie in drei Monaten liest, soll die
+    // Tage sehen, ohne den Zettel zu suchen.
+    const { data: blaetter } = await sb
+      .from("shop_aufmass_foto")
+      .select("stunden_gelesen")
+      .eq("nachkalkulation_id", nkId)
+
+    type StdZeile = { name?: string; datum?: string; stunden?: number; rolle?: string }
+    const stdZeilen: StdZeile[] = []
+    for (const b of blaetter ?? []) {
+      const g = (b as Record<string, any>).stunden_gelesen
+      // Nur Blaetter, deren Stunden auch gebucht wurden. Ein ungebuchtes
+      // Blatt steckt nicht in der Summe - seine Zeilen hier aufzufuehren
+      // hiesse, Stunden zu zeigen, die niemand berechnet.
+      if (!g?.gebucht_am) continue
+      for (const z of g.zeilen ?? []) if (Number(z?.stunden) > 0) stdZeilen.push(z)
+    }
+
+    // Steht kein Name auf dem Blatt, sagt das Material, wer da war: Elektro-
+    // positionen bedeuten einen Elektriker. Das ist ein Rueckschluss und
+    // keine Kenntnis - deshalb nur die Berufsbezeichnung, nie ein geratener
+    // Name.
+    const hatElektro = (nk.shop_nachkalkulation_positionen ?? []).some((pp: NkPosition) =>
+      /elektr|schalter|leitungsschutz|mantelleitung|aderleitung|abzweigdose|klemme|sls|nym|h07v/i
+        .test(pp.shop_artikel?.name ?? pp.freitext ?? "")
+    )
+    const ohneNamen = hatElektro ? "Elektriker" : "Monteur"
+
+    const datumDe = (d?: string) => {
+      if (!d) return ""
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d)
+      return m ? `${m[3]}.${m[2]}.${m[1]}` : d
+    }
+
     const stundenPositionen = (!schonGebucht && stdGesamt > 0)
       ? [{
         positionsTyp: "ARTIKEL",
@@ -527,11 +563,19 @@ Deno.serve(async (req: Request) => {
         menge: stdGesamt,
         langtext: [
           "Regiearbeit nach Aufmass",
-          stdT > 0 ? `Techniker: ${stdT.toLocaleString("de-DE")} Std` : null,
-          stdM > 0 ? `Monteur: ${stdM.toLocaleString("de-DE")} Std` : null,
+          "",
+          ...stdZeilen
+            .slice()
+            .sort((a, b) => String(a.datum ?? "").localeCompare(String(b.datum ?? "")))
+            .map((z) => {
+              const wer = String(z.name ?? "").trim()
+                || (z.rolle === "techniker" ? "Techniker" : ohneNamen)
+              return `${datumDe(z.datum)}  ${wer}  ${Number(z.stunden).toLocaleString("de-DE")} Std`
+            }),
+          "",
           `Summe: ${stdGesamt.toLocaleString("de-DE")} Std`,
           nk.stunden_quelle === "schaetzung" ? "Hinweis: Stunden geschaetzt, nicht belegt." : null,
-        ].filter(Boolean).join("\n"),
+        ].filter((z) => z !== null).join("\n"),
       }]
       : []
 
@@ -627,15 +671,13 @@ Deno.serve(async (req: Request) => {
                 // Nachkalkulation soll den Preis nicht bestimmen, sondern
                 // zeigen, was gewesen waere.
                 ...(p.vk_einzel != null ? { vkPreis: { einzelPreis: p.vk_einzel } } : {}),
-                // Die Bezeichnung noch einmal im Langtext (Patrick, 30.09.2026):
-                // der Kurztext wird in Listen und Ausdrucken abgeschnitten,
-                // und bei einer Katalogposition steht er ueberhaupt nicht im
-                // Dokument, sondern wird aus dem Katalog geholt.
-                langtext: [
-                  p.name,
-                  `${p.menge.toLocaleString("de-DE")} ${p.einheit ?? ""}`.trim(),
-                  "Verbaut laut Aufmass.",
-                ].join("\n"),
+                // Die Bezeichnung im Langtext (Patrick, 30.09.2026): der
+                // Kurztext wird in Listen abgeschnitten, und bei einer
+                // Katalogposition steht er ueberhaupt nicht im Dokument,
+                // sondern wird aus dem Katalog geholt. Nur die Bezeichnung -
+                // die Menge steht in der Mengenspalte und gehoert nicht
+                // doppelt ins Dokument (Patrick, 01.10.2026).
+                langtext: p.name,
               })),
               // Die Stunden gehoeren zum Regieaufmass wie das Material: was
               // geleistet wurde, muss in den Auftrag, sonst wird es nicht
