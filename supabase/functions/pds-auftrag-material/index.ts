@@ -555,7 +555,6 @@ Deno.serve(async (req: Request) => {
           // Fahrzeugaufwand steckt im Satz. Ein EK darauf waere erfunden.
           ekPreis: { einzelPreis: 0 },
           vkPreis: { einzelPreis: satz },
-          vkFix: true,
           langtext: [
             `Anfahrt Zone ${nk.anfahrt_zone ?? "?"}`,
             `${fahrten} Fahrt(en) zu je ${satz.toLocaleString("de-DE", { minimumFractionDigits: 2 })} EUR`,
@@ -576,7 +575,6 @@ Deno.serve(async (req: Request) => {
           menge: 1,
           ekPreis: { einzelPreis: 0 },
           vkPreis: { einzelPreis: betrag },
-          vkFix: true,
           langtext: [text, pa?.schluessel ? `Schluessel ${pa.schluessel}` : null]
             .filter(Boolean).join("\n"),
         })
@@ -590,7 +588,6 @@ Deno.serve(async (req: Request) => {
           menge: 1,
           ekPreis: { einzelPreis: 0 },
           vkPreis: { einzelPreis: Number(nk.geruest_betrag) },
-          vkFix: true,
           langtext: "Geruestgestellung fuer die Montage, Auf- und Abbau.",
         })
       }
@@ -624,7 +621,12 @@ Deno.serve(async (req: Request) => {
                   : { kurztext: p.einheit ? `${p.name} (${p.einheit})` : p.name }),
                 menge: p.menge,
                 ekPreis: { einzelPreis: p.ek_einzel },
-                ...(p.vk_einzel != null ? { vkPreis: { einzelPreis: p.vk_einzel }, vkFix: true } : {}),
+                // Kein vkFix (Patrick, 01.10.2026): der Verkaufspreis ist ein
+                // Vorschlag aus EK mal Aufschlag. Festgenagelt wuerde er jede
+                // spaetere Anpassung im Client blockieren - und eine
+                // Nachkalkulation soll den Preis nicht bestimmen, sondern
+                // zeigen, was gewesen waere.
+                ...(p.vk_einzel != null ? { vkPreis: { einzelPreis: p.vk_einzel } } : {}),
                 // Die Bezeichnung noch einmal im Langtext (Patrick, 30.09.2026):
                 // der Kurztext wird in Listen und Ausdrucken abgeschnitten,
                 // und bei einer Katalogposition steht er ueberhaupt nicht im
