@@ -158,7 +158,7 @@ Deno.serve(async (req: Request) => {
       .from("shop_nachkalkulation")
       .select(`
         id, pds_vorgang_uuid, pds_vorgangs_nummer, bezeichnung, status,
-        pds_transport_uuid, pds_transport_nummer,
+        pds_projektakte_uuid, pds_transport_uuid, pds_transport_nummer,
         ist_stunden_techniker, ist_stunden_monteur,
         stundensatz_techniker, stundensatz_monteur, stunden_transport_at, stunden_quelle,
         anfahrt_zone, anfahrt_fahrten, anfahrt_satz, baustelle_adresse,
@@ -646,6 +646,12 @@ Deno.serve(async (req: Request) => {
       vorgangsdaten: {
         personUUID: EIGENE_FIRMA_ALS_KUNDE,
         bezeichnung: angebotBezeichnung,
+        // In die Projektakte des Auftrags haengen (Patrick, 01.10.2026). Als
+        // Kunde steht weiterhin die Weich GmbH - das Angebot ist ein
+        // Transportmittel und geht nie an den Kunden. Aber es gehoert dorthin,
+        // wo der Auftrag liegt: so findet es wieder, wer in drei Monaten
+        // wissen will, woher die Positionen kamen.
+        ...(nk.pds_projektakte_uuid ? { projektakteUUID: nk.pds_projektakte_uuid } : {}),
         selektionskriterien: [{ bezeichnung: "Gewerk", wert: "SHK" }],
         rootEbene: {
           bezeichnung: "Leistungsverzeichnis",
@@ -744,8 +750,9 @@ Deno.serve(async (req: Request) => {
         vk_summe: transportVk,
       },
       anleitung:
-        `Angebot ${angebotNummer} im PDS-Client öffnen (Kunde Weich GmbH), die Ebene in Auftrag ` +
-        `${nk.pds_vorgangs_nummer} kopieren, Kundenpreise anpassen, Angebot löschen.`,
+        `Angebot ${angebotNummer} im PDS-Client öffnen` +
+        (nk.pds_projektakte_uuid ? " (liegt in der Projektakte des Auftrags, Kunde Weich GmbH)" : " (Kunde Weich GmbH)") +
+        `, die Ebene in Auftrag ${nk.pds_vorgangs_nummer} kopieren, Kundenpreise anpassen, Angebot löschen.`,
       warnung: fehlerBeimMerken
         ? `Angebot ${angebotNummer} steht in PDS, die Markierung im Shop scheiterte: ${fehlerBeimMerken}. Nicht erneut anlegen.`
         : undefined,
