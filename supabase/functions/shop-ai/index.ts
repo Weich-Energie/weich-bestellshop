@@ -48,6 +48,12 @@ function extractJson(text: string): any | null {
 }
 
 async function callClaude(model: string, systemPrompt: string, messages: any[], maxTokens = 1024) {
+  return (await callClaudeVoll(model, systemPrompt, messages, maxTokens)).text
+}
+
+// Wie callClaude, dazu der stop_reason. "max_tokens" heisst: die Antwort ist
+// abgeschnitten — das JSON ist dann unvollstaendig und nicht zu retten.
+async function callClaudeVoll(model: string, systemPrompt: string, messages: any[], maxTokens = 1024) {
   const ak = Deno.env.get("ANTHROPIC_API_KEY")
   if (!ak) throw new Error("ANTHROPIC_API_KEY fehlt")
   const resp = await fetch(API_URL, {
@@ -70,7 +76,17 @@ async function callClaude(model: string, systemPrompt: string, messages: any[], 
   }
   const r = await resp.json()
   const text = r.content?.filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n") || ""
-  return text
+  return { text, stopReason: String(r.stop_reason || "") }
+}
+
+// Seitenzahl eines PDFs ohne Bibliothek. Reicht fuer die Kopierer-Scans
+// (PDF 1.4, Seitenobjekte im Klartext). Steckt der Seitenbaum in komprimierten
+// Objektstroemen, kommt 0 heraus — dann wird ganz normal gelesen.
+function pdfSeitenzahl(text: string): number {
+  const seiten = (text.match(/\/Type\s*\/Page(?![a-zA-Z])/g) || []).length
+  let count = 0
+  for (const m of text.matchAll(/\/Type\s*\/Pages\b[^>]*?\/Count\s+(\d+)/g)) count = Math.max(count, Number(m[1]))
+  return Math.max(seiten, count)
 }
 
 // ─── Task: enrich_artikel ─────────────────────────────────────────────
@@ -146,6 +162,13 @@ async function analyzeBedarfBild(body: any) {
 // gilt nicht. Zaehlbar ist allein, was ein Monteur mit der Hand danebenge-
 // schrieben hat. Wer die gedruckte 1 uebernimmt, bekommt eine vollstaendig
 // aussehende und vollstaendig falsche Nachkalkulation.
+//
+// 02.10.2026 (Schmid Hahnbach, Kopierer-Scan 18 Seiten): der Barcode-Vordruck
+// traegt statt der 1 eine Packungsgroesse ("10 Stück =") — die wurde als Menge
+// gelesen. Strichlisten, freie Notizen ("130S25 : 11", wurde zu 11 Stunden) und
+// der Textmarker auf dem Wochenbericht stehen seither ausdruecklich im Prompt.
+// Eine Datei ist EIN Aufruf: mehrseitige Scans zerlegt die App im Browser
+// (src/lib/pdfSeiten.js), hier werden sie nur noch abgewiesen.
 async function extractAufmass(body: any) {
   const { bild_url, artikel_hinweis } = body
   if (!bild_url) return json({ error: "bild_url fehlt" }, 400)
@@ -161,6 +184,23 @@ async function extractAufmass(body: any) {
     mimeType = "image/jpeg"
   }
 
+  // Ein mehrseitiger Scan ist fuer EINEN Aufruf zu viel: die Antwort reisst nach
+  // gut zwei Minuten ab. Neue Uploads zerlegt die App schon im Browser; das hier
+  // faengt "Neu lesen" an alten Eintraegen ab — Antwort in einer Sekunde statt
+  // nach zwei Minuten. Ein PDF mit Schrift (Reonic-Angebot) ist kein Scan und
+  // wird weiter als Ganzes gelesen.
+  if (istPdf) {
+    const roh = new TextDecoder("latin1").decode(new Uint8Array(buf))
+    const seiten = pdfSeitenzahl(roh)
+    if (seiten > 1 && !/\/Font\b/.test(roh)) {
+      return json({
+        error: `Gescanntes PDF mit ${seiten} Seiten — für einen Lesedurchgang zu viel. ` +
+          `Bitte diesen Eintrag löschen und das PDF neu hochladen: die App zerlegt es ` +
+          `dabei in Einzelseiten und lässt leere Seiten weg.`,
+      }, 422)
+    }
+  }
+
   // Bekannte Artikelnummern mitgeben: abgegriffene Zettel und krakelige
   // Handschrift werden damit deutlich zuverlaessiger gelesen, weil das Modell
   // gegen eine echte Liste abgleichen kann statt zu raten.
@@ -171,10 +211,12 @@ async function extractAufmass(body: any) {
   const systemPrompt =
     `Du liest Baustellenunterlagen der Firma WEICHENERGIE (Weich GmbH, Klima- und ` +
     `Heizungsbau). Es kommen DREI Sorten Blatt herein, und sie werden alle gleich ` +
-    `abfotografiert. Bestimme zuerst, was du vor dir hast:\n\n` +
-    `  "material" — Aufmass- oder Montagebericht. Meist ein Ausdruck aus einem ` +
-    `Lieferantenshop mit Artikelnummer, Bezeichnung und Preisspalten; ein Monteur hat ` +
-    `die verbauten Mengen HANDSCHRIFTLICH danebengeschrieben.\n` +
+    `abfotografiert oder gescannt, manchmal quer oder auf dem Kopf — lies sie in der ` +
+    `richtigen Ausrichtung. Bestimme zuerst, was du vor dir hast:\n\n` +
+    `  "material" — Aufmass- oder Montagebericht: ein Ausdruck aus einem ` +
+    `Lieferantenshop mit Artikelnummer, Bezeichnung und Preisspalten, oder ein ` +
+    `Barcode-Vordruck mit Artikelkacheln (Regieaufmass). Ein Monteur hat die verbauten ` +
+    `Mengen HANDSCHRIFTLICH dazugeschrieben.\n` +
     `  "stunden" — Stundenzettel. Namen, Tage, Arbeitszeiten, oft handschriftlich.\n` +
     `  "angebot" — ein gedrucktes Angebot oder Auftrag (haeufig aus Reonic) mit ` +
     `Positionen, Mengen und Preisen. Nichts Handschriftliches.\n\n` +
@@ -184,19 +226,53 @@ async function extractAufmass(body: any) {
     `ZUSAETZLICH aus. Das ist der haeufige Fall — der Monteur notiert beides auf dasselbe ` +
     `Blatt. Sie zu uebersehen heisst, dass die Arbeit nicht abgerechnet wird.\n\n` +
     `--- BEI "material" ---\n` +
-    `ENTSCHEIDENDE REGEL: Nur die handschriftliche Menge zaehlt. In der gedruckten ` +
-    `Mengen- oder Anzahl-Spalte steht bei jeder Zeile eine 1 — das ist ein Kopierrest ` +
-    `des Ausdrucks und KEINE Menge. Uebernimm sie niemals. Steht neben einer Zeile ` +
-    `nichts von Hand, lass die Zeile weg.\n` +
+    `ENTSCHEIDENDE REGEL: Nur die handschriftliche Menge zaehlt. Eine GEDRUCKTE Zahl ist ` +
+    `NIE eine Menge. Zwei Vordrucke kommen vor:\n` +
+    `  a) Shop-Ausdruck als Tabelle: in der gedruckten Mengen- oder Anzahl-Spalte steht ` +
+    `bei jeder Zeile eine 1 — ein Kopierrest des Ausdrucks.\n` +
+    `  b) Barcode-Vordruck (Regieaufmass): Kacheln im Raster mit drei Spalten. Jede Kachel ` +
+    `hat Strichcode, Artikelnummer, eine gedruckte Packungsangabe wie "10 Stück =", ` +
+    `"5 m =", "60 Satz =" oder "1 Rolle =", darunter Bezeichnung und Bild. Die Zahl vor ` +
+    `"Stück =" ist die PACKUNGSGROESSE des Lieferanten. Die Menge ist allein, was der ` +
+    `Monteur mit der Hand an genau diese Kachel geschrieben hat — meist direkt unter der ` +
+    `Bezeichnung, manchmal ueber den Bildrand. Eine Handschrift gehoert zur Kachel ` +
+    `unmittelbar darueber.\n` +
+    `Nimm eine Zeile nur auf, wenn an genau dieser Zeile oder Kachel eine handschriftliche ` +
+    `Markierung steht. Ohne Handschrift gehoert sie NICHT ins Ergebnis, auch nicht mit ` +
+    `Menge 1. Im Zweifel weglassen — eine fehlende Zeile faellt beim Pruefen auf, eine ` +
+    `erfundene nicht.\n` +
+    `So liest du die Handschrift:\n` +
+    `  - Summen ausrechnen: "2+1" = 3, "8+5" = 13, "12m+6m" = 18 (Einheit "m"). Die ` +
+    `Rechnung in "notiz" festhalten.\n` +
+    `  - Dezimalkomma: "1,2" = 1.2, "5,40+3" = 8.4.\n` +
+    `  - Strichliste: mehrere Striche nebeneinander werden GEZAEHLT — "|||" = 3, "|| ||" = 4. ` +
+    `Ein Buendel aus vier Strichen mit Querstrich ist 5, ein Buendel und "|||" sind 8.\n` +
+    `  - Ein einzelner Haken oder Strich ohne Zahl ist Menge 1 bei Sicherheit 0.6.\n` +
+    `  - Durchgestrichene Zeilen gehoeren weg.\n` +
     `Handschrift ist oft unsauber: 1 und 7, 4 und 9, 0 und 6 werden verwechselt. Gib ` +
-    `deine Lesesicherheit je Zeile ehrlich an. Ein Haken oder ein Strich ohne Zahl ` +
-    `bedeutet Menge 1 bei Sicherheit 0.6. Durchgestrichene Zeilen gehoeren weg.\n` +
-    `Meterware (Leitung, Kabel, Schlauch, Isolierung) wird in Metern notiert, auch ` +
-    `wenn der Artikel eine Rolle ist. Uebernimm die Zahl wie sie dasteht, Einheit "m".\n\n` +
+    `deine Lesesicherheit je Zeile ehrlich an.\n` +
+    `Meterware (Leitung, Kabel, Schlauch, Isolierung, Rohr) wird in Metern notiert, auch ` +
+    `wenn der Artikel eine Rolle oder Stange ist. Uebernimm die Zahl wie sie dasteht, ` +
+    `Einheit "m".\n` +
+    `Freie Notizen — unter einem Trennstrich, am Rand oder auf leerer Flaeche, z. B. ` +
+    `"130S25 : 11" oder "Wasserfilter 1 Zoll" — sind weiteres MATERIAL: Artikelnummer bzw. ` +
+    `Bezeichnung so wie geschrieben, Menge ist die Zahl hinter ":" oder "x". Zollangaben ` +
+    `(1", 3/4") sind eine Groesse, keine Menge; steht keine Menge dabei, Menge 1 bei ` +
+    `Sicherheit 0.5 und notiz "frei notiert". Solche Notizen sind NIE Stunden.\n\n` +
     `--- BEI "stunden" ---\n` +
     `Je Eintrag Name, Datum und Stunden. "2 Mann 6 h" sind zwei Zeilen zu 6 Stunden. ` +
     `Pausen abziehen, wenn sie ausgewiesen sind. Die Rolle (techniker oder monteur) ` +
-    `nur setzen, wenn sie auf dem Blatt steht — sonst leer lassen und NICHT raten.\n\n` +
+    `nur setzen, wenn sie auf dem Blatt steht — sonst leer lassen und NICHT raten.\n` +
+    `Stunden sind nur Eintraege, die eindeutig Arbeitszeit sind: ein Name mit Stunden, ` +
+    `"Std", "h", Uhrzeiten von–bis. Eine Artikelnummer mit einer Zahl ist nie eine Stunde.\n` +
+    `Wochenbericht (Tabelle mit Spalten Mo–Fr und Zeitraum "vom … bis …"): je Name und Tag ` +
+    `eine Zeile, das Datum aus Zeitraum und Spalte. "8,5" sind 8.5 Stunden; ein Haken hinter ` +
+    `der Zahl ist nur ein Pruefzeichen. Den Namen so uebernehmen, wie er dasteht, samt ` +
+    `Ortsangabe in Klammern, z. B. "Schmid Christopher (Hahnbach)".\n` +
+    `Ein Wochenbericht fuehrt oft mehrere Baustellen, und das Buero hebt die Zeilen des ` +
+    `Auftrags mit Textmarker farbig hervor. Setze deshalb bei jeder Zeile "markiert": true, ` +
+    `wenn sie hervorgehoben ist, sonst false. Ist auf dem Blatt gar nichts hervorgehoben, ` +
+    `setze bei allen null. Gib trotzdem ALLE Zeilen zurueck — aussortiert wird in der App.\n\n` +
     `--- BEI "angebot" ---\n` +
     `Alle Warenpositionen mit Menge und Preisen, netto. KEINE Zeilen wie Zwischensumme, ` +
     `MwSt, Rabatt, Endbetrag. Steht nur ein Gesamtpreis je Zeile, rechne den Einzelpreis ` +
@@ -220,7 +296,7 @@ async function extractAufmass(body: any) {
     `    }\n` +
     `  ],\n` +
     `  "stunden_zeilen": [\n` +
-    `    { "name": "Nachname", "datum": "YYYY-MM-DD", "stunden": 8, "rolle": "", "sicherheit": 0.9 }\n` +
+    `    { "name": "Nachname (Ort)", "datum": "YYYY-MM-DD", "stunden": 8, "rolle": "", "markiert": null, "sicherheit": 0.9 }\n` +
     `  ],\n` +
     `  "angebot_positionen": [\n` +
     `    { "bezeichnung": "...", "menge": 1, "einheit": "Stck",\n` +
@@ -241,9 +317,19 @@ async function extractAufmass(body: any) {
     { type: "text", text: "Bestimme die Blattart und lies das Blatt aus." },
   ]
 
-  const text = await callClaude(MODEL_VISION, systemPrompt, [{ role: "user", content: userContent }], 8000)
+  const { text, stopReason } = await callClaudeVoll(
+    MODEL_VISION, systemPrompt, [{ role: "user", content: userContent }], 8000,
+  )
+  if (stopReason === "max_tokens") {
+    return json({
+      error: "Zu viel auf einmal für einen Lesedurchgang — die Antwort der KI wurde " +
+        "abgeschnitten. Bitte die Seite einzeln oder in zwei Fotos hochladen.",
+    }, 422)
+  }
   const parsed = extractJson(text)
-  if (!parsed) return json({ error: "KI-Antwort nicht parsebar", raw: text }, 502)
+  if (!parsed) {
+    return json({ error: "Die KI-Antwort war nicht lesbar. Bitte noch einmal lesen lassen.", raw: text }, 502)
+  }
   return json({ result: parsed })
 }
 

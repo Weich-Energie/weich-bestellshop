@@ -16,6 +16,8 @@ import {
 } from '@chakra-ui/react'
 import { Camera, ScanLine, Check, X, Trash2, ExternalLink, AlertTriangle, Clock, FileText, Search } from 'lucide-react'
 import LieferantSucheDialog from './LieferantSucheDialog.jsx'
+import { bereiteZettelVor } from '../../lib/pdfSeiten.js'
+import { irgendwasMarkiert, vorbelegteRolle, stundenZahl } from '../../lib/stunden.js'
 import { listKategorien } from '../../data/api/kategorien.js'
 import { listLieferanten } from '../../data/api/lieferanten.js'
 import {
@@ -45,6 +47,7 @@ export default function AufmassFotoBox({ nachkalkulationId, artikelListe = [], o
   const [liestFoto, setLiestFoto] = useState(null)
   const [fortschritt, setFortschritt] = useState(null)
   const [fehler, setFehler] = useState(null)
+  const [hinweis, setHinweis] = useState(null)
   const [offenesFoto, setOffenesFoto] = useState(null)
 
   const { data: fotos = [], isLoading } = useQuery({
@@ -57,10 +60,14 @@ export default function AufmassFotoBox({ nachkalkulationId, artikelListe = [], o
   }
 
   async function handleUpload(e) {
-    const dateien = Array.from(e.target.files || [])
-    if (!dateien.length) return
-    setLaedtHoch(true); setFehler(null)
+    const gewaehlt = Array.from(e.target.files || [])
+    if (!gewaehlt.length) return
+    setLaedtHoch(true); setFehler(null); setHinweis(null)
     try {
+      // Ein mehrseitiger Scan wird hier in Einzelseiten zerlegt, leere Seiten
+      // fallen weg — als Ganzes waere er fuer einen KI-Aufruf zu viel.
+      const { dateien, hinweis: zerlegt } = await bereiteZettelVor(gewaehlt)
+      if (zerlegt) setHinweis(zerlegt)
       // Mehrere Seiten eines Berichts gehoeren zusammen — die Reihenfolge der
       // Auswahl wird als Seitennummer festgehalten.
       let nr = fotos.length
@@ -139,9 +146,11 @@ export default function AufmassFotoBox({ nachkalkulationId, artikelListe = [], o
 
       <Text fontSize="xs" color="fg.muted" mb={3}>
         Foto des ausgefüllten Berichts hochladen — gelesen wird nur die handschriftliche
-        Menge. Die gedruckte 1 im Vordruck bleibt außen vor.
+        Menge, keine gedruckte Zahl aus dem Vordruck. Ein mehrseitiger Scan wird
+        beim Hochladen in Einzelseiten zerlegt, leere Seiten fallen weg.
       </Text>
 
+      {hinweis && <Text fontSize="sm" color="fg.muted" mb={2}>{hinweis}</Text>}
       {fehler && <Text fontSize="sm" color="red.600" mb={2}>{fehler}</Text>}
       {isLoading && <Flex justify="center" p={4}><Spinner size="sm" /></Flex>}
 
@@ -244,14 +253,18 @@ export default function AufmassFotoBox({ nachkalkulationId, artikelListe = [], o
 // geraten.
 function StundenZettel({ foto, nachkalkulationId, onAenderung }) {
   const zeilen = foto.stunden_gelesen?.zeilen || []
+  // Hat das Buero Zeilen mit Textmarker hervorgehoben, gehoeren nur diese zum
+  // Auftrag; die uebrigen stehen auf "nicht buchen" und bleiben sichtbar.
+  const markiert = irgendwasMarkiert(zeilen)
   const [rollen, setRollen] = useState(() =>
-    Object.fromEntries(zeilen.map((z, i) => [i, z.rolle === 'techniker' ? 'techniker' : 'monteur'])))
+    Object.fromEntries(zeilen.map((z, i) => [i, vorbelegteRolle(z, markiert)])))
   const [laeuft, setLaeuft] = useState(false)
   const [fehler, setFehler] = useState(null)
   const erledigt = Boolean(foto.stunden_gelesen?.gebucht_am) || foto.status === 'uebernommen'
 
-  const summeT = zeilen.reduce((s, z, i) => s + (rollen[i] === 'techniker' ? Number(z.stunden || 0) : 0), 0)
-  const summeM = zeilen.reduce((s, z, i) => s + (rollen[i] === 'monteur' ? Number(z.stunden || 0) : 0), 0)
+  const summeT = zeilen.reduce((s, z, i) => s + (rollen[i] === 'techniker' ? stundenZahl(z.stunden) : 0), 0)
+  const summeM = zeilen.reduce((s, z, i) => s + (rollen[i] === 'monteur' ? stundenZahl(z.stunden) : 0), 0)
+  const gebuchteZeilen = zeilen.filter((_, i) => rollen[i] !== 'nicht').length
 
   async function uebernehmen() {
     setLaeuft(true); setFehler(null)
@@ -274,7 +287,10 @@ function StundenZettel({ foto, nachkalkulationId, onAenderung }) {
       <HStack gap={2} mb={2}>
         <Clock size={14} />
         <Text fontSize="sm" fontWeight="medium">
-          {zeilen.length} Einträge · {(summeT + summeM).toLocaleString('de-DE')} Stunden
+          {gebuchteZeilen === zeilen.length
+            ? `${zeilen.length} Einträge`
+            : `${gebuchteZeilen} von ${zeilen.length} Einträgen`}
+          {' · '}{(summeT + summeM).toLocaleString('de-DE')} Stunden
         </Text>
         <Spacer />
         {!erledigt && (
@@ -286,23 +302,36 @@ function StundenZettel({ foto, nachkalkulationId, onAenderung }) {
 
       <Text fontSize="xs" color="fg.muted" mb={2}>
         Die Rolle entscheidet über den Satz — 75 €/h für Techniker, 69 €/h für Monteur.
-        Steht sie nicht auf dem Zettel, ist hier Monteur vorbelegt.
+        Steht sie nicht auf dem Zettel, ist hier Monteur vorbelegt. Zeilen einer anderen
+        Baustelle auf „nicht buchen" stellen.
       </Text>
+      {markiert && (
+        <Text fontSize="xs" color="orange.700" mb={2}>
+          Auf dem Zettel sind Zeilen mit Textmarker hervorgehoben — nur diese sind zum
+          Buchen vorbelegt. Die übrigen gehören zu anderen Baustellen.
+        </Text>
+      )}
 
       <VStack align="stretch" gap={1}>
         {zeilen.map((z, i) => (
-          <HStack key={i} gap={2} fontSize="sm">
+          <HStack key={i} gap={2} fontSize="sm" opacity={rollen[i] === 'nicht' ? 0.5 : 1}>
             <Text minW="140px">{z.name || '—'}</Text>
             <Text minW="90px" color="fg.muted">{z.datum || '—'}</Text>
-            <Text minW="60px" textAlign="right">{Number(z.stunden || 0).toLocaleString('de-DE')} h</Text>
+            <Text minW="60px" textAlign="right">{stundenZahl(z.stunden).toLocaleString('de-DE')} h</Text>
             {erledigt ? (
-              <Badge size="sm" variant="subtle">{rollen[i] === 'techniker' ? 'Techniker' : 'Monteur'}</Badge>
+              <Badge size="sm" variant="subtle">
+                {rollen[i] === 'techniker' ? 'Techniker' : rollen[i] === 'nicht' ? 'nicht gebucht' : 'Monteur'}
+              </Badge>
             ) : (
               <select value={rollen[i]} onChange={(e) => setRollen({ ...rollen, [i]: e.target.value })}
                 style={{ padding: '2px 6px', border: '1px solid #e2e8f0', borderRadius: 6 }}>
                 <option value="monteur">Monteur</option>
                 <option value="techniker">Techniker</option>
+                <option value="nicht">nicht buchen</option>
               </select>
+            )}
+            {z.markiert === true && (
+              <Badge size="sm" colorPalette="purple" variant="subtle">markiert</Badge>
             )}
             {z.sicherheit != null && Number(z.sicherheit) < 0.8 && (
               <Badge size="sm" colorPalette="orange" variant="subtle">unsicher</Badge>

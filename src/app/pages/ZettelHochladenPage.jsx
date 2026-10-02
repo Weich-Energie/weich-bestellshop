@@ -17,6 +17,7 @@ import { Camera, Check, Plus, ArrowLeft, Search, Download } from 'lucide-react'
 import { listNachkalkulationen } from '../../data/api/nachkalkulation.js'
 import { sucheAuftraege, importiereSoll } from '../../data/api/pdsSync.js'
 import { uploadAufmassFoto, leseAufmassFoto, neueNachkalkulation } from '../../data/api/aufmassFoto.js'
+import { bereiteZettelVor } from '../../lib/pdfSeiten.js'
 
 const ART_TEXT = {
   material: 'Materialliste', stunden: 'Stundenzettel', angebot: 'Angebot', unbekannt: 'Art unklar',
@@ -213,12 +214,30 @@ function Hochladen({ nk, onZurueck }) {
   const [laeuft, setLaeuft] = useState(false)
   const [fertig, setFertig] = useState([])
   const [fehler, setFehler] = useState(null)
+  const [hinweis, setHinweis] = useState(null)
   const liestGerade = useRef(false)
 
   async function handleUpload(e) {
-    const dateien = Array.from(e.target.files || [])
-    if (!dateien.length) return
-    setLaeuft(true); setFehler(null)
+    const input = e.target
+    const gewaehlt = Array.from(input.files || [])
+    if (!gewaehlt.length) return
+    setLaeuft(true); setFehler(null); setHinweis(null)
+
+    // Ein mehrseitiger Scan wird hier in Einzelseiten zerlegt, leere Seiten
+    // fallen weg — als Ganzes waere er fuer einen KI-Aufruf zu viel und kaeme
+    // nach zwei Minuten mit einem Fehler zurueck.
+    let dateien
+    try {
+      const vorbereitet = await bereiteZettelVor(gewaehlt)
+      dateien = vorbereitet.dateien
+      if (vorbereitet.hinweis) setHinweis(vorbereitet.hinweis)
+    } catch (e2) {
+      setFehler(`Das PDF ließ sich nicht in Seiten zerlegen: ${e2.message}`)
+      setLaeuft(false)
+      input.value = ''
+      return
+    }
+
     for (const datei of dateien) {
       try {
         const foto = await uploadAufmassFoto({ nachkalkulationId: nk.id, file: datei })
@@ -228,7 +247,7 @@ function Hochladen({ nk, onZurueck }) {
       }
     }
     setLaeuft(false)
-    e.target.value = ''
+    input.value = ''
   }
 
   // Arbeitet die Warteschlange ab, immer nur eines. Laeuft weiter, solange die
@@ -272,6 +291,7 @@ function Hochladen({ nk, onZurueck }) {
         <input type="file" accept="image/*,application/pdf" multiple hidden onChange={handleUpload} />
       </Button>
 
+      {hinweis && <Text fontSize="sm" color="fg.muted" mb={2}>{hinweis}</Text>}
       {fehler && <Text fontSize="sm" color="red.600" mb={2}>{fehler}</Text>}
 
       {fertig.length > 0 && (

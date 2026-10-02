@@ -8,6 +8,7 @@
 
 import { supabase } from '../../supabaseClient.js'
 import { normalizeArtikelnr } from './belege.js'
+import { stundenSumme } from '../../lib/stunden.js'
 
 const BUCKET = 'shop-belege'
 const PRAEFIX = 'aufmass'
@@ -79,7 +80,7 @@ export async function leseAufmassFoto(fotoId) {
     const { data: antwort, error: aiErr } = await supabase.functions.invoke('shop-ai', {
       body: { task: 'extract_aufmass', bild_url: signed.signedUrl, artikel_hinweis: hinweis },
     })
-    if (aiErr) throw aiErr
+    if (aiErr) throw new Error(await fehlerAusFunktion(aiErr))
     if (antwort?.error) throw new Error(antwort.error)
     const ergebnis = antwort?.result
     if (!ergebnis) throw new Error('Kein Ergebnis von der KI')
@@ -103,7 +104,7 @@ export async function leseAufmassFoto(fotoId) {
           gelesen_am: new Date().toISOString(),
           stunden_gelesen: {
             zeilen: stundenZeilen,
-            summe: stundenZeilen.reduce((s, z) => s + Number(z.stunden || 0), 0),
+            summe: stundenSumme(stundenZeilen),
             baustelle: ergebnis.baustelle || null,
             datum: ergebnis.datum || null,
           },
@@ -112,7 +113,7 @@ export async function leseAufmassFoto(fotoId) {
       return {
         blatt_art: art,
         stunden_zeilen: stundenZeilen.length,
-        stunden_summe: stundenZeilen.reduce((s, z) => s + Number(z.stunden || 0), 0),
+        stunden_summe: stundenSumme(stundenZeilen),
       }
     }
 
@@ -201,7 +202,7 @@ export async function leseAufmassFoto(fotoId) {
           ? {
             stunden_gelesen: {
               zeilen: stundenZeilen,
-              summe: stundenZeilen.reduce((s, z) => s + Number(z.stunden || 0), 0),
+              summe: stundenSumme(stundenZeilen),
               baustelle: ergebnis.baustelle || null,
               datum: ergebnis.datum || null,
             },
@@ -230,6 +231,17 @@ export async function leseAufmassFoto(fotoId) {
       .eq('id', fotoId)
     throw e
   }
+}
+
+// supabase-js meldet bei jedem Fehlerstatus nur "Edge Function returned a
+// non-2xx status code". Der eigentliche Grund steht im Antworttext — ohne ihn
+// sieht ein zu langes PDF genauso aus wie ein abgelaufener Schluessel.
+async function fehlerAusFunktion(err) {
+  try {
+    const body = await err?.context?.json?.()
+    if (body?.error) return body.error
+  } catch { /* kein JSON im Antworttext */ }
+  return err?.message || String(err)
 }
 
 // Alle aktiven Artikel, nicht nur die mit Klima-Kennzeichen.
