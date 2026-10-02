@@ -304,3 +304,31 @@ teurer sind als die PROFIPRESS-Gegenstuecke, auf die sie zeigten.
 
 ## Doku-Regel
 Wenn sich eine Kern-Entscheidung aendert: ADR schreiben, CLAUDE.md updaten, CONTEXT.md pflegen.
+
+## Zettel hochladen: eine Seite je KI-Aufruf (02.10.2026)
+`shop-ai` (`extract_aufmass`) liest jede Datei in **einem** Aufruf (`max_tokens`
+8000). Ein Kopierer-Scan mit 18 Seiten riss nach ~135 s ab und kam nur als
+"Edge Function returned a non-2xx status code" zurueck. Seither:
+- **Der Browser zerlegt Scans** (`src/lib/pdfSeiten.js`, beide Upload-Knoepfe):
+  mehrseitiges PDF ohne sichtbare Schrift -> eine JPEG je Seite (150 dpi),
+  Leerseiten (< 0,3 % Tinte) fallen weg. **PDFs mit Schrift (Reonic-Angebot)
+  bleiben ganz** — Positionen laufen ueber Seiten, die Summe steht hinten.
+- **pdf.js braucht seine WebAssembly-Decoder** (`jbig2.wasm` fuer Kopierer-Scans,
+  `openjpeg.wasm` fuer JPEG 2000). Fehlen sie, werden Scanbilder kommentarlos
+  weggelassen und jede Seite ist **weiss**. Ausgeliefert unter
+  `/bestellshop/pdfjs-wasm/` vom Plugin in `vite.config.js` (nicht per
+  prebuild-Hook: Vercel ruft u. U. direkt `vite build`). Achtung: fehlt eine
+  Datei, antwortet die Catch-all-Rewrite in `vercel.json` mit `index.html` und
+  Status 200 — nach Aenderungen am Build pruefen, dass `.wasm` als
+  `application/wasm` kommt.
+- `shop-ai` weist einen mehrseitigen Scan (Seiten > 1, keine `/Font`) sofort mit
+  **422** ab und meldet eine abgeschnittene Antwort (`stop_reason max_tokens`)
+  im Klartext. Das Frontend zeigt den Antworttext (`fehlerAusFunktion` in
+  `aufmassFoto.js`) statt der supabase-js-Meldung.
+- Prompt kennt den **Barcode-Vordruck**: "10 Stück =" ist die Packungsgroesse,
+  keine Menge; Strichlisten werden gezaehlt; freie Notizen ("130S25 : 11") sind
+  Material, nie Stunden.
+- **Wochenbericht ueber mehrere Baustellen:** die KI setzt je Zeile
+  `markiert` (Textmarker). Ist etwas markiert, zaehlt `src/lib/stunden.js` nur
+  das; die uebrigen Zeilen stehen in der Oberflaeche auf "nicht buchen".
+- Tests: `npx vitest run` (`src/lib/*.test.js`).
