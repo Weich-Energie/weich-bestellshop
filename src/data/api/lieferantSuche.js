@@ -14,14 +14,14 @@ import { createArtikel } from './artikel.js'
 // Welche Shops abgefragt werden können, und woran ihre Artikelnummern zu
 // erkennen sind. Der Vorschlag spart den häufigsten Klick: die Nummer auf dem
 // Zettel verrät meist schon, wo der Artikel herkommt.
+// Nur Shops, deren Trefferliste nachweislich stimmt. Vier weitere sind
+// angebunden, können aber (noch) nicht zuverlässig suchen — ihre Playbooks
+// haben keine eigene Suche, und der allgemeine Textweg hielt bei Colons eine
+// Telefonnummer für eine Artikelnummer. Lieber eine ehrliche Lücke als ein
+// erfundener Preis im Stamm.
 export const LIEFERANTEN = [
   { slug: 'gut', name: 'GUT', muster: /^[A-Z]{2,}[A-Z0-9]*$/ },
   { slug: 'fega-schmitt', name: 'FEGA & Schmitt', muster: /^\d{6,7}$/ },
-  { slug: 'r-f', name: 'R+F', muster: /^\d{13}$/ },
-  { slug: 'frigotechnik', name: 'Frigotechnik', muster: null },
-  { slug: 'linum', name: 'Linum', muster: /^[A-Z]{3}-\d{4}-\d{3}$/ },
-  { slug: 'colons', name: 'Colons', muster: null },
-  { slug: 'schiessl-kaelte', name: 'Schiessl Kälte', muster: null },
 ]
 
 /** Rät den Lieferanten aus dem Format der Artikelnummer. Nur ein Vorschlag —

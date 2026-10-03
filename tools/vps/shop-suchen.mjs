@@ -35,21 +35,52 @@ if (!angemeldet) {
 const pb = playbook(slug)
 
 try {
+  // Zwei Wege zur Trefferliste, und der zweite faengt den ersten auf.
+  //
   // Nicht jedes Playbook hat ein eigenes suchen(): vier von sieben kennen nur
-  // eine sucheUrl. Frueher stuerzte der Aufruf dort ab ("pb.suchen is not a
-  // function") - und zwar erst in der Oberflaeche, nicht beim Anlegen der
-  // Weissliste. Der Umweg ueber die URL tut dasselbe und geht ueberall.
+  // eine sucheUrl, und dort stuerzte der Aufruf ab ("pb.suchen is not a
+  // function") - erst in der Oberflaeche, nicht beim Anlegen der Weissliste.
+  //
+  // Und wo es eines gibt, kann sein Selektor veraltet sein: bei R+F wartete
+  // suchen() am 03.10.2026 vergeblich auf ein Suchfeld, das es so nicht mehr
+  // gibt. Deshalb faengt der URL-Weg auch einen Fehlschlag auf, statt nur ein
+  // fehlendes suchen() zu ersetzen.
+  let gesucht = false
   if (typeof pb.suchen === "function") {
-    await pb.suchen(page, begriff)
-  } else if (typeof pb.sucheUrl === "function") {
+    try {
+      await pb.suchen(page, begriff)
+      gesucht = true
+    } catch (e) {
+      console.error(`${slug}: suchen() scheiterte (${String(e).slice(0, 80)}), versuche die Such-URL`)
+    }
+  }
+  if (!gesucht) {
+    if (typeof pb.sucheUrl !== "function") {
+      const hinweis = `${slug}: dieses Playbook kann nicht suchen`
+      if (alsJson) console.log(JSON.stringify({ fehler: hinweis, lieferant: slug }))
+      else console.error(hinweis)
+      await browser.close()
+      process.exit(3)
+    }
     await seiteOeffnen(page, pb.sucheUrl(begriff), pb)
     await page.waitForTimeout(2500)
-  } else {
-    const hinweis = `${slug}: dieses Playbook kann nicht suchen`
-    if (alsJson) console.log(JSON.stringify({ fehler: hinweis, lieferant: slug }))
+  }
+
+  // Bevor irgendetwas ausgelesen wird: ist das ueberhaupt eine Suchseite?
+  // Eine abgelaufene Sitzung zeigt das Login, und der Textweg liest daraus
+  // brav "Benutzername" und "Passwort vergessen" als Artikel. Scheintreffer
+  // sind schlimmer als keine - sie sehen aus wie ein Ergebnis.
+  const istLogin = await page.evaluate(() => {
+    const t = document.body.innerText.slice(0, 4000)
+    return /Passwort vergessen|Kennwort vergessen|melden Sie sich|Zugangsdaten eingeben|um sich im Online Shop anzumelden/i.test(t)
+      && !/Warenkorb|Treffer|Artikelnummer/i.test(t)
+  }).catch(() => false)
+  if (istLogin || /\/login/i.test(page.url())) {
+    const hinweis = `${slug}: Sitzung abgelaufen, die Seite zeigt das Login`
+    if (alsJson) console.log(JSON.stringify({ sitzung_abgelaufen: true, lieferant: slug, url: page.url() }))
     else console.error(hinweis)
     await browser.close()
-    process.exit(3)
+    process.exit(2)
   }
 
   let treffer = typeof pb.trefferAusListe === "function" ? await pb.trefferAusListe(page).catch(() => []) : []
@@ -61,7 +92,11 @@ try {
     treffer = await page.evaluate(() => {
       const zeilen = document.body.innerText.replace(/\r/g, "").split("\n").map((z) => z.trim()).filter(Boolean)
       const istPreis = (z) => /^[\d.]+,\d{2}\s*€?$/.test(z)
-      const istNummer = (z) => /^[A-Z0-9][A-Z0-9.\-\/]{4,}$/i.test(z) && !istPreis(z)
+      // Eine Artikelnummer traegt immer Ziffern, und mindestens drei am
+      // Stueck. Ohne diese Schranke hielt der Textweg "WarenkorbPLUS" und
+      // "Bestellmatrix" aus der Navigation fuer Artikel.
+      const istNummer = (z) => /^[A-Z0-9][A-Z0-9.\-\/]{4,}$/i.test(z)
+        && /\d{3}/.test(z) && !istPreis(z)
       const zahl = (t) => (t ? Number(t.replace(/[^\d,]/g, "").replace(",", ".")) : null)
       const out = []
       for (let i = 0; i < zeilen.length && out.length < 40; i++) {
