@@ -246,17 +246,46 @@ function StundenZettel({ foto, nachkalkulationId, onAenderung }) {
   const zeilen = foto.stunden_gelesen?.zeilen || []
   const [rollen, setRollen] = useState(() =>
     Object.fromEntries(zeilen.map((z, i) => [i, z.rolle === 'techniker' ? 'techniker' : 'monteur'])))
+
+  // Ein Stundenzettel läuft oft über eine ganze Woche und führt mehrere
+  // Baustellen (Patrick, 02.10.2026). Die KI trägt je Zeile ein, was auf dem
+  // Blatt daneben steht, und bewertet die Zugehörigkeit — gefiltert wird hier,
+  // sichtbar und umkehrbar. Weggelassen hat sie nichts: wer filtert, ohne es zu
+  // zeigen, nimmt dem Menschen die Möglichkeit, einen Fehler zu bemerken.
+  const [dabei, setDabei] = useState(() =>
+    new Set(zeilen.map((z, i) => (z.gehoert_dazu === 'nein' ? null : i)).filter((i) => i !== null)))
+
   const [laeuft, setLaeuft] = useState(false)
   const [fehler, setFehler] = useState(null)
   const erledigt = Boolean(foto.stunden_gelesen?.gebucht_am) || foto.status === 'uebernommen'
 
-  const summeT = zeilen.reduce((s, z, i) => s + (rollen[i] === 'techniker' ? Number(z.stunden || 0) : 0), 0)
-  const summeM = zeilen.reduce((s, z, i) => s + (rollen[i] === 'monteur' ? Number(z.stunden || 0) : 0), 0)
+  const zaehlt = (i) => dabei.has(i)
+  const summeT = zeilen.reduce((s, z, i) => s + (zaehlt(i) && rollen[i] === 'techniker' ? Number(z.stunden || 0) : 0), 0)
+  const summeM = zeilen.reduce((s, z, i) => s + (zaehlt(i) && rollen[i] === 'monteur' ? Number(z.stunden || 0) : 0), 0)
+  const fremd = zeilen.filter((z, i) => !zaehlt(i))
+  const fremdStunden = fremd.reduce((s, z) => s + Number(z.stunden || 0), 0)
+
+  function umschalten(i) {
+    const neu = new Set(dabei)
+    if (neu.has(i)) neu.delete(i)
+    else neu.add(i)
+    setDabei(neu)
+  }
 
   async function uebernehmen() {
     setLaeuft(true); setFehler(null)
     try {
-      await uebernimmStunden(nachkalkulationId, foto.id, { techniker: summeT, monteur: summeM })
+      await uebernimmStunden(nachkalkulationId, foto.id, {
+        techniker: summeT,
+        monteur: summeM,
+        // Die Entscheidung wandert mit an die Zeilen: der Langtext der
+        // PDS-Position führt später nur die Tage auf, die auch gezählt wurden.
+        zeilen: zeilen.map((z, i) => ({
+          ...z,
+          rolle: rollen[i],
+          gebucht: zaehlt(i),
+        })),
+      })
       onAenderung?.()
     } catch (e) {
       setFehler(e.message)
@@ -271,45 +300,75 @@ function StundenZettel({ foto, nachkalkulationId, onAenderung }) {
 
   return (
     <Box mt={3} bg="white" borderWidth="1px" borderRadius="md" p={3}>
-      <HStack gap={2} mb={2}>
+      <HStack gap={2} mb={2} flexWrap="wrap">
         <Clock size={14} />
         <Text fontSize="sm" fontWeight="medium">
-          {zeilen.length} Einträge · {(summeT + summeM).toLocaleString('de-DE')} Stunden
+          {dabei.size} von {zeilen.length} Einträgen · {(summeT + summeM).toLocaleString('de-DE')} Stunden
         </Text>
+        {fremd.length > 0 && (
+          <Badge size="sm" colorPalette="gray" variant="subtle">
+            {fremd.length} andere Baustelle · {fremdStunden.toLocaleString('de-DE')} h
+          </Badge>
+        )}
         <Spacer />
         {!erledigt && (
-          <Button size="xs" colorPalette="blue" loading={laeuft} onClick={uebernehmen}>
+          <Button size="xs" colorPalette="blue" loading={laeuft} onClick={uebernehmen}
+            disabled={dabei.size === 0}>
             <Check size={12} /> Auf den Auftrag buchen
           </Button>
         )}
       </HStack>
 
       <Text fontSize="xs" color="fg.muted" mb={2}>
-        Die Rolle entscheidet über den Satz — 75 €/h für Techniker, 69 €/h für Monteur.
-        Steht sie nicht auf dem Zettel, ist hier Monteur vorbelegt.
+        Abgehakt zählt. Die Rolle entscheidet über den Satz — 75 €/h für Techniker, 69 €/h
+        für Monteur; steht sie nicht auf dem Zettel, ist Monteur vorbelegt.
       </Text>
 
       <VStack align="stretch" gap={1}>
-        {zeilen.map((z, i) => (
-          <HStack key={i} gap={2} fontSize="sm">
-            <Text minW="140px">{z.name || '—'}</Text>
-            <Text minW="90px" color="fg.muted">{z.datum || '—'}</Text>
-            <Text minW="60px" textAlign="right">{Number(z.stunden || 0).toLocaleString('de-DE')} h</Text>
-            {erledigt ? (
-              <Badge size="sm" variant="subtle">{rollen[i] === 'techniker' ? 'Techniker' : 'Monteur'}</Badge>
-            ) : (
-              <select value={rollen[i]} onChange={(e) => setRollen({ ...rollen, [i]: e.target.value })}
-                style={{ padding: '2px 6px', border: '1px solid #e2e8f0', borderRadius: 6 }}>
-                <option value="monteur">Monteur</option>
-                <option value="techniker">Techniker</option>
-              </select>
-            )}
-            {z.sicherheit != null && Number(z.sicherheit) < 0.8 && (
-              <Badge size="sm" colorPalette="orange" variant="subtle">unsicher</Badge>
-            )}
-          </HStack>
-        ))}
+        {zeilen.map((z, i) => {
+          const an = zaehlt(i)
+          return (
+            <HStack key={i} gap={2} fontSize="sm" opacity={an ? 1 : 0.55}>
+              {erledigt ? (
+                <Box w="14px">{z.gebucht === false ? '' : '·'}</Box>
+              ) : (
+                <input type="checkbox" checked={an} onChange={() => umschalten(i)} />
+              )}
+              <Text minW="130px">{z.name || '—'}</Text>
+              <Text minW="88px" color="fg.muted">{z.datum || '—'}</Text>
+              <Text minW="58px" textAlign="right">{Number(z.stunden || 0).toLocaleString('de-DE')} h</Text>
+              {erledigt ? (
+                <Badge size="sm" variant="subtle">{rollen[i] === 'techniker' ? 'Techniker' : 'Monteur'}</Badge>
+              ) : (
+                <select value={rollen[i]} onChange={(e) => setRollen({ ...rollen, [i]: e.target.value })}
+                  disabled={!an}
+                  style={{ padding: '2px 6px', border: '1px solid #e2e8f0', borderRadius: 6 }}>
+                  <option value="monteur">Monteur</option>
+                  <option value="techniker">Techniker</option>
+                </select>
+              )}
+              {z.baustelle && (
+                <Text fontSize="xs" color={z.gehoert_dazu === 'nein' ? 'orange.700' : 'fg.muted'} truncate maxW="170px">
+                  {z.baustelle}
+                </Text>
+              )}
+              {z.gehoert_dazu === 'unklar' && !z.baustelle && (
+                <Badge size="sm" colorPalette="orange" variant="subtle">ohne Baustelle</Badge>
+              )}
+              {z.sicherheit != null && Number(z.sicherheit) < 0.8 && (
+                <Badge size="sm" colorPalette="orange" variant="subtle">unsicher</Badge>
+              )}
+            </HStack>
+          )
+        })}
       </VStack>
+
+      {fremd.length > 0 && !erledigt && (
+        <Text fontSize="xs" color="fg.muted" mt={2}>
+          Die abgewählten Zeilen gehören zu einer anderen Baustelle und bleiben hier stehen,
+          damit du sie prüfen kannst. Gebucht wird nur, was abgehakt ist.
+        </Text>
+      )}
 
       <HStack gap={6} mt={3} pt={2} borderTopWidth="1px">
         <Text fontSize="sm">Techniker <b>{summeT.toLocaleString('de-DE')} h</b></Text>

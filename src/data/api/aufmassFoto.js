@@ -54,6 +54,20 @@ export async function leseAufmassFoto(fotoId) {
     .single()
   if (fErr) throw fErr
 
+  // Welche Baustelle gerade bearbeitet wird. Ein Stundenzettel läuft oft über
+  // eine ganze Woche und führt mehrere Baustellen — ohne diesen Hinweis wandern
+  // fremde Zeilen in die Nachkalkulation (Patrick, 02.10.2026, Fall Schmidt).
+  const { data: nk } = await supabase
+    .from('shop_nachkalkulation')
+    .select('bezeichnung, pds_vorgangs_nummer, baustelle_adresse')
+    .eq('id', foto.nachkalkulation_id)
+    .single()
+  const baustelleHinweis = [
+    nk?.bezeichnung,
+    nk?.baustelle_adresse,
+    nk?.pds_vorgangs_nummer && nk.pds_vorgangs_nummer !== '—' ? `Auftrag ${nk.pds_vorgangs_nummer}` : null,
+  ].filter(Boolean).join(' · ')
+
   await supabase.from('shop_aufmass_foto').update({ status: 'laeuft', fehler_text: null }).eq('id', fotoId)
 
   try {
@@ -77,7 +91,12 @@ export async function leseAufmassFoto(fotoId) {
       .join('\n')
 
     const { data: antwort, error: aiErr } = await supabase.functions.invoke('shop-ai', {
-      body: { task: 'extract_aufmass', bild_url: signed.signedUrl, artikel_hinweis: hinweis },
+      body: {
+        task: 'extract_aufmass',
+        bild_url: signed.signedUrl,
+        artikel_hinweis: hinweis,
+        baustelle_hinweis: baustelleHinweis,
+      },
     })
     if (aiErr) throw aiErr
     if (antwort?.error) throw new Error(antwort.error)
@@ -425,7 +444,7 @@ export async function uebernimmZeilen(nachkalkulationId, zeilen) {
 //
 // Addiert wird auf den vorhandenen Stand — ein Auftrag hat mehrere
 // Stundenzettel, und jeder bringt seinen Teil mit.
-export async function uebernimmStunden(nachkalkulationId, fotoId, { techniker = 0, monteur = 0 }) {
+export async function uebernimmStunden(nachkalkulationId, fotoId, { techniker = 0, monteur = 0, zeilen = null }) {
   const { data: nk, error: nErr } = await supabase
     .from('shop_nachkalkulation')
     .select('ist_stunden_techniker, ist_stunden_monteur')
@@ -458,7 +477,16 @@ export async function uebernimmStunden(nachkalkulationId, fotoId, { techniker = 
   // erledigt, das noch niemand angesehen hat.
   await supabase
     .from('shop_aufmass_foto')
-    .update({ stunden_gelesen: { ...(foto?.stunden_gelesen || {}), gebucht_am: new Date().toISOString() } })
+    .update({
+      stunden_gelesen: {
+        ...(foto?.stunden_gelesen || {}),
+        // Die Zeilen kommen mit der Rollen- und Baustellenentscheidung zurück.
+        // Beides steht nicht auf dem Blatt und ginge sonst verloren — und der
+        // Langtext in PDS führt später nur die Tage auf, die gezählt wurden.
+        ...(zeilen ? { zeilen } : {}),
+        gebucht_am: new Date().toISOString(),
+      },
+    })
     .eq('id', fotoId)
   await fotoStatusNachziehen(fotoId)
 

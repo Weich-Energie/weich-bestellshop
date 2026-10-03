@@ -147,7 +147,7 @@ async function analyzeBedarfBild(body: any) {
 // schrieben hat. Wer die gedruckte 1 uebernimmt, bekommt eine vollstaendig
 // aussehende und vollstaendig falsche Nachkalkulation.
 async function extractAufmass(body: any) {
-  const { bild_url, artikel_hinweis } = body
+  const { bild_url, artikel_hinweis, baustelle_hinweis } = body
   if (!bild_url) return json({ error: "bild_url fehlt" }, 400)
 
   const imgRes = await fetch(bild_url)
@@ -164,6 +164,25 @@ async function extractAufmass(body: any) {
   // Bekannte Artikelnummern mitgeben: abgegriffene Zettel und krakelige
   // Handschrift werden damit deutlich zuverlaessiger gelesen, weil das Modell
   // gegen eine echte Liste abgleichen kann statt zu raten.
+  // Welche Baustelle gerade bearbeitet wird. Ein Stundenzettel laeuft ueber
+  // eine ganze Woche und fuehrt mehrere Baustellen; ohne diesen Hinweis wandern
+  // fremde Zeilen in die Nachkalkulation (Patrick, 02.10.2026, Fall Schmidt).
+  //
+  // Das Modell entscheidet NICHT allein: es traegt je Zeile ein, was auf dem
+  // Blatt steht, und bewertet die Zugehoerigkeit mit ja, nein oder unklar.
+  // Weggelassen wird nichts - was gefiltert wurde, muss sichtbar bleiben, sonst
+  // merkt niemand, wenn die Zuordnung danebenliegt.
+  const baustelleRegel = typeof baustelle_hinweis === "string" && baustelle_hinweis.trim().length
+    ? `Du erfasst die Baustelle: ${baustelle_hinweis.trim()}
+` +
+      `Setze "gehoert_dazu" je Zeile: "ja", wenn die Baustelle neben der Zeile zu dieser ` +
+      `passt - Nachname, Ort oder Auftragsnummer genuegen, Schreibweisen duerfen abweichen. ` +
+      `"nein", wenn dort erkennbar eine ANDERE Baustelle steht. "unklar", wenn nichts ` +
+      `dabeisteht oder es sich nicht entscheiden laesst. Lass KEINE Zeile weg - auch die ` +
+      `fremden gehoeren in die Liste, nur eben mit "nein". Wer filtert, ohne es zu zeigen, ` +
+      `nimmt dem Menschen die Moeglichkeit, einen Fehler zu bemerken.`
+    : `Setze "gehoert_dazu" auf "unklar", solange keine Baustelle vorgegeben ist.`
+
   const hinweis = typeof artikel_hinweis === "string" && artikel_hinweis.length
     ? `\n\nBekannte Artikel aus dem Katalog (Nummer = Bezeichnung), nutze sie zum Abgleich:\n${artikel_hinweis.slice(0, 60000)}`
     : ""
@@ -193,10 +212,20 @@ async function extractAufmass(body: any) {
     `bedeutet Menge 1 bei Sicherheit 0.6. Durchgestrichene Zeilen gehoeren weg.\n` +
     `Meterware (Leitung, Kabel, Schlauch, Isolierung) wird in Metern notiert, auch ` +
     `wenn der Artikel eine Rolle ist. Uebernimm die Zahl wie sie dasteht, Einheit "m".\n\n` +
-    `--- BEI "stunden" ---\n` +
+    `--- BEI "stunden" ---
+` +
     `Je Eintrag Name, Datum und Stunden. "2 Mann 6 h" sind zwei Zeilen zu 6 Stunden. ` +
     `Pausen abziehen, wenn sie ausgewiesen sind. Die Rolle (techniker oder monteur) ` +
-    `nur setzen, wenn sie auf dem Blatt steht — sonst leer lassen und NICHT raten.\n\n` +
+    `nur setzen, wenn sie auf dem Blatt steht — sonst leer lassen und NICHT raten.
+` +
+    `WICHTIG: Ein Stundenzettel laeuft oft ueber eine ganze Woche und fuehrt MEHRERE ` +
+    `Baustellen. Schreibe zu jeder Zeile in "baustelle", was daneben steht — Kundenname, ` +
+    `Ort, Objekt oder Auftragsnummer, woertlich wie auf dem Blatt und nicht gedeutet. ` +
+    `Steht nichts dabei, lass das Feld leer. Gilt eine Ueberschrift fuer mehrere ` +
+    `darunterliegende Zeilen, trage sie bei jeder einzelnen ein.
+` +
+    `${baustelleRegel}
+` +
     `--- BEI "angebot" ---\n` +
     `Alle Warenpositionen mit Menge und Preisen, netto. KEINE Zeilen wie Zwischensumme, ` +
     `MwSt, Rabatt, Endbetrag. Steht nur ein Gesamtpreis je Zeile, rechne den Einzelpreis ` +
@@ -220,7 +249,12 @@ async function extractAufmass(body: any) {
     `    }\n` +
     `  ],\n` +
     `  "stunden_zeilen": [\n` +
-    `    { "name": "Nachname", "datum": "YYYY-MM-DD", "stunden": 8, "rolle": "", "sicherheit": 0.9 }\n` +
+    `    { "name": "Nachname", "datum": "YYYY-MM-DD", "stunden": 8, "rolle": "",
+` +
+    `      "baustelle": "was neben der Zeile steht, sonst leer",
+` +
+    `      "gehoert_dazu": "ja|nein|unklar", "sicherheit": 0.9 }
+` +
     `  ],\n` +
     `  "angebot_positionen": [\n` +
     `    { "bezeichnung": "...", "menge": 1, "einheit": "Stck",\n` +

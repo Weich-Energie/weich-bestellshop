@@ -536,7 +536,13 @@ Deno.serve(async (req: Request) => {
       // Blatt steckt nicht in der Summe - seine Zeilen hier aufzufuehren
       // hiesse, Stunden zu zeigen, die niemand berechnet.
       if (!g?.gebucht_am) continue
-      for (const z of g.zeilen ?? []) if (Number(z?.stunden) > 0) stdZeilen.push(z)
+      // gebucht === false heisst: die Zeile gehoert zu einer anderen
+      // Baustelle und wurde beim Buchen abgewaehlt. Sie steckt nicht in der
+      // Summe und hat im Langtext nichts verloren.
+      for (const z of g.zeilen ?? []) {
+        if (z?.gebucht === false) continue
+        if (Number(z?.stunden) > 0) stdZeilen.push(z)
+      }
     }
 
     // Steht kein Name auf dem Blatt, sagt das Material, wer da war: Elektro-
