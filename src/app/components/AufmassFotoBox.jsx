@@ -9,13 +9,14 @@
 // Zeilen ohne Artikel sind kein Fehler, sondern das Nebenprodukt: was hier
 // auftaucht, wurde verbaut und fehlt im Katalog der Aufmass-App.
 
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Box, Text, HStack, VStack, Button, Input, Table, Badge, Spinner, Flex, Spacer, IconButton,
 } from '@chakra-ui/react'
 import { Camera, ScanLine, Check, X, Trash2, ExternalLink, AlertTriangle, Clock, FileText, Search } from 'lucide-react'
 import LieferantSucheDialog from './LieferantSucheDialog.jsx'
+import { sortiereNachPassung } from './artikelPassung.js'
 import { listKategorien } from '../../data/api/kategorien.js'
 import { listLieferanten } from '../../data/api/lieferanten.js'
 import {
@@ -565,6 +566,16 @@ function Zeilen({ fotoId, nachkalkulationId, artikelListe, onAenderung }) {
 function Zeile({ z, artikelListe, kategorien, lieferanten, onUebernehmen, onAenderung }) {
   const [menge, setMenge] = useState(z.roh_menge ?? '')
   const [suchtImShop, setSuchtImShop] = useState(false)
+  const [suche, setSuche] = useState('')
+
+  // Erst nach Passung zur gelesenen Zeile sortieren, dann nach dem Suchfeld
+  // filtern. Die Reihenfolge ist wichtig: wer tippt, will unter seinen
+  // Treffern wieder den passendsten zuerst sehen.
+  const { vorschlaege, rest } = useMemo(() => {
+    const s = suche.trim().toLowerCase()
+    const passt = (a) => !s || `${a.name} ${a.artikelnr ?? ''}`.toLowerCase().includes(s)
+    return sortiereNachPassung(z, artikelListe.filter(passt))
+  }, [z, artikelListe, suche])
   const erledigt = z.status !== 'offen'
   const unsicher = z.sicherheit != null && Number(z.sicherheit) < 0.8
 
@@ -599,15 +610,30 @@ function Zeile({ z, artikelListe, kategorien, lieferanten, onUebernehmen, onAend
           <Text fontSize="sm">{z.artikel?.name || <Text as="span" color="fg.muted">als Freitext</Text>}</Text>
         ) : (
           <VStack align="stretch" gap={1}>
+            {/* Nach Passung sortiert statt alphabetisch: bei
+                "Kondensatpumpe" stand sonst ein Fitting obenan, und die
+                Zuordnung wurde zur Sucharbeit. Das Suchfeld bleibt, weil
+                500 Artikel auch sortiert zu viele fuer ein Aufklappfeld sind. */}
+            <Input size="xs" maxW="280px" placeholder="Artikel suchen…" value={suche}
+              onChange={(e) => setSuche(e.target.value)} />
             <select
               value={z.artikel_id || ''}
               onChange={(e) => artikelSetzen(e.target.value)}
               style={{ padding: '4px 8px', border: '1px solid #e2e8f0', borderRadius: 6, maxWidth: 280 }}
             >
               <option value="">— kein Artikel, als Freitext —</option>
-              {artikelListe.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
+              {vorschlaege.length > 0 && (
+                <optgroup label={`Passt zu „${(z.roh_bezeichnung || z.roh_artikelnr || '').slice(0, 30)}“`}>
+                  {vorschlaege.map(({ artikel: a }) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label={vorschlaege.length ? 'Alle anderen' : 'Alle Artikel'}>
+                {rest.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </optgroup>
             </select>
             {!z.artikel_id && (
               <VStack align="start" gap={0.5}>
