@@ -47,7 +47,8 @@ function extractJson(text: string): any | null {
   try { return JSON.parse(candidate) } catch { return null }
 }
 
-async function callClaude(model: string, systemPrompt: string, messages: any[], maxTokens = 1024) {
+// systemPrompt: Text oder Bloecke (fuer Prompt-Caching mit cache_control).
+async function callClaude(model: string, systemPrompt: string | any[], messages: any[], maxTokens = 1024) {
   const ak = Deno.env.get("ANTHROPIC_API_KEY")
   if (!ak) throw new Error("ANTHROPIC_API_KEY fehlt")
   const resp = await fetch(API_URL, {
@@ -224,7 +225,7 @@ async function extractAufmass(body: any) {
     `Steht nichts dabei, lass das Feld leer. Gilt eine Ueberschrift fuer mehrere ` +
     `darunterliegende Zeilen, trage sie bei jeder einzelnen ein.
 ` +
-    `${baustelleRegel}
+    `Wie du "gehoert_dazu" setzt, steht ganz am Ende unter BAUSTELLE.
 ` +
     `--- BEI "angebot" ---\n` +
     `Alle Warenpositionen mit Menge und Preisen, netto. KEINE Zeilen wie Zwischensumme, ` +
@@ -275,7 +276,16 @@ async function extractAufmass(body: any) {
     { type: "text", text: "Bestimme die Blattart und lies das Blatt aus." },
   ]
 
-  const text = await callClaude(MODEL_VISION, systemPrompt, [{ role: "user", content: userContent }], 8000)
+  // Prompt-Caching (04.10.2026): Anleitung + Artikelkatalog (bis 60.000
+  // Zeichen) sind fuer jedes Blatt gleich und tragen den Cache-Marker; die
+  // Baustellen-Regel wechselt und steht deshalb als eigener Block dahinter.
+  // Fotografiert der Monteur mehrere Blaetter hintereinander, kommt der
+  // Katalog ab dem zweiten aus dem Cache.
+  const systemBloecke = [
+    { type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } },
+    { type: "text", text: `BAUSTELLE:\n${baustelleRegel}` },
+  ]
+  const text = await callClaude(MODEL_VISION, systemBloecke, [{ role: "user", content: userContent }], 8000)
   const parsed = extractJson(text)
   if (!parsed) return json({ error: "KI-Antwort nicht parsebar", raw: text }, 502)
   return json({ result: parsed })

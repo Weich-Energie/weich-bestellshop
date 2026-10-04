@@ -262,7 +262,10 @@ async function alleArtikel() {
     .from('shop_artikel')
     .select('id, artikelnr, name, einheit, preis_netto, nachkalkulation_klima')
     .eq('aktiv', true)
+    // id als zweiter Schluessel: gleiche Namen kommen sonst in wechselnder
+    // Reihenfolge, und der Katalog-Text fuer shop-ai verfehlt den Prompt-Cache.
     .order('name')
+    .order('id')
   if (error) throw error
   return data || []
 }
@@ -276,6 +279,8 @@ async function gutBruecke() {
     .from('shop_gut_rf_zuordnung')
     .select('gut_artikelnummer, rf_artikelnummer')
     .eq('entscheidung', 'zugeordnet')
+    // feste Reihenfolge: bei mehreren GUT-Nummern je R+F-Artikel gewinnt immer dieselbe
+    .order('gut_artikelnummer')
   if (error) return new Map()
   const m = new Map()
   for (const z of data || []) {
