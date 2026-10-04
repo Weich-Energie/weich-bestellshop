@@ -263,6 +263,7 @@ async function alleArtikel() {
     .select('id, artikelnr, name, einheit, preis_netto, nachkalkulation_klima')
     .eq('aktiv', true)
     .order('name')
+    .order('id') // feste Reihenfolge, sonst wechselt die Liste und der KI-Cache greift nicht
   if (error) throw error
   return data || []
 }
@@ -276,6 +277,7 @@ async function gutBruecke() {
     .from('shop_gut_rf_zuordnung')
     .select('gut_artikelnummer, rf_artikelnummer')
     .eq('entscheidung', 'zugeordnet')
+    .order('gut_artikelnummer') // feste Reihenfolge, siehe alleArtikel
   if (error) return new Map()
   const m = new Map()
   for (const z of data || []) {

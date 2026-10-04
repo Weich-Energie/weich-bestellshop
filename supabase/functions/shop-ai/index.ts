@@ -47,7 +47,19 @@ function extractJson(text: string): any | null {
   try { return JSON.parse(candidate) } catch { return null }
 }
 
-async function callClaude(model: string, systemPrompt: string, messages: any[], maxTokens = 1024) {
+// Prompt-Caching: der System-Prompt bekommt einen Cache-Marker. Bleibt er
+// innerhalb von 5 Minuten byte-gleich, zahlt der naechste Aufruf dafuer nur ein
+// Zehntel. Lohnt vor allem bei extract_aufmass (Artikelliste, ~15-20k Tokens,
+// mehrere Zettel je Baustelle hintereinander). Unter 1024 Tokens cached die API
+// stillschweigend nicht - kostet dann aber auch nichts extra.
+// `systemRest` steht HINTER dem Marker: dorthin gehoert, was je Aufruf wechselt.
+async function callClaude(
+  model: string,
+  systemPrompt: string,
+  messages: any[],
+  maxTokens = 1024,
+  systemRest = "",
+) {
   const ak = Deno.env.get("ANTHROPIC_API_KEY")
   if (!ak) throw new Error("ANTHROPIC_API_KEY fehlt")
   const resp = await fetch(API_URL, {
@@ -60,7 +72,10 @@ async function callClaude(model: string, systemPrompt: string, messages: any[], 
     body: JSON.stringify({
       model,
       max_tokens: maxTokens,
-      system: systemPrompt,
+      system: [
+        { type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } },
+        ...(systemRest ? [{ type: "text", text: systemRest }] : []),
+      ],
       messages,
     }),
   })
@@ -69,6 +84,9 @@ async function callClaude(model: string, systemPrompt: string, messages: any[], 
     throw new Error(`Anthropic API ${resp.status}: ${et}`)
   }
   const r = await resp.json()
+  // Im Function-Log pruefbar: cache_read > 0 heisst, der Cache hat gegriffen.
+  const u = r.usage || {}
+  console.log(`[shop-ai] ${model} input=${u.input_tokens} cache_write=${u.cache_creation_input_tokens || 0} cache_read=${u.cache_read_input_tokens || 0} output=${u.output_tokens}`)
   const text = r.content?.filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n") || ""
   return text
 }
@@ -173,7 +191,7 @@ async function extractAufmass(body: any) {
   // Weggelassen wird nichts - was gefiltert wurde, muss sichtbar bleiben, sonst
   // merkt niemand, wenn die Zuordnung danebenliegt.
   const baustelleRegel = typeof baustelle_hinweis === "string" && baustelle_hinweis.trim().length
-    ? `Du erfasst die Baustelle: ${baustelle_hinweis.trim()}
+    ? `--- BAUSTELLE ---\nDu erfasst die Baustelle: ${baustelle_hinweis.trim()}
 ` +
       `Setze "gehoert_dazu" je Zeile: "ja", wenn die Baustelle neben der Zeile zu dieser ` +
       `passt - Nachname, Ort oder Auftragsnummer genuegen, Schreibweisen duerfen abweichen. ` +
@@ -181,7 +199,7 @@ async function extractAufmass(body: any) {
       `dabeisteht oder es sich nicht entscheiden laesst. Lass KEINE Zeile weg - auch die ` +
       `fremden gehoeren in die Liste, nur eben mit "nein". Wer filtert, ohne es zu zeigen, ` +
       `nimmt dem Menschen die Moeglichkeit, einen Fehler zu bemerken.`
-    : `Setze "gehoert_dazu" auf "unklar", solange keine Baustelle vorgegeben ist.`
+    : `--- BAUSTELLE ---\nSetze "gehoert_dazu" auf "unklar", solange keine Baustelle vorgegeben ist.`
 
   const hinweis = typeof artikel_hinweis === "string" && artikel_hinweis.length
     ? `\n\nBekannte Artikel aus dem Katalog (Nummer = Bezeichnung), nutze sie zum Abgleich:\n${artikel_hinweis.slice(0, 60000)}`
@@ -224,7 +242,7 @@ async function extractAufmass(body: any) {
     `Steht nichts dabei, lass das Feld leer. Gilt eine Ueberschrift fuer mehrere ` +
     `darunterliegende Zeilen, trage sie bei jeder einzelnen ein.
 ` +
-    `${baustelleRegel}
+    `Wie "gehoert_dazu" zu setzen ist, steht ganz am Ende unter BAUSTELLE.
 ` +
     `--- BEI "angebot" ---\n` +
     `Alle Warenpositionen mit Menge und Preisen, netto. KEINE Zeilen wie Zwischensumme, ` +
@@ -275,7 +293,9 @@ async function extractAufmass(body: any) {
     { type: "text", text: "Bestimme die Blattart und lies das Blatt aus." },
   ]
 
-  const text = await callClaude(MODEL_VISION, systemPrompt, [{ role: "user", content: userContent }], 8000)
+  // Anweisungen + Artikelliste sind fuer alle Zettel gleich und werden gecacht;
+  // die Baustelle wechselt und steht deshalb dahinter.
+  const text = await callClaude(MODEL_VISION, systemPrompt, [{ role: "user", content: userContent }], 8000, baustelleRegel)
   const parsed = extractJson(text)
   if (!parsed) return json({ error: "KI-Antwort nicht parsebar", raw: text }, 502)
   return json({ result: parsed })
