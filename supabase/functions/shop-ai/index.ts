@@ -12,6 +12,14 @@ import { createClient } from "jsr:@supabase/supabase-js@2"
 
 const API_URL = "https://api.anthropic.com/v1/messages"
 
+// Zugang (13.10.2026, Patrick Frage 36): Ein Login allein reicht nicht -- die
+// Anmeldung teilen sich alle Apps, und die Selbstregistrierung ist offen. Wer
+// Claude auf Firmenkosten aufruft, braucht app_access.bestellshop (alle Aufrufer
+// liegen im Shop: Katalog, Bedarf, Import, Nachkalkulation, Zettel hochladen).
+// Fail-closed: fehlt der Eintrag oder ist er nicht true, kommt 403.
+// Mitarbeiter ueber employees.auth_uuid (eindeutiger Index), nicht per E-Mail.
+const APP_KEY = "bestellshop"
+
 const CORS_HEADERS = {
   "Content-Type": "application/json",
   "Access-Control-Allow-Origin": "*",
@@ -502,6 +510,19 @@ Deno.serve(async (req: Request) => {
     )
     const { data: userData, error: authErr } = await sb.auth.getUser(token)
     if (authErr || !userData?.user) return json({ error: "Ungueltige Session" }, 401)
+
+    const { data: profil, error: profilFehler } = await sb
+      .from("employees")
+      .select("berechtigungen, aktiv")
+      .eq("auth_uuid", userData.user.id)
+      .maybeSingle()
+    if (profilFehler) {
+      console.error("shop-ai: Berechtigung nicht lesbar:", profilFehler.message)
+      return json({ error: "Berechtigung konnte nicht geprueft werden. Bitte gleich noch einmal." }, 503)
+    }
+    if ((profil?.berechtigungen as any)?.app_access?.[APP_KEY] !== true || profil?.aktiv === false) {
+      return json({ error: "Keine Berechtigung fuer die KI-Funktionen des Bestellshops." }, 403)
+    }
 
     const body = await req.json()
     const task = body?.task
