@@ -233,6 +233,13 @@ Deno.serve(async (req: Request) => {
       return { ok: r.ok, status: r.status, daten, text }
     }
 
+    if (!nk.pds_vorgang_uuid) {
+      return json({
+        error: "Diese Nachkalkulation ist mit keinem PDS-Auftrag verknüpft (z. B. aus Foto/Zettel angelegt). " +
+          "Erst den Auftrag zuordnen, dann übertragen.",
+      }, 409)
+    }
+
     const det = await pdsRoh("/vorgang/details", { uuid: nk.pds_vorgang_uuid, vorgangstyp: "AUFTRAG" })
     if (!det.ok || !det.daten?.uuid) {
       return json({ error: `Auftrag ${nk.pds_vorgangs_nummer} ist in PDS nicht mehr auffindbar (${det.status}).` }, 404)

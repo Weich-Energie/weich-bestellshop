@@ -629,12 +629,14 @@ function MaterialBlock({ nk, onGeaendert }) {
         <Box>
           <Text fontWeight="bold" fontSize="sm">Nach PDS übertragen</Text>
           <Text fontSize="xs" color="fg.muted">
-            Platzhalter der Ebene „Montagematerial" in {nk.pds_vorgangs_nummer} bekommen ihre Menge direkt.
-            Material ohne Platzhalter geht als Transportangebot zum Kopieren im Client.
+            {nk.pds_vorgang_uuid
+              ? <>Platzhalter der Ebene „Montagematerial" in {nk.pds_vorgangs_nummer} bekommen ihre Menge direkt.
+                Material ohne Platzhalter geht als Transportangebot zum Kopieren im Client.</>
+              : 'Diese Nachkalkulation hat noch keinen PDS-Auftrag — Übertragen ist erst nach der Zuordnung möglich.'}
           </Text>
         </Box>
         <Spacer />
-        <Button size="sm" variant="outline" onClick={handleVorschau} loading={laedt} disabled={offen === 0}>
+        <Button size="sm" variant="outline" onClick={handleVorschau} loading={laedt} disabled={offen === 0 || !nk.pds_vorgang_uuid}>
           <Eye size={14} /> Vorschau {offen > 0 ? `(${offen} offen)` : ''}
         </Button>
       </Flex>
