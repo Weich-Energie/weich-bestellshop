@@ -8,7 +8,7 @@ import {
   Search, Download, Trash2, Plus, ArrowLeft, TrendingDown, TrendingUp, Eye, Send, RotateCcw, FileText,
 } from 'lucide-react'
 import {
-  sucheAuftraege, importiereSoll, materialVorschau, mengenSetzen, transportAnlegen, materialZuruecksetzen,
+  sucheAuftraege, importiereSoll, auftragZuordnen, materialVorschau, mengenSetzen, transportAnlegen, materialZuruecksetzen,
 } from '../../data/api/pdsSync.js'
 import {
   listNachkalkulationen, addPosition, deletePosition, setStatus, KALKULATIONSARTEN,
@@ -545,6 +545,80 @@ function KalkuliertePositionen({ soll }) {
   )
 }
 
+// ─── Auftrag zuordnen (Nachkalkulation aus Foto/Zettel ohne PDS-Auftrag) ───
+// Sucht wie "Auftrag aus PDS holen", importiert aber nichts: es wird nur die
+// Verknüpfung gesetzt. Danach geht "Nach PDS übertragen".
+function AuftragZuordnen({ nk, onGeaendert }) {
+  const [suchwort, setSuchwort] = useState(String(nk.bezeichnung || '').split(/[\s,:]+/)[0] || '')
+  const [treffer, setTreffer] = useState(null)
+  const [suchend, setSuchend] = useState(false)
+  const [setzt, setSetzt] = useState(null)
+  const [fehler, setFehler] = useState(null)
+
+  async function suchen() {
+    if (!suchwort.trim()) return
+    setSuchend(true); setFehler(null)
+    try {
+      setTreffer(await sucheAuftraege(suchwort.trim()))
+    } catch (e) {
+      setFehler(e.message)
+    } finally {
+      setSuchend(false)
+    }
+  }
+
+  async function zuordnen(a) {
+    if (!window.confirm(`„${nk.bezeichnung}" dem Auftrag ${a.vorgangs_nummer} (${a.bezeichnung}) zuordnen?
+
+Es wird nichts nach PDS gesendet.`)) return
+    setSetzt(a.vorgang_uuid); setFehler(null)
+    try {
+      await auftragZuordnen(nk.id, a.vorgang_uuid)
+      onGeaendert()
+    } catch (e) {
+      setFehler(e.message)
+    } finally {
+      setSetzt(null)
+    }
+  }
+
+  return (
+    <Box mt={3}>
+      <HStack gap={2} flexWrap="wrap">
+        <HStack borderWidth="1px" borderRadius="md" px={2} bg="gray.50">
+          <Search size={14} />
+          <Input variant="flushed" size="sm" value={suchwort} border="none" maxW="240px" placeholder="Kundenname oder Auftragsnummer"
+            onChange={(e) => setSuchwort(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && suchen()} />
+        </HStack>
+        <Button size="sm" onClick={suchen} loading={suchend}>PDS-Auftrag suchen</Button>
+      </HStack>
+      {fehler && <Text fontSize="sm" color="red.600" mt={2}>{fehler}</Text>}
+      {treffer && (
+        <Box mt={2} overflowX="auto" maxH="260px" overflowY="auto">
+          {treffer.auftraege.length === 0 && <Text fontSize="sm" color="fg.muted">Kein Auftrag gefunden.</Text>}
+          <Table.Root variant="line" size="sm" minW="560px">
+            <Table.Body>
+              {treffer.auftraege.map((a) => (
+                <Table.Row key={a.vorgang_uuid}>
+                  <Table.Cell><Text fontSize="sm" fontWeight="medium">{a.vorgangs_nummer}</Text></Table.Cell>
+                  <Table.Cell><Text fontSize="sm">{a.bezeichnung}</Text></Table.Cell>
+                  <Table.Cell><Badge size="sm" variant="subtle">{a.status || '—'}</Badge></Table.Cell>
+                  <Table.Cell textAlign="right">
+                    {a.nachkalkulation
+                      ? <Text fontSize="xs" color="fg.muted">schon vergeben</Text>
+                      : <Button size="xs" variant="outline" onClick={() => zuordnen(a)} loading={setzt === a.vorgang_uuid}>Zuordnen</Button>}
+                  </Table.Cell>
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </Table.Root>
+        </Box>
+      )}
+    </Box>
+  )
+}
+
 // ─── Nach PDS: Mengen setzen oder Transportangebot ─────────────────────────
 // ADR 0007. Die Vorschau teilt die offenen Positionen in zwei Gruppen:
 //   mengen    — Platzhalter im Auftrag vorhanden, Menge wird per API gesetzt
@@ -632,14 +706,18 @@ function MaterialBlock({ nk, onGeaendert }) {
             {nk.pds_vorgang_uuid
               ? <>Platzhalter der Ebene „Montagematerial" in {nk.pds_vorgangs_nummer} bekommen ihre Menge direkt.
                 Material ohne Platzhalter geht als Transportangebot zum Kopieren im Client.</>
-              : 'Diese Nachkalkulation hat noch keinen PDS-Auftrag — Übertragen ist erst nach der Zuordnung möglich.'}
+              : 'Diese Nachkalkulation hat noch keinen PDS-Auftrag. Unten den Auftrag suchen und zuordnen, dann ist das Übertragen möglich.'}
           </Text>
         </Box>
         <Spacer />
-        <Button size="sm" variant="outline" onClick={handleVorschau} loading={laedt} disabled={offen === 0 || !nk.pds_vorgang_uuid}>
-          <Eye size={14} /> Vorschau {offen > 0 ? `(${offen} offen)` : ''}
-        </Button>
+        {nk.pds_vorgang_uuid && (
+          <Button size="sm" variant="outline" onClick={handleVorschau} loading={laedt} disabled={offen === 0}>
+            <Eye size={14} /> Vorschau {offen > 0 ? `(${offen} offen)` : ''}
+          </Button>
+        )}
       </Flex>
+
+      {!nk.pds_vorgang_uuid && <AuftragZuordnen nk={nk} onGeaendert={onGeaendert} />}
 
       {antwort?.status === 'mengen_gesetzt' && (
         <Box mt={3} borderWidth="1px" borderRadius="md" p={3} bg="green.50" borderColor="green.200">

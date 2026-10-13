@@ -200,7 +200,7 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    const bekannt = new Set(["vorschau", "mengen_setzen", "transport_anlegen"])
+    const bekannt = new Set(["vorschau", "mengen_setzen", "transport_anlegen", "zuordnen"])
     if (!bekannt.has(aktion)) {
       return json({ error: 'aktion muss "vorschau", "mengen_setzen", "transport_anlegen" oder "zuruecksetzen" sein' }, 400)
     }
@@ -231,6 +231,42 @@ Deno.serve(async (req: Request) => {
       let daten: any = null
       try { daten = text ? JSON.parse(text) : null } catch { daten = null }
       return { ok: r.ok, status: r.status, daten, text }
+    }
+
+    // ─── Auftrag zuordnen ──────────────────────────────────────────────────
+    // Für Nachkalkulationen ohne Auftrag (Foto/Zettel). Setzt nur die
+    // Verknüpfung; nichts geht nach PDS. Ein Auftrag gehört höchstens einer
+    // Nachkalkulation, und eine bereits verknüpfte wird nie überschrieben.
+    if (aktion === "zuordnen") {
+      const vorgangUuid = String(body?.vorgang_uuid ?? "").trim()
+      if (!vorgangUuid) return json({ error: "vorgang_uuid fehlt" }, 400)
+      if (nk.pds_vorgang_uuid) return json({ error: "Diese Nachkalkulation hat schon einen PDS-Auftrag." }, 409)
+
+      const { data: belegt } = await sb
+        .from("shop_nachkalkulation")
+        .select("id, bezeichnung")
+        .eq("pds_vorgang_uuid", vorgangUuid)
+        .maybeSingle()
+      if (belegt) return json({ error: `Dieser Auftrag gehört schon zu „${belegt.bezeichnung}".` }, 409)
+
+      const d = await pdsRoh("/vorgang/details", { uuid: vorgangUuid, vorgangstyp: "AUFTRAG" })
+      if (!d.ok || !d.daten?.uuid) {
+        return json({ error: `Auftrag in PDS nicht gefunden (${d.status}).` }, 404)
+      }
+      const nummer = String(d.daten.vorgangsNummer ?? "")
+      if (/-N\d+$/.test(nummer)) return json({ error: "Auf einen Nachtrag kann nicht zugeordnet werden." }, 400)
+
+      const { error: upErr } = await sb
+        .from("shop_nachkalkulation")
+        .update({
+          pds_vorgang_uuid: d.daten.uuid,
+          pds_vorgangs_nummer: nummer,
+          pds_projektakte_uuid: d.daten.projektakteUUID ?? null,
+        })
+        .eq("id", nkId)
+        .is("pds_vorgang_uuid", null)
+      if (upErr) return json({ error: upErr.message }, 500)
+      return json({ status: "zugeordnet", vorgangs_nummer: nummer })
     }
 
     if (!nk.pds_vorgang_uuid) {

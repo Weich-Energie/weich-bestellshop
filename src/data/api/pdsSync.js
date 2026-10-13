@@ -158,3 +158,11 @@ export async function transportAnlegen(nachkalkulationId) {
 export async function materialZuruecksetzen(nachkalkulationId) {
   return invoke('pds-auftrag-material', { aktion: 'zuruecksetzen', nachkalkulation_id: nachkalkulationId })
 }
+
+// Verknuepft eine Nachkalkulation ohne Auftrag (Foto/Zettel) mit einem PDS-Auftrag.
+// Sendet nichts nach PDS.
+export async function auftragZuordnen(nachkalkulationId, vorgangUuid) {
+  return invoke('pds-auftrag-material', {
+    aktion: 'zuordnen', nachkalkulation_id: nachkalkulationId, vorgang_uuid: vorgangUuid,
+  })
+}
